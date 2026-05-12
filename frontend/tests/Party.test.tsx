@@ -18,16 +18,26 @@ const partyResponse = {
     {
       id: 'dance',
       label: 'DANCE',
-      x: 25,
-      y: 25,
-      width: 40,
+      x: 6,
+      y: 8,
+      width: 34,
       height: 36,
-      color: 'rgba(255,107,157,0.25)',
-      labelColor: '#8b1a4a',
+      color: '#ff6b9d',
+      labelColor: '#ffffff',
+      borderColor: '#8b1a4a',
     },
   ],
   music: { url: null, label: 'Music coming soon' },
   worldSize: { width: 800, height: 500 },
+  room: {
+    clipPath: null,
+    border: '6px solid #8b6f47',
+    borderRadius: 12,
+    walls: [
+      { x: 50, y: 0, width: 0.75, height: 30, color: '#8b6f47' },
+      { x: 75, y: 40, width: 25, height: 1.2, color: '#8b6f47' },
+    ],
+  },
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -53,7 +63,7 @@ describe('Party', () => {
     localStorage.clear();
   });
 
-  it('renders party space, zones, avatar, and music placeholder', async () => {
+  it('renders party space, zones, avatar, walls, and music placeholder', async () => {
     render(
       <MemoryRouter initialEntries={['/party/cream-terrazzo']}>
         <Routes>
@@ -65,6 +75,8 @@ describe('Party', () => {
     expect(await screen.findByLabelText('zone-dance')).toBeInTheDocument();
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText(/music coming soon/i)).toBeInTheDocument();
+    // Both wall stubs from the mock render.
+    expect(screen.getAllByTestId('wall')).toHaveLength(2);
   });
 
   it('redirects to /lobby when slug is unknown', async () => {
