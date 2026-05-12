@@ -29,6 +29,27 @@ describe('SignIn', () => {
     vi.restoreAllMocks();
   });
 
+  it('redirects to /lobby if a valid session already exists', async () => {
+    localStorage.setItem('session_id', 'sid-1');
+    renderSignIn();
+    expect(await screen.findByText(/lobby page/i)).toBeInTheDocument();
+  });
+
+  it('clears stale session_id and stays on sign-in when session 404s', async () => {
+    localStorage.setItem('session_id', 'stale-id');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ detail: 'not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    renderSignIn();
+    // Form is still rendered; not redirected to lobby.
+    expect(await screen.findByRole('button', { name: /enter/i })).toBeDisabled();
+    // Stale id should have been cleared.
+    expect(localStorage.getItem('session_id')).toBeNull();
+  });
+
   it('disables submit until input is valid', async () => {
     renderSignIn();
     const button = screen.getByRole('button', { name: /enter/i });

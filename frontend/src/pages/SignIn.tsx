@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ApiError, apiPost } from '../api/client';
+import { ApiError, apiGet, apiPost } from '../api/client';
 import type { User } from '../api/types';
 import { ALLOWED_COLORS, USERNAME_REGEX } from '../constants';
-import { setStoredSessionId } from '../hooks/useSession';
+import {
+  clearStoredSessionId,
+  getStoredSessionId,
+  setStoredSessionId,
+} from '../hooks/useSession';
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -11,6 +15,18 @@ export default function SignIn() {
   const [color, setColor] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const id = getStoredSessionId();
+    if (!id) return;
+    apiGet<User>(`/api/session/${id}`)
+      .then(() => navigate('/lobby', { replace: true }))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          clearStoredSessionId();
+        }
+      });
+  }, [navigate]);
 
   const usernameTouched = username.length > 0;
   const usernameValid = USERNAME_REGEX.test(username);
