@@ -15,6 +15,7 @@ export default function SignIn() {
   const [color, setColor] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     const id = getStoredSessionId();
@@ -167,6 +168,8 @@ export default function SignIn() {
         <button
           type="submit"
           disabled={!canSubmit}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
           style={{
             marginTop: 24,
             width: '100%',
@@ -178,7 +181,12 @@ export default function SignIn() {
             fontSize: 16,
             fontWeight: 600,
             cursor: canSubmit ? 'pointer' : 'not-allowed',
-            boxShadow: canSubmit ? '0 4px 10px rgba(255,107,157,0.30)' : 'none',
+            transform: canSubmit && hovered ? 'translateY(-1px)' : 'translateY(0)',
+            boxShadow: canSubmit
+              ? hovered
+                ? '0 6px 14px rgba(255,107,157,0.40)'
+                : '0 4px 10px rgba(255,107,157,0.30)'
+              : 'none',
             transition: 'transform 120ms ease, box-shadow 120ms ease',
           }}
         >
