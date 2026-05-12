@@ -133,3 +133,49 @@ def chat(
     except ChatValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"cursor": world.cursor}
+
+
+def _room_view(party) -> dict:
+    return {
+        "slug": party.slug,
+        "name": party.name,
+        "worldSize": {
+            "width": party.worldSize.width,
+            "height": party.worldSize.height,
+        },
+        "zones": [
+            {
+                "id": z.id,
+                "label": z.label,
+                "x": z.x,
+                "y": z.y,
+                "width": z.width,
+                "height": z.height,
+            }
+            for z in party.zones
+        ],
+        "walls": [
+            {"x": w.x, "y": w.y, "width": w.width, "height": w.height}
+            for w in party.room.walls
+        ],
+        "music": party.music.label,
+    }
+
+
+@router.get("/{slug}/observe")
+def observe(
+    slug: str = Path(pattern=_SLUG_PATTERN),
+    since: int | None = None,
+    store: Store = Depends(_store_dep),
+) -> dict:
+    world = _world(store, slug)
+    party = store.get_party(slug)
+    assert party is not None
+    if since is None:
+        snap = world.snapshot()
+        return {
+            "room": _room_view(party),
+            "participants": snap["participants"],
+            "cursor": snap["cursor"],
+        }
+    return world.observe_since(since)
