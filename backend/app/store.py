@@ -1,13 +1,17 @@
 import uuid
 
+from app.events import Agent
 from app.models import PartyConfig, User
 from app.parties_data import PARTY_REGISTRY
+from app.world import PartyWorld
 
 
 class Store:
     def __init__(self) -> None:
         self._sessions: dict[str, User] = {}
         self._parties: dict[str, PartyConfig] = dict(PARTY_REGISTRY)
+        self._agents: dict[str, Agent] = {}
+        self._worlds: dict[str, PartyWorld] = {}
 
     def create_session(self, username: str, color: str) -> User:
         session_id = uuid.uuid4().hex
@@ -26,3 +30,22 @@ class Store:
 
     def get_party(self, slug: str) -> PartyConfig | None:
         return self._parties.get(slug)
+
+    def register_agent(self, username: str, color: str) -> Agent:
+        agent = Agent(agent_id=uuid.uuid4().hex, username=username, color=color)
+        self._agents[agent.agent_id] = agent
+        return agent
+
+    def get_agent(self, agent_id: str) -> Agent | None:
+        return self._agents.get(agent_id)
+
+    def delete_agent(self, agent_id: str) -> bool:
+        return self._agents.pop(agent_id, None) is not None
+
+    def get_or_create_world(self, slug: str) -> PartyWorld | None:
+        party = self._parties.get(slug)
+        if party is None:
+            return None
+        if slug not in self._worlds:
+            self._worlds[slug] = PartyWorld(party)
+        return self._worlds[slug]
