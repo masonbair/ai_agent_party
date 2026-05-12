@@ -111,4 +111,50 @@ describe('useMovement', () => {
     expect(result.current.target).toBeNull();
     expect(result.current.position.x).toBeLessThanOrEqual(xAfterClickStart + 1);
   });
+
+  it('does not enter a wall when WASD pushes into it', () => {
+    const raf = setupRaf();
+    // Wall covers x>=50% (i.e. logical x>=400) of an 800x500 world.
+    const walls = [{ x: 50, y: 0, width: 50, height: 100, color: '#000' }];
+    const { result } = renderHook(() =>
+      useMovement({
+        worldWidth: 800,
+        worldHeight: 500,
+        speed: 1000,
+        walls,
+        start: { x: 100, y: 250 },
+      }),
+    );
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }));
+      raf.tick(40);
+    });
+    // Avatar (radius 14) should not enter the wall: x must stay < 400 - 14 = 386.
+    expect(result.current.position.x).toBeLessThanOrEqual(386);
+  });
+
+  it('slides along a wall when clicking past it', () => {
+    const raf = setupRaf();
+    // Vertical wall stub at x=50% (400 in logical), height 60% (300), from y=0 to y=300.
+    const walls = [{ x: 50, y: 0, width: 1, height: 60, color: '#000' }];
+    const { result } = renderHook(() =>
+      useMovement({
+        worldWidth: 800,
+        worldHeight: 500,
+        speed: 400,
+        walls,
+        start: { x: 200, y: 100 },
+      }),
+    );
+
+    act(() => {
+      // Click target is on the other side of the wall, lower than the stub.
+      result.current.setTarget({ x: 700, y: 450 });
+      raf.tick(80);
+    });
+
+    // After enough ticks, the avatar should have crossed past the wall (x > 420).
+    expect(result.current.position.x).toBeGreaterThan(420);
+  });
 });
