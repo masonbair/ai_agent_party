@@ -16,6 +16,7 @@ export default function PartySpace({ party, user }: Props) {
     worldWidth: width,
     worldHeight: height,
     speed: SPEED,
+    walls: party.room.walls,
   });
   const floorRef = useRef<HTMLDivElement>(null);
 
