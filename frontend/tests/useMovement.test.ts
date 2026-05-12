@@ -157,4 +157,31 @@ describe('useMovement', () => {
     // After enough ticks, the avatar should have crossed past the wall (x > 420).
     expect(result.current.position.x).toBeGreaterThan(420);
   });
+
+  it('navigates around a vertical wall when clicking straight across', () => {
+    const raf = setupRaf();
+    // Tall wall at logical x=400, y=0..300. Inflated: x∈[386,422], y∈[-14,314].
+    const walls = [{ x: 50, y: 0, width: 1, height: 60, color: '#000' }];
+    const { result } = renderHook(() =>
+      useMovement({
+        worldWidth: 800,
+        worldHeight: 500,
+        speed: 400,
+        walls,
+        start: { x: 100, y: 100 },
+      }),
+    );
+
+    act(() => {
+      // Click target on the other side at the SAME y. The naive slide can't
+      // make progress here (no perpendicular component), so the hook must plan
+      // a detour around the wall corner.
+      result.current.setTarget({ x: 700, y: 100 });
+      raf.tick(200);
+    });
+
+    // After enough ticks the avatar should have routed around the wall and
+    // ended up near the target on the far side.
+    expect(result.current.position.x).toBeGreaterThan(600);
+  });
 });
