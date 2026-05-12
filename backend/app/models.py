@@ -37,6 +37,7 @@ class Zone(BaseModel):
     height: float
     color: str
     labelColor: str
+    borderColor: str
 
 
 class Theme(BaseModel):
@@ -54,6 +55,21 @@ class WorldSize(BaseModel):
     height: int
 
 
+class Wall(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+    color: str
+
+
+class Room(BaseModel):
+    clipPath: str | None = None
+    border: str
+    borderRadius: int | None = None
+    walls: list[Wall]
+
+
 class PartyConfig(BaseModel):
     slug: str = Field(pattern=r"^[a-z0-9-]+$")
     name: str
@@ -62,6 +78,7 @@ class PartyConfig(BaseModel):
     zones: list[Zone]
     music: Music
     worldSize: WorldSize
+    room: Room
 
 
 class PartiesListResponse(BaseModel):

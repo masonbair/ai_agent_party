@@ -1,7 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
-from app.models import CreateSessionRequest, PartyConfig, User, Zone
+from app.models import (
+    CreateSessionRequest,
+    PartyConfig,
+    Room,
+    User,
+    Wall,
+    Zone,
+)
 
 
 def test_create_session_request_accepts_valid() -> None:
@@ -33,12 +40,13 @@ def test_party_config_minimum_shape() -> None:
     zone = Zone(
         id="dance",
         label="DANCE",
-        x=25.0,
-        y=25.0,
-        width=40.0,
+        x=8.0,
+        y=10.0,
+        width=34.0,
         height=36.0,
-        color="rgba(255,107,157,0.25)",
-        labelColor="#8b1a4a",
+        color="#ff6b9d",
+        labelColor="#ffffff",
+        borderColor="#8b1a4a",
     )
     cfg = PartyConfig(
         slug="cream-terrazzo",
@@ -48,6 +56,37 @@ def test_party_config_minimum_shape() -> None:
         zones=[zone],
         music={"url": None, "label": "Music coming soon"},
         worldSize={"width": 800, "height": 500},
+        room={
+            "clipPath": None,
+            "border": "6px solid #8b6f47",
+            "borderRadius": 12,
+            "walls": [
+                {"x": 50.0, "y": 0.0, "width": 0.75, "height": 30.0, "color": "#8b6f47"}
+            ],
+        },
     )
     assert cfg.slug == "cream-terrazzo"
-    assert cfg.zones[0].id == "dance"
+    assert cfg.zones[0].borderColor == "#8b1a4a"
+    assert cfg.room.border.startswith("6px")
+    assert len(cfg.room.walls) == 1
+
+
+def test_room_allows_no_walls_and_no_clip_path() -> None:
+    room = Room(clipPath=None, border="2px solid black", walls=[])
+    assert room.clipPath is None
+    assert room.borderRadius is None
+    assert room.walls == []
+
+
+def test_room_accepts_clip_path_string() -> None:
+    room = Room(
+        clipPath="polygon(0 0, 100% 0, 100% 100%, 0 100%)",
+        border="2px solid black",
+        walls=[],
+    )
+    assert "polygon" in room.clipPath
+
+
+def test_wall_validates_dimensions() -> None:
+    w = Wall(x=10.0, y=20.0, width=5.0, height=0.75, color="#000000")
+    assert w.x == 10.0
