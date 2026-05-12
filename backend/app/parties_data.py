@@ -64,4 +64,62 @@ CREAM_TERRAZZO = PartyConfig(
     ),
 )
 
-PARTY_REGISTRY: dict[str, PartyConfig] = {CREAM_TERRAZZO.slug: CREAM_TERRAZZO}
+SPEAKEASY = PartyConfig(
+    slug="speakeasy",
+    name="The Speakeasy",
+    description="A warm prohibition-era bar with low light, a long polished counter, and intimate booths.",
+    theme=Theme(
+        floor="linear-gradient(180deg, #4a3526 0%, #3a2516 100%)",
+        accent="#c89b6a",
+    ),
+    zones=[
+        Zone(
+            id="bar",
+            label="BAR",
+            x=10.0,
+            y=28.0,
+            width=80.0,
+            height=18.0,
+            color="#d4a574",
+            labelColor="#3a2516",
+            borderColor="#6b4a2a",
+        ),
+        Zone(
+            id="dance",
+            label="DANCE",
+            x=8.0,
+            y=52.0,
+            width=40.0,
+            height=40.0,
+            color="#b8336a",
+            labelColor="#ffffff",
+            borderColor="#5a1a35",
+        ),
+        Zone(
+            id="booths",
+            label="BOOTHS",
+            x=52.0,
+            y=52.0,
+            width=40.0,
+            height=40.0,
+            color="#7a5836",
+            labelColor="#ffffff",
+            borderColor="#3d2c1c",
+        ),
+    ],
+    music=Music(url=None, label="Music coming soon"),
+    worldSize=WorldSize(width=800, height=500),
+    room=Room(
+        clipPath=None,
+        border="8px solid #8a6234",
+        borderRadius=8,
+        walls=[
+            # Left counter segment
+            Wall(x=15.0, y=22.0, width=30.0, height=1.5, color="#c89b6a"),
+            # Right counter segment (gap in the middle for walking through)
+            Wall(x=55.0, y=22.0, width=30.0, height=1.5, color="#c89b6a"),
+        ],
+    ),
+)
+
+PARTY_REGISTRY: dict[str, PartyConfig] = {CREAM_TERRAZZO.slug: CREAM_TERRAZZO, SPEAKEASY.slug: SPEAKEASY}

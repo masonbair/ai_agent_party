@@ -1,4 +1,4 @@
-from app.parties_data import CREAM_TERRAZZO
+from app.parties_data import CREAM_TERRAZZO, SPEAKEASY
 
 
 def test_cream_terrazzo_has_expected_slug_and_zones() -> None:
@@ -25,3 +25,17 @@ def test_cream_terrazzo_zones_have_solid_fill_colors() -> None:
     for z in CREAM_TERRAZZO.zones:
         assert z.color.startswith("#"), f"zone {z.id} should use solid hex fill"
         assert z.borderColor.startswith("#")
+
+
+def test_speakeasy_has_expected_slug_and_zones() -> None:
+    assert SPEAKEASY.slug == "speakeasy"
+    zone_ids = {z.id for z in SPEAKEASY.zones}
+    assert zone_ids == {"bar", "dance", "booths"}
+
+
+def test_speakeasy_has_split_bar_counter_walls() -> None:
+    # Two horizontal wall stubs forming a bar counter with a gap.
+    assert len(SPEAKEASY.room.walls) == 2
+    for w in SPEAKEASY.room.walls:
+        # Wide thin horizontal segments (wide > tall)
+        assert w.width > w.height

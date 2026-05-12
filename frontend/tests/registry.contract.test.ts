@@ -27,4 +27,16 @@ describe('frontend party registry', () => {
       expect(z.borderColor.startsWith('#')).toBe(true);
     }
   });
+
+  it('includes speakeasy with bar, dance, booths zones', () => {
+    const s = PARTIES.find((p) => p.slug === 'speakeasy');
+    expect(s).toBeDefined();
+    const zoneIds = new Set(s!.zones.map((z) => z.id));
+    expect(zoneIds).toEqual(new Set(['bar', 'dance', 'booths']));
+  });
+
+  it('speakeasy has a split bar counter (2 wall segments)', () => {
+    const s = PARTIES.find((p) => p.slug === 'speakeasy')!;
+    expect(s.room.walls.length).toBe(2);
+  });
 });
