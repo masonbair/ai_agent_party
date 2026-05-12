@@ -1,0 +1,47 @@
+# AI-generated context (regenerate on demand)
+.ai/context/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/cache
+.pnpm-store/
+
+
+
+
+
+
+# Build outputs
+dist/
+build/
+out/
+*.egg-info/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+logs/
