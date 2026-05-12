@@ -3,6 +3,7 @@ import type { PartyConfig, User } from '../api/types';
 import { useMovement } from '../hooks/useMovement';
 import Avatar from './Avatar';
 import MusicPill from './MusicPill';
+import Wall from './Wall';
 import Zone from './Zone';
 
 const SPEED = 220; // logical units / sec
@@ -20,32 +21,53 @@ export default function PartySpace({ party, user }: Props) {
 
   function onClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = floorRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTarget({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+    const logicalX = ((e.clientX - rect.left) / rect.width) * width;
+    const logicalY = ((e.clientY - rect.top) / rect.height) * height;
+    setTarget({ x: logicalX, y: logicalY });
   }
 
   return (
     <div
-      ref={floorRef}
-      onClick={onClick}
       style={{
-        position: 'relative',
-        width,
-        height,
-        background: party.theme.floor,
-        borderRadius: 16,
-        overflow: 'hidden',
+        width: 'min(95vw, 1000px)',
+        aspectRatio: `${width} / ${height}`,
         margin: '24px auto',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-        cursor: 'pointer',
-        userSelect: 'none',
+        position: 'relative',
       }}
     >
-      {party.zones.map((z) => (
-        <Zone key={z.id} zone={z} worldWidth={width} worldHeight={height} />
-      ))}
-      <Avatar username={user.username} color={user.color} x={position.x} y={position.y} />
-      <MusicPill label={party.music.label} />
+      <div
+        ref={floorRef}
+        onClick={onClick}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: party.theme.floor,
+          border: party.room.border,
+          borderRadius: party.room.borderRadius ?? 0,
+          clipPath: party.room.clipPath ?? 'none',
+          overflow: 'hidden',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+      >
+        {party.zones.map((z) => (
+          <Zone key={z.id} zone={z} />
+        ))}
+        {party.room.walls.map((w, i) => (
+          <Wall key={i} wall={w} />
+        ))}
+        <Avatar
+          username={user.username}
+          color={user.color}
+          x={position.x}
+          y={position.y}
+          worldWidth={width}
+          worldHeight={height}
+        />
+        <MusicPill label={party.music.label} />
+      </div>
     </div>
   );
 }
