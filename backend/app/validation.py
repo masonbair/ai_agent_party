@@ -16,3 +16,21 @@ ALLOWED_COLORS: tuple[str, ...] = (
     "#ffb74d",  # orange
     "#a1887f",  # taupe
 )
+
+CHAT_MAX_LEN = 280
+CHAT_TEXT_REGEX = re.compile(r"^[A-Za-z0-9 .,!?'\-]+$")
+
+
+class ChatValidationError(ValueError):
+    pass
+
+
+def validate_chat_text(text: str) -> str:
+    trimmed = text.strip()
+    if not trimmed:
+        raise ChatValidationError("chat text must not be empty")
+    if len(trimmed) > CHAT_MAX_LEN:
+        raise ChatValidationError(f"chat text exceeds {CHAT_MAX_LEN} chars")
+    if CHAT_TEXT_REGEX.fullmatch(trimmed) is None:
+        raise ChatValidationError("chat text contains disallowed characters")
+    return trimmed
