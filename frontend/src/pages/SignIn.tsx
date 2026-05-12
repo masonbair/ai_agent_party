@@ -50,8 +50,16 @@ export default function SignIn() {
   }
 
   return (
-    <main style={{ maxWidth: 420, margin: '64px auto', padding: 24 }}>
-      <h1>Welcome to ai_agent_party</h1>
+    <main
+      style={{
+        maxWidth: 'min(420px, 92vw)',
+        margin: 'clamp(24px, 8vh, 64px) auto',
+        padding: 'clamp(16px, 4vw, 24px)',
+      }}
+    >
+      <h1 style={{ fontSize: 'clamp(20px, 5vw, 28px)', margin: 0 }}>
+        Welcome to ai_agent_party
+      </h1>
       <form onSubmit={onSubmit}>
         <label htmlFor="username" style={{ display: 'block', marginTop: 16 }}>
           Username

@@ -32,8 +32,17 @@ export default function Party() {
 
   return (
     <main>
-      <header style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between' }}>
-        <h1 style={{ margin: 0 }}>{party.name}</h1>
+      <header
+        style={{
+          padding: 'clamp(8px, 2vw, 16px) clamp(12px, 3vw, 24px)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <h1 style={{ margin: 0, fontSize: 'clamp(20px, 4vw, 28px)' }}>{party.name}</h1>
         <button type="button" onClick={() => navigate('/lobby')}>
           Leave party
         </button>
