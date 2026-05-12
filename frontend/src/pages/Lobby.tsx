@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import type { PartiesListResponse, PartyConfig } from '../api/types';
+import PartyPreview from '../components/PartyPreview';
 import { useSession } from '../hooks/useSession';
 
 export default function Lobby() {
@@ -19,12 +20,20 @@ export default function Lobby() {
   if (session.status !== 'authed') return null;
 
   return (
-    <main style={{ maxWidth: 900, margin: '40px auto', padding: 24 }}>
-      <h1>Pick a party, {session.user.username}</h1>
+    <main
+      style={{
+        maxWidth: 'min(1100px, 92vw)',
+        margin: 'clamp(24px, 6vh, 40px) auto',
+        padding: 'clamp(16px, 4vw, 24px)',
+      }}
+    >
+      <h1 style={{ fontSize: 'clamp(22px, 5vw, 32px)', margin: 0 }}>
+        Pick a party, {session.user.username}
+      </h1>
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
           gap: 16,
           marginTop: 16,
         }}
@@ -37,22 +46,20 @@ export default function Lobby() {
             onClick={() => navigate(`/party/${p.slug}`)}
             style={{
               textAlign: 'left',
-              padding: 16,
+              padding: 12,
               border: `2px solid ${p.theme.accent}`,
               borderRadius: 12,
               background: '#fff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
             }}
           >
-            <div
-              style={{
-                height: 80,
-                borderRadius: 8,
-                background: p.theme.floor,
-                marginBottom: 12,
-              }}
-            />
-            <strong>{p.name}</strong>
-            <p style={{ margin: '4px 0 0', color: '#555' }}>{p.description}</p>
+            <PartyPreview party={p} />
+            <div>
+              <strong>{p.name}</strong>
+              <p style={{ margin: '4px 0 0', color: '#555' }}>{p.description}</p>
+            </div>
           </button>
         ))}
       </div>

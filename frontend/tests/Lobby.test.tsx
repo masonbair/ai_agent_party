@@ -17,9 +17,27 @@ const partiesResponse = {
       name: 'Cream Terrazzo Lounge',
       description: 'A bright, friendly room.',
       theme: { floor: '#f4ead5', accent: '#ff6b9d' },
-      zones: [],
+      zones: [
+        {
+          id: 'dance',
+          label: 'DANCE',
+          x: 6,
+          y: 8,
+          width: 34,
+          height: 36,
+          color: '#ff6b9d',
+          labelColor: '#ffffff',
+          borderColor: '#8b1a4a',
+        },
+      ],
       music: { url: null, label: 'Music coming soon' },
       worldSize: { width: 800, height: 500 },
+      room: {
+        clipPath: null,
+        border: '6px solid #8b6f47',
+        borderRadius: 12,
+        walls: [{ x: 50, y: 0, width: 0.75, height: 30, color: '#8b6f47' }],
+      },
     },
   ],
 };
@@ -46,7 +64,7 @@ describe('Lobby', () => {
     localStorage.clear();
   });
 
-  it('renders a card per party from the API', async () => {
+  it('renders a card per party with a mini preview', async () => {
     render(
       <MemoryRouter initialEntries={['/lobby']}>
         <Routes>
@@ -57,6 +75,7 @@ describe('Lobby', () => {
     );
 
     expect(await screen.findByText(/Cream Terrazzo Lounge/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('preview-cream-terrazzo')).toBeInTheDocument();
   });
 
   it('navigates to /party/:slug when a card is clicked', async () => {
