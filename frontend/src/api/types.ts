@@ -13,6 +13,22 @@ export type Zone = {
   height: number;
   color: string;
   labelColor: string;
+  borderColor: string;
+};
+
+export type Wall = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+};
+
+export type Room = {
+  clipPath: string | null;
+  border: string;
+  borderRadius?: number;
+  walls: Wall[];
 };
 
 export type PartyConfig = {
@@ -23,6 +39,7 @@ export type PartyConfig = {
   zones: Zone[];
   music: { url: string | null; label: string };
   worldSize: { width: number; height: number };
+  room: Room;
 };
 
 export type PartiesListResponse = {

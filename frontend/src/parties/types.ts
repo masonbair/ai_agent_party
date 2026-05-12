@@ -1,1 +1,1 @@
-export type { PartyConfig, Zone } from '../api/types';
+export type { PartyConfig, Room, Wall, Zone } from '../api/types';
