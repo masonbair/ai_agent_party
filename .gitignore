@@ -48,3 +48,7 @@ logs/
 
 # Brainstorming visual companion sessions
 .superpowers/
+
+# Python virtual environments
+backend/.venv/
+.venv/
