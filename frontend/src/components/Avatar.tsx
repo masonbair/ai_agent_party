@@ -1,19 +1,22 @@
 type Props = {
   username: string;
   color: string;
-  x: number;
-  y: number;
+  x: number;            // logical coord
+  y: number;            // logical coord
+  worldWidth: number;
+  worldHeight: number;
 };
 
-export default function Avatar({ username, color, x, y }: Props) {
+export default function Avatar({ username, color, x, y, worldWidth, worldHeight }: Props) {
+  const leftPct = (x / worldWidth) * 100;
+  const topPct = (y / worldHeight) * 100;
   return (
     <div
       style={{
         position: 'absolute',
-        left: x - 12,
-        top: y - 12,
-        width: 24,
-        height: 24,
+        left: `${leftPct}%`,
+        top: `${topPct}%`,
+        transform: 'translate(-50%, -50%)',
         pointerEvents: 'none',
         transition: 'left 80ms linear, top 80ms linear',
       }}
@@ -25,22 +28,23 @@ export default function Avatar({ username, color, x, y }: Props) {
           left: '50%',
           transform: 'translateX(-50%)',
           fontSize: 12,
-          background: 'rgba(255,255,255,0.85)',
+          background: 'rgba(255,255,255,0.9)',
           padding: '1px 6px',
           borderRadius: 8,
           whiteSpace: 'nowrap',
+          fontWeight: 600,
         }}
       >
         {username}
       </div>
       <div
         style={{
-          width: 24,
-          height: 24,
+          width: 28,
+          height: 28,
           borderRadius: '50%',
           background: color,
           border: '2px solid white',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
         }}
       />
     </div>
