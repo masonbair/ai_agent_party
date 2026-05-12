@@ -43,8 +43,23 @@ export default function Party() {
         }}
       >
         <h1 style={{ margin: 0, fontSize: 'clamp(20px, 4vw, 28px)' }}>{party.name}</h1>
-        <button type="button" onClick={() => navigate('/lobby')}>
-          Leave party
+        <button
+          type="button"
+          onClick={() => navigate('/lobby')}
+          style={{
+            background: party.theme.accent,
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 999,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+            transition: 'transform 120ms ease, box-shadow 120ms ease',
+          }}
+        >
+          ← Leave party
         </button>
       </header>
       <PartySpace party={party} user={session.user} />
