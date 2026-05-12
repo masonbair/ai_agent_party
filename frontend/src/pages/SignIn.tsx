@@ -58,7 +58,7 @@ export default function SignIn() {
       }}
     >
       <h1 style={{ fontSize: 'clamp(20px, 5vw, 28px)', margin: 0 }}>
-        Welcome to ai_agent_party
+        Welcome to openParty
       </h1>
       <form onSubmit={onSubmit}>
         <label htmlFor="username" style={{ display: 'block', marginTop: 16 }}>
