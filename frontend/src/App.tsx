@@ -1,3 +1,10 @@
+import { Route, Routes } from 'react-router-dom';
+import SignIn from './pages/SignIn';
+
 export default function App() {
-  return <div>ai_agent_party</div>;
+  return (
+    <Routes>
+      <Route path="/" element={<SignIn />} />
+    </Routes>
+  );
 }
