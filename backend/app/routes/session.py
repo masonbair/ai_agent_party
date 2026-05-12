@@ -1,0 +1,32 @@
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+
+from app.models import CreateSessionRequest, User
+from app.store import Store
+
+router = APIRouter(prefix="/api/session")
+
+
+def _store_dep() -> Store:  # pragma: no cover - overridden by main
+    raise NotImplementedError
+
+
+@router.post("", response_model=User)
+def create_session(
+    body: CreateSessionRequest, store: Store = Depends(_store_dep)
+) -> User:
+    return store.create_session(username=body.username, color=body.color)
+
+
+@router.get("/{session_id}", response_model=User)
+def get_session(session_id: str, store: Store = Depends(_store_dep)) -> User:
+    user = store.get_session(session_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return user
+
+
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(session_id: str, store: Store = Depends(_store_dep)) -> Response:
+    if not store.delete_session(session_id):
+        raise HTTPException(status_code=404, detail="session not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
