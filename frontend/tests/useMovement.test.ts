@@ -49,6 +49,20 @@ describe('useMovement', () => {
     expect(result.current.position.x).toBeGreaterThan(startX);
   });
 
+  it('moves right when "ArrowRight" is held', () => {
+    const raf = setupRaf();
+    const { result } = renderHook(() =>
+      useMovement({ worldWidth: 800, worldHeight: 500, speed: 200 }),
+    );
+
+    const startX = result.current.position.x;
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+      raf.tick(3);
+    });
+    expect(result.current.position.x).toBeGreaterThan(startX);
+  });
+
   it('clamps position at world bounds', () => {
     const raf = setupRaf();
     const { result } = renderHook(() =>

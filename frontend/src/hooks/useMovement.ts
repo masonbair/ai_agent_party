@@ -14,6 +14,10 @@ const KEY_TO_DIR: Record<string, Point> = {
   a: { x: -1, y: 0 },
   s: { x: 0, y: 1 },
   d: { x: 1, y: 0 },
+  arrowup: { x: 0, y: -1 },
+  arrowleft: { x: -1, y: 0 },
+  arrowdown: { x: 0, y: 1 },
+  arrowright: { x: 1, y: 0 },
 };
 
 function clamp(value: number, min: number, max: number): number {
