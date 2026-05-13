@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import type { PartiesListResponse, PartyConfig } from '../api/types';
 import PartyPreview from '../components/PartyPreview';
-import { useSession } from '../hooks/useSession';
+import { clearStoredSessionId, useSession } from '../hooks/useSession';
+import { useSessionPresence } from '../hooks/useSessionPresence';
 
 export default function Lobby() {
   const session = useSession();
@@ -16,6 +17,16 @@ export default function Lobby() {
       .then((res) => setParties(res.parties))
       .catch(() => setParties([]));
   }, [session.status]);
+
+  const onEvicted = useCallback(() => {
+    clearStoredSessionId();
+    navigate('/?takeover=1', { replace: true });
+  }, [navigate]);
+
+  useSessionPresence({
+    sessionId: session.status === 'authed' ? session.user.session_id : null,
+    onEvicted,
+  });
 
   if (session.status !== 'authed') return null;
 

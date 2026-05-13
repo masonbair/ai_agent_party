@@ -92,4 +92,56 @@ describe('Lobby', () => {
     await userEvent.click(card);
     expect(await screen.findByText(/Party page/i)).toBeInTheDocument();
   });
+
+  it('opens a session presence WebSocket when authed', async () => {
+    const seen: string[] = [];
+    class FakeWS {
+      url: string;
+      onopen: ((e: Event) => void) | null = null;
+      onmessage: ((e: MessageEvent) => void) | null = null;
+      onclose: ((e: CloseEvent) => void) | null = null;
+      onerror: ((e: Event) => void) | null = null;
+      readyState = 0;
+      constructor(url: string) {
+        this.url = url;
+        seen.push(url);
+      }
+      send() {}
+      close() {}
+    }
+    vi.stubGlobal('WebSocket', FakeWS);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : (input as URL).toString();
+      if (url.endsWith('/api/session/sid-1')) {
+        return new Response(
+          JSON.stringify({ session_id: 'sid-1', username: 'Alice', color: '#ff6b9d' }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/parties')) {
+        return new Response(JSON.stringify({ parties: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    localStorage.setItem('session_id', 'sid-1');
+    render(
+      <MemoryRouter initialEntries={['/lobby']}>
+        <Routes>
+          <Route path="/lobby" element={<Lobby />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/Pick a party/);
+    expect(seen.some((u) => u.includes('/api/session/ws'))).toBe(true);
+
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
 });
