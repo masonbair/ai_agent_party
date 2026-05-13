@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { Participant } from '../api/types';
 import type { Principal } from '../api/party';
 
-type Options = { slug: string; principal: Principal };
+type Options = {
+  slug: string;
+  principal: Principal;
+  onEvicted?: () => void;
+};
 
 type Status = 'connecting' | 'open' | 'closed';
 
@@ -11,11 +15,12 @@ function wsUrlFor(slug: string): string {
   return `${proto}://${window.location.host}/api/parties/${slug}/ws`;
 }
 
-export function useRealtimeParty({ slug, principal }: Options) {
+export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [status, setStatus] = useState<Status>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
   const backoffRef = useRef(1000);
+  const evictedRef = useRef(false);
 
   useEffect(() => {
     if (!slug || !principal.id) return;
@@ -43,6 +48,12 @@ export function useRealtimeParty({ slug, principal }: Options) {
         }
         if (!frame || typeof frame !== 'object') return;
         const f = frame as { type?: string };
+        if (f.type === 'evicted') {
+          evictedRef.current = true;
+          onEvicted?.();
+          ws.close();
+          return;
+        }
         if (f.type === 'snapshot') {
           const s = frame as { participants: Participant[] };
           setParticipants(s.participants);
@@ -70,7 +81,7 @@ export function useRealtimeParty({ slug, principal }: Options) {
 
       ws.onclose = () => {
         setStatus('closed');
-        if (cancelled) return;
+        if (cancelled || evictedRef.current) return;
         const delay = Math.min(backoffRef.current, 8000);
         backoffRef.current = Math.min(backoffRef.current * 2, 8000);
         reconnectTimer = setTimeout(connect, delay);
