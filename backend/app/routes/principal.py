@@ -24,7 +24,7 @@ def resolve_principal(store: Store, principal: Principal) -> ResolvedPrincipal:
     if principal.kind == "human":
         user = store.get_session(principal.id)
         if user is None:
-            raise HTTPException(status_code=401, detail="invalid principal")
+            raise HTTPException(status_code=401, detail="principal_unknown")
         return ResolvedPrincipal(
             id=user.session_id,
             kind="human",
@@ -33,7 +33,7 @@ def resolve_principal(store: Store, principal: Principal) -> ResolvedPrincipal:
         )
     agent = store.get_agent(principal.id)
     if agent is None:
-        raise HTTPException(status_code=401, detail="invalid principal")
+        raise HTTPException(status_code=401, detail="principal_unknown")
     return ResolvedPrincipal(
         id=agent.agent_id,
         kind="agent",
