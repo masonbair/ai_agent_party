@@ -97,3 +97,38 @@ async def test_hub_unsubscribe_does_not_clear_replaced_slot() -> None:
 
     assert hub._by_principal["human:s-alice"] is b
     assert b in hub.subscribers
+
+
+from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
+
+
+def _signin(client: TestClient, username: str, color: str) -> dict:
+    return client.post(
+        "/api/session", json={"username": username, "color": color}
+    ).json()
+
+
+def test_second_ws_with_same_session_evicts_the_first(client: TestClient) -> None:
+    user = _signin(client, "Alice", "#ff6b9d")
+    sid = user["session_id"]
+    r = client.post(
+        "/api/parties/cream-terrazzo/join",
+        json={"principal": {"kind": "human", "id": sid}},
+    )
+    assert r.status_code == 200
+
+    with client.websocket_connect("/api/parties/cream-terrazzo/ws") as ws_a:
+        ws_a.send_json({"type": "auth", "principal": {"kind": "human", "id": sid}})
+        snap_a = ws_a.receive_json()
+        assert snap_a["type"] == "snapshot"
+
+        with client.websocket_connect("/api/parties/cream-terrazzo/ws") as ws_b:
+            ws_b.send_json({"type": "auth", "principal": {"kind": "human", "id": sid}})
+            snap_b = ws_b.receive_json()
+            assert snap_b["type"] == "snapshot"
+
+            evict_frame = ws_a.receive_json()
+            assert evict_frame == {"type": "evicted", "reason": "takeover"}
+            with pytest.raises(WebSocketDisconnect):
+                ws_a.receive_json()
