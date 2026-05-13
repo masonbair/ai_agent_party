@@ -190,3 +190,45 @@ def test_observe_since_collapses_per_participant_not_globally() -> None:
     assert set(by_pid.keys()) == {"s-alice", "s-bob"}
     assert by_pid["s-alice"]["x"] == 70.0
     assert by_pid["s-bob"]["x"] == 60.0
+
+
+def test_on_event_callback_is_invoked_on_append() -> None:
+    w = PartyWorld(CREAM_TERRAZZO)
+    received: list = []
+    w.on_event(received.append)
+    w.join(_alice())
+    w.move("s-alice", 300.0, 200.0)
+    move_events = [e for e in received if isinstance(e, MoveEvent)]
+    assert len(move_events) == 1
+    assert move_events[0].x == 300.0 and move_events[0].y == 200.0
+    join_events = [e for e in received if isinstance(e, JoinEvent)]
+    assert len(join_events) == 1
+
+
+def test_on_event_supports_multiple_callbacks_and_unregister() -> None:
+    w = PartyWorld(CREAM_TERRAZZO)
+    a: list = []
+    b: list = []
+    unsub = w.on_event(a.append)
+    w.on_event(b.append)
+    w.join(_alice())
+    assert len(a) == 1 and len(b) == 1
+    unsub()
+    bob = _alice().model_copy(update={"id": "s-bob", "username": "Bob"})
+    w.join(bob)
+    assert len(a) == 1  # unsubscribed
+    assert len(b) == 2
+
+
+def test_on_event_listener_exception_does_not_break_world() -> None:
+    w = PartyWorld(CREAM_TERRAZZO)
+    received: list = []
+
+    def bad(_ev):
+        raise RuntimeError("boom")
+
+    w.on_event(bad)
+    w.on_event(received.append)
+    ev = w.join(_alice())
+    assert ev.seq == 1
+    assert len(received) == 1

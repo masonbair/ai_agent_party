@@ -1,4 +1,5 @@
 import time
+from typing import Callable
 
 from app.collision import Rect, inflate_walls, slide
 from app.events import (
@@ -25,6 +26,31 @@ class PartyWorld:
         self._wall_rects: list[Rect] = inflate_walls(
             party.room.walls, party.worldSize
         )
+        self._listeners: list[Callable[[Event], None]] = []
+
+    def on_event(
+        self, callback: Callable[[Event], None]
+    ) -> Callable[[], None]:
+        """Register a callback fired synchronously after each event is appended.
+
+        Returns an ``unsubscribe`` callable that removes the callback.
+        """
+        self._listeners.append(callback)
+
+        def _unsub() -> None:
+            if callback in self._listeners:
+                self._listeners.remove(callback)
+
+        return _unsub
+
+    def _emit(self, event: Event) -> None:
+        # Snapshot so a listener may unsubscribe itself during dispatch.
+        for cb in list(self._listeners):
+            try:
+                cb(event)
+            except Exception:
+                # A misbehaving listener must never break world bookkeeping.
+                pass
 
     @property
     def cursor(self) -> int:
@@ -41,6 +67,7 @@ class PartyWorld:
         self.participants[participant.id] = participant
         ev = JoinEvent(seq=self._next_seq(), participant=participant, at=time.time())
         self._events.append(ev)
+        self._emit(ev)
         return ev
 
     def leave(self, participant_id: str) -> LeaveEvent:
@@ -49,6 +76,7 @@ class PartyWorld:
         del self.participants[participant_id]
         ev = LeaveEvent(seq=self._next_seq(), participant_id=participant_id, at=time.time())
         self._events.append(ev)
+        self._emit(ev)
         return ev
 
     def move(self, participant_id: str, x: float, y: float) -> MoveEvent:
@@ -72,6 +100,7 @@ class PartyWorld:
             at=time.time(),
         )
         self._events.append(ev)
+        self._emit(ev)
         return ev
 
     def chat(self, participant_id: str, text: str) -> ChatEvent:
@@ -85,6 +114,7 @@ class PartyWorld:
             at=time.time(),
         )
         self._events.append(ev)
+        self._emit(ev)
         return ev
 
     def derive_zone(self, x: float, y: float) -> str | None:
