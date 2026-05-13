@@ -18,6 +18,7 @@ export function useRealtimeParty({ slug, principal }: Options) {
   const backoffRef = useRef(1000);
 
   useEffect(() => {
+    if (!slug || !principal.id) return;
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
