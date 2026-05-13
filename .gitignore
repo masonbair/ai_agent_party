@@ -28,7 +28,8 @@ yarn-error.log*
 .pnpm-store/
 
 
-
+# Vite
+.vite/
 
 
 
