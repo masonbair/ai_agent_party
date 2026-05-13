@@ -79,3 +79,21 @@ async def test_hub_eviction_broadcasts_leave_event_to_others() -> None:
         f.get("type") == "event" and f.get("event", {}).get("type") == "leave"
         for f in a.sent
     )
+
+
+@pytest.mark.asyncio
+async def test_hub_unsubscribe_does_not_clear_replaced_slot() -> None:
+    world = PartyWorld(CREAM_TERRAZZO)
+    hub = PartyWorldHub(world)
+    world.join(_alice())
+
+    a = FakeSocket()
+    b = FakeSocket()
+    hub.subscribe(a, principal_key="human:s-alice", participant_id="s-alice")
+    hub.subscribe(b, principal_key="human:s-alice", participant_id="s-alice")
+    await hub.drain()
+
+    hub.unsubscribe(a, principal_key="human:s-alice")
+
+    assert hub._by_principal["human:s-alice"] is b
+    assert b in hub.subscribers
