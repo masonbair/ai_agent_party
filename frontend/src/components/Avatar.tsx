@@ -5,20 +5,30 @@ type Props = {
   y: number;            // logical coord
   worldWidth: number;
   worldHeight: number;
+  variant?: 'self' | 'other';
 };
 
-export default function Avatar({ username, color, x, y, worldWidth, worldHeight }: Props) {
+export default function Avatar({
+  username,
+  color,
+  x,
+  y,
+  worldWidth,
+  worldHeight,
+  variant = 'other',
+}: Props) {
   const leftPct = (x / worldWidth) * 100;
   const topPct = (y / worldHeight) * 100;
   return (
     <div
+      data-self={variant === 'self' ? 'true' : undefined}
       style={{
         position: 'absolute',
         left: `${leftPct}%`,
         top: `${topPct}%`,
         transform: 'translate(-50%, -50%)',
         pointerEvents: 'none',
-        transition: 'left 80ms linear, top 80ms linear',
+        transition: 'left 150ms linear, top 150ms linear',
       }}
     >
       <div
@@ -44,7 +54,10 @@ export default function Avatar({ username, color, x, y, worldWidth, worldHeight 
           borderRadius: '50%',
           background: color,
           border: '2px solid white',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+          boxShadow:
+            variant === 'self'
+              ? '0 2px 6px rgba(0,0,0,0.25), inset 0 0 0 2px rgba(255,255,255,0.8)'
+              : '0 2px 6px rgba(0,0,0,0.25)',
         }}
       />
     </div>
