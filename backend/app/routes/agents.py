@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, field_validator
 
+from app.errors import INVALID_COLOR, envelope
 from app.events import Agent
 from app.store import Store
 from app.validation import ALLOWED_COLORS, USERNAME_REGEX
@@ -31,10 +32,7 @@ def create_agent(
     if body.color not in ALLOWED_COLORS:
         raise HTTPException(
             status_code=422,
-            detail={
-                "error": "invalid_color",
-                "allowed_colors": list(ALLOWED_COLORS),
-            },
+            detail=envelope(INVALID_COLOR, allowed_colors=list(ALLOWED_COLORS)),
         )
     return store.register_agent(username=body.username, color=body.color)
 

@@ -1,6 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from app.errors import VALIDATION_ERROR, envelope
 from app.routes import agent_guide as agent_guide_routes
 from app.routes import agents as agents_routes
 from app.routes import parties as parties_routes
@@ -9,6 +12,25 @@ from app.routes import session as session_routes
 from app.store import Store
 
 app = FastAPI(title="ai_agent_party")
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    fields = []
+    for err in exc.errors():
+        loc = [str(p) for p in err.get("loc", ()) if p not in ("body", "query", "path")]
+        fields.append(
+            {
+                "field": ".".join(loc) if loc else None,
+                "message": err.get("msg", ""),
+            }
+        )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": envelope(VALIDATION_ERROR, fields=fields)},
+    )
 
 app.add_middleware(
     CORSMiddleware,

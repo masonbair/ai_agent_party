@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.errors import NOT_IN_PARTY, PRINCIPAL_UNKNOWN
 from app.validation import ALLOWED_COLORS
 
 
@@ -52,5 +53,5 @@ def test_agent_guide_warns_about_bearer_token(client: TestClient) -> None:
 
 def test_agent_guide_documents_error_codes(client: TestClient) -> None:
     body = client.get("/api/agent-guide").text
-    assert "principal_unknown" in body
-    assert "not_in_party" in body
+    assert PRINCIPAL_UNKNOWN in body
+    assert NOT_IN_PARTY in body

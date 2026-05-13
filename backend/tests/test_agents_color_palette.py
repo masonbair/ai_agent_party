@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.errors import INVALID_COLOR
 from app.validation import ALLOWED_COLORS
 
 
@@ -9,7 +10,7 @@ def test_invalid_color_422_includes_allowed_list(client: TestClient) -> None:
     )
     assert r.status_code == 422
     detail = r.json()["detail"]
-    assert detail["error"] == "invalid_color"
+    assert detail["error"] == INVALID_COLOR
     assert detail["allowed_colors"] == list(ALLOWED_COLORS)
 
 

@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app.errors import NOT_IN_PARTY, PRINCIPAL_UNKNOWN
+
 
 def test_unknown_principal_returns_principal_unknown_code(client: TestClient) -> None:
     r = client.post(
@@ -11,7 +13,7 @@ def test_unknown_principal_returns_principal_unknown_code(client: TestClient) ->
         },
     )
     assert r.status_code == 401
-    assert r.json() == {"detail": "principal_unknown"}
+    assert r.json() == {"detail": PRINCIPAL_UNKNOWN}
 
 
 def test_session_deleted_after_action_returns_principal_unknown(client: TestClient) -> None:
@@ -28,7 +30,7 @@ def test_session_deleted_after_action_returns_principal_unknown(client: TestClie
         json={"principal": principal, "x": 100, "y": 100},
     )
     assert r.status_code == 401
-    assert r.json() == {"detail": "principal_unknown"}
+    assert r.json() == {"detail": PRINCIPAL_UNKNOWN}
 
 
 def test_joined_then_left_returns_not_in_party(client: TestClient) -> None:
@@ -47,4 +49,4 @@ def test_joined_then_left_returns_not_in_party(client: TestClient) -> None:
         json={"principal": principal, "x": 100, "y": 100},
     )
     assert r.status_code == 409
-    assert r.json() == {"detail": "not_in_party"}
+    assert r.json() == {"detail": NOT_IN_PARTY}
