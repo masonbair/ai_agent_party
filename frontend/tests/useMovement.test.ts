@@ -158,6 +158,32 @@ describe('useMovement', () => {
     expect(result.current.position.x).toBeGreaterThan(420);
   });
 
+  it('emits throttled onMove callbacks as position changes', () => {
+    const raf = setupRaf();
+    const onMove = vi.fn();
+    renderHook(() =>
+      useMovement({
+        worldWidth: 800,
+        worldHeight: 500,
+        speed: 400,
+        onMove,
+        moveThrottleMs: 100,
+        start: { x: 100, y: 100 },
+      }),
+    );
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }));
+      raf.tick(20); // ~320ms simulated time → expect ~3 throttled emits
+    });
+
+    expect(onMove.mock.calls.length).toBeGreaterThan(0);
+    expect(onMove.mock.calls.length).toBeLessThanOrEqual(4);
+    const [lastX, lastY] = onMove.mock.calls[onMove.mock.calls.length - 1];
+    expect(lastX).toBeGreaterThan(100);
+    expect(lastY).toBe(100);
+  });
+
   it('navigates around a vertical wall when clicking straight across', () => {
     const raf = setupRaf();
     // Tall wall at logical x=400, y=0..300. Inflated: x∈[386,422], y∈[-14,314].
