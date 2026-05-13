@@ -12,6 +12,8 @@ function wsUrl(): string {
 
 export function useSessionPresence({ sessionId, onEvicted }: Options): void {
   const evictedRef = useRef(false);
+  const onEvictedRef = useRef(onEvicted);
+  onEvictedRef.current = onEvicted;
 
   useEffect(() => {
     if (!sessionId) return;
@@ -41,7 +43,7 @@ export function useSessionPresence({ sessionId, onEvicted }: Options): void {
         const f = frame as { type?: string };
         if (f.type === 'evicted') {
           evictedRef.current = true;
-          onEvicted?.();
+          onEvictedRef.current?.();
           ws?.close();
           return;
         }
@@ -61,5 +63,5 @@ export function useSessionPresence({ sessionId, onEvicted }: Options): void {
       if (reconnectTimer != null) clearTimeout(reconnectTimer);
       ws?.close();
     };
-  }, [sessionId, onEvicted]);
+  }, [sessionId]);
 }
