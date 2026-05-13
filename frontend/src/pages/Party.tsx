@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PartySpace from '../components/PartySpace';
 import { ApiError, apiGet } from '../api/client';
 import type { PartyConfig } from '../api/types';
-import { useSession } from '../hooks/useSession';
+import { useSession, clearStoredSessionId } from '../hooks/useSession';
 import { joinParty, leaveParty, moveInParty, type Principal } from '../api/party';
 import { useRealtimeParty } from '../hooks/useRealtimeParty';
 
@@ -36,7 +36,14 @@ export default function Party() {
 
   const { participants } = useRealtimeParty(
     ready && principal
-      ? { slug: party!.slug, principal }
+      ? {
+          slug: party!.slug,
+          principal,
+          onEvicted: () => {
+            clearStoredSessionId();
+            navigate('/?takeover=1', { replace: true });
+          },
+        }
       : { slug: '', principal: { kind: 'human', id: '' } },
   );
 
