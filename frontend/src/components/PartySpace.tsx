@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import type { PartyConfig, User } from '../api/types';
+import type { Participant, PartyConfig, User } from '../api/types';
 import { useMovement } from '../hooks/useMovement';
 import Avatar from './Avatar';
 import MusicPill from './MusicPill';
@@ -8,15 +8,22 @@ import Zone from './Zone';
 
 const SPEED = 220; // logical units / sec
 
-type Props = { party: PartyConfig; user: User };
+type Props = {
+  party: PartyConfig;
+  user: User;
+  participants?: Participant[];
+  onMove?: (x: number, y: number) => void;
+};
 
-export default function PartySpace({ party, user }: Props) {
+export default function PartySpace({ party, user, participants, onMove }: Props) {
   const { width, height } = party.worldSize;
   const { position, setTarget } = useMovement({
     worldWidth: width,
     worldHeight: height,
     speed: SPEED,
     walls: party.room.walls,
+    onMove,
+    moveThrottleMs: 100,
   });
   const floorRef = useRef<HTMLDivElement>(null);
 
@@ -27,6 +34,27 @@ export default function PartySpace({ party, user }: Props) {
     const logicalY = ((e.clientY - rect.top) / rect.height) * height;
     setTarget({ x: logicalX, y: logicalY });
   }
+
+  // If participants is provided and non-empty, render everyone (overriding the
+  // local-only view). The local user's x/y is overridden with the hook's
+  // `position` so the local avatar stays visually responsive even before the
+  // server echoes a move. Otherwise fall back to the single-player path:
+  // render only the local user.
+  const renderList: Participant[] =
+    participants && participants.length > 0
+      ? participants.map((p) =>
+          p.id === user.session_id ? { ...p, x: position.x, y: position.y } : p,
+        )
+      : [
+          {
+            id: user.session_id,
+            kind: 'human' as const,
+            username: user.username,
+            color: user.color,
+            x: position.x,
+            y: position.y,
+          },
+        ];
 
   return (
     <div
@@ -59,14 +87,18 @@ export default function PartySpace({ party, user }: Props) {
         {party.room.walls.map((w, i) => (
           <Wall key={i} wall={w} />
         ))}
-        <Avatar
-          username={user.username}
-          color={user.color}
-          x={position.x}
-          y={position.y}
-          worldWidth={width}
-          worldHeight={height}
-        />
+        {renderList.map((p) => (
+          <Avatar
+            key={p.id}
+            username={p.username}
+            color={p.color}
+            x={p.x}
+            y={p.y}
+            worldWidth={width}
+            worldHeight={height}
+            variant={p.id === user.session_id ? 'self' : 'other'}
+          />
+        ))}
         <MusicPill label={party.music.label} />
       </div>
     </div>
