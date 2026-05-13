@@ -161,4 +161,5 @@ class PartyWorld:
                     "at": mv.at,
                 }
             )
+        out.sort(key=lambda e: e["seq"])
         return {"events": out, "cursor": self.cursor}
