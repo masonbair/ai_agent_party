@@ -1,5 +1,6 @@
 import time
 
+from app.collision import Rect, inflate_walls, slide
 from app.events import (
     ChatEvent,
     Event,
@@ -16,15 +17,14 @@ class ParticipantNotInPartyError(LookupError):
     pass
 
 
-def _clamp(value: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, value))
-
-
 class PartyWorld:
     def __init__(self, party: PartyConfig) -> None:
         self._party = party
         self.participants: dict[str, Participant] = {}
         self._events: list[Event] = []
+        self._wall_rects: list[Rect] = inflate_walls(
+            party.room.walls, party.worldSize
+        )
 
     @property
     def cursor(self) -> int:
@@ -54,14 +54,23 @@ class PartyWorld:
     def move(self, participant_id: str, x: float, y: float) -> MoveEvent:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
-        w = self._party.worldSize
-        cx = _clamp(float(x), 0.0, float(w.width))
-        cy = _clamp(float(y), 0.0, float(w.height))
         current = self.participants[participant_id]
-        self.participants[participant_id] = current.model_copy(
-            update={"x": cx, "y": cy}
+        new_x, new_y = slide(
+            (current.x, current.y),
+            (float(x), float(y)),
+            self._wall_rects,
+            self._party.worldSize,
         )
-        ev = MoveEvent(seq=self._next_seq(), participant_id=participant_id, x=cx, y=cy, at=time.time())
+        self.participants[participant_id] = current.model_copy(
+            update={"x": new_x, "y": new_y}
+        )
+        ev = MoveEvent(
+            seq=self._next_seq(),
+            participant_id=participant_id,
+            x=new_x,
+            y=new_y,
+            at=time.time(),
+        )
         self._events.append(ev)
         return ev
 
