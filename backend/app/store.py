@@ -4,6 +4,7 @@ from app.events import Agent
 from app.models import PartyConfig, User
 from app.parties_data import PARTY_REGISTRY
 from app.realtime import PartyWorldHub
+from app.session_presence import SessionPresenceHub
 from app.world import PartyWorld
 
 
@@ -14,6 +15,7 @@ class Store:
         self._agents: dict[str, Agent] = {}
         self._worlds: dict[str, PartyWorld] = {}
         self._hubs: dict[str, PartyWorldHub] = {}
+        self._session_presence: SessionPresenceHub | None = None
 
     def create_session(self, username: str, color: str) -> User:
         session_id = uuid.uuid4().hex
@@ -26,6 +28,15 @@ class Store:
 
     def delete_session(self, session_id: str) -> bool:
         return self._sessions.pop(session_id, None) is not None
+
+    def worlds(self) -> list[PartyWorld]:
+        return list(self._worlds.values())
+
+    @property
+    def session_presence(self) -> SessionPresenceHub:
+        if self._session_presence is None:
+            self._session_presence = SessionPresenceHub(self)
+        return self._session_presence
 
     def list_parties(self) -> list[PartyConfig]:
         return list(self._parties.values())
