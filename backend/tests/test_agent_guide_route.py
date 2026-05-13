@@ -1,5 +1,8 @@
 from fastapi.testclient import TestClient
 
+from app.errors import NOT_IN_PARTY, PRINCIPAL_UNKNOWN
+from app.validation import ALLOWED_COLORS
+
 
 def test_agent_guide_returns_markdown(client: TestClient) -> None:
     r = client.get("/api/agent-guide")
@@ -23,3 +26,32 @@ def test_agent_guide_mentions_core_endpoints(client: TestClient) -> None:
 def test_agent_guide_has_example_loop(client: TestClient) -> None:
     body = client.get("/api/agent-guide").text
     assert "Example sequence" in body
+
+
+def test_agent_guide_lists_every_allowed_color(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    for hex_color in ALLOWED_COLORS:
+        assert hex_color in body, f"missing color {hex_color}"
+
+
+def test_agent_guide_documents_zone_centers(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "centerX" in body
+    assert "centerY" in body
+
+
+def test_agent_guide_documents_poll_cadence(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "1-2" in body or "1–2" in body
+    assert "poll" in body.lower()
+
+
+def test_agent_guide_warns_about_bearer_token(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text.lower()
+    assert "password" in body or "bearer" in body
+
+
+def test_agent_guide_documents_error_codes(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert PRINCIPAL_UNKNOWN in body
+    assert NOT_IN_PARTY in body

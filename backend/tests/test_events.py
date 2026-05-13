@@ -37,19 +37,19 @@ def test_participant_requires_human_or_agent_kind() -> None:
 
 
 def test_join_event_carries_participant_and_seq() -> None:
-    ev = JoinEvent(seq=1, participant=_participant())
+    ev = JoinEvent(seq=1, participant=_participant(), at=1715533200.0)
     assert ev.type == "join"
     assert ev.seq == 1
     assert ev.participant.username == "Alice"
 
 
 def test_leave_event_carries_participant_id() -> None:
-    ev = LeaveEvent(seq=2, participant_id="abc123")
+    ev = LeaveEvent(seq=2, participant_id="abc123", at=1715533200.0)
     assert ev.type == "leave"
 
 
 def test_move_event_carries_coords() -> None:
-    ev = MoveEvent(seq=3, participant_id="abc123", x=10.0, y=20.0)
+    ev = MoveEvent(seq=3, participant_id="abc123", x=10.0, y=20.0, at=1715533200.0)
     assert ev.type == "move"
     assert ev.x == 10.0
 

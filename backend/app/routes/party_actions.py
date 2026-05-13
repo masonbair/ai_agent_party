@@ -3,6 +3,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import BaseModel
 
+from app.errors import INVALID_CHAT_TEXT, NOT_IN_PARTY, envelope
 from app.events import Participant
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
@@ -94,7 +95,7 @@ def leave(
     try:
         world.leave(resolved.id)
     except ParticipantNotInPartyError:
-        raise HTTPException(status_code=409, detail="principal not in party")
+        raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -109,7 +110,7 @@ def move(
     try:
         ev = world.move(resolved.id, body.x, body.y)
     except ParticipantNotInPartyError:
-        raise HTTPException(status_code=409, detail="principal not in party")
+        raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
     return {
         "x": ev.x,
         "y": ev.y,
@@ -129,20 +130,21 @@ def chat(
     try:
         world.chat(resolved.id, body.text)
     except ParticipantNotInPartyError:
-        raise HTTPException(status_code=409, detail="principal not in party")
+        raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
     except ChatValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(
+            status_code=422,
+            detail=envelope(INVALID_CHAT_TEXT, message=str(exc)),
+        )
     return {"cursor": world.cursor}
 
 
 def _room_view(party) -> dict:
+    w = party.worldSize
     return {
         "slug": party.slug,
         "name": party.name,
-        "worldSize": {
-            "width": party.worldSize.width,
-            "height": party.worldSize.height,
-        },
+        "worldSize": {"width": w.width, "height": w.height},
         "zones": [
             {
                 "id": z.id,
@@ -151,12 +153,14 @@ def _room_view(party) -> dict:
                 "y": z.y,
                 "width": z.width,
                 "height": z.height,
+                "centerX": (z.x + z.width / 2.0) / 100.0 * w.width,
+                "centerY": (z.y + z.height / 2.0) / 100.0 * w.height,
             }
             for z in party.zones
         ],
         "walls": [
-            {"x": w.x, "y": w.y, "width": w.width, "height": w.height}
-            for w in party.room.walls
+            {"x": wl.x, "y": wl.y, "width": wl.width, "height": wl.height}
+            for wl in party.room.walls
         ],
         "music": party.music.label,
     }

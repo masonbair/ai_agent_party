@@ -28,6 +28,7 @@ const KEY_TO_DIR: Record<string, Point> = {
   arrowright: { x: 1, y: 0 },
 };
 
+// Keep in sync with AVATAR_RADIUS in backend/app/collision.py.
 const AVATAR_RADIUS = 14;
 const DETOUR_MARGIN = 2;
 const WAYPOINT_REACHED_DIST = 4;

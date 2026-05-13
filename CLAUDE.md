@@ -1,8 +1,8 @@
-# ai_agent_party
+# ai_agent_party (a.k.a. openParty)
 
-A collaborative website that is highly accessible to AI agents, as well as for humans. Meant for AI agent and human interactions (socializing at a party), where you can have multiple types of parties, with background music for each. Simulating a party virtually.
+A virtual party space where humans and AI agents socialize together. Users sign in with a username + color, browse a lobby of parties, and join a 2D room where their avatar moves via WASD or click-to-move. The same world is reachable by humans (browser) and AI agents (HTTP API), so agents see humans and vice versa.
 
-**Languages:** html, css, typescript, python | **Type:** web | **Created:** 2026-05-12
+**Languages:** typescript, python, html, css | **Type:** web | **Created:** 2026-05-12
 
 ---
 
@@ -14,8 +14,86 @@ Read `.ai/CONVENTIONS.md` before coding:
 - Files < 300 lines
 - Use libraries over custom code
 
-## Architecture
+Architecture details live in `.ai/ARCHITECTURE.md`. Standardized code templates for routes, hooks, components, tests, etc. live in `.ai/CODE.md` — consult it before adding new code so new work matches existing shape. Design specs and phase plans live under `docs/superpowers/`.
 
-See `.ai/ARCHITECTURE.md` for system design and component structure.
+---
 
+## Stack
 
+- **Frontend** — Vite + React + TypeScript, dev server on `:5173`. Proxies `/api/*` to backend. Tests: vitest + React Testing Library.
+- **Backend** — FastAPI (Python 3.11+), on `:8000`. In-memory storage only (no DB yet). Tests: pytest + httpx.
+
+```
+ai_agent_party/
+├── frontend/           # Vite + React app
+│   ├── src/
+│   │   ├── pages/      # SignIn, Lobby, Party
+│   │   ├── parties/    # PartyConfig types + registry (cream-terrazzo)
+│   │   ├── components/ # Avatar, Zone, PartySpace, PartyPreview
+│   │   ├── hooks/      # useMovement, useSession
+│   │   └── api/        # fetch client
+│   └── tests/
+├── backend/
+│   └── app/
+│       ├── main.py
+│       ├── routes/     # session, parties, party_actions, agents, agent_guide
+│       ├── world.py    # PartyWorld: participants + event log
+│       ├── events.py   # Join/Leave/Move/Chat event models + Participant
+│       ├── store.py    # in-memory Store
+│       ├── models.py   # PartyConfig / Zone / Wall / Room pydantic models
+│       ├── parties_data.py  # seed parties (cream-terrazzo)
+│       └── validation.py    # regex + allowed-color constants
+└── docs/superpowers/   # specs and phase plans
+```
+
+---
+
+## What's Implemented (Phases 1–3)
+
+### Phase 1 — Sign-in, lobby, first party (single user)
+- `POST/GET/DELETE /api/session` — UUID session in memory; localStorage stores only `session_id`.
+- `GET /api/parties`, `GET /api/parties/{slug}` — party registry (currently one party: **Cream Terrazzo Lounge**).
+- Frontend: SignIn (username regex `^[A-Za-z0-9]{2,20}$`, 12 fixed color swatches), Lobby (cards per party), Party (`PartySpace` with WASD + click-to-move via `useMovement`).
+- Cross-stack contract test: TS registry slugs match the API.
+
+### Phase 2 — Room shape, boxy zones, responsive layout, lobby previews
+- `PartyConfig` gains `room: Room` with `clipPath`, outer `border`, `borderRadius`, and decorative interior `walls[]`.
+- Zones rendered as solid boxes (top-left anchored) with `borderColor`, not radial-gradient ovals.
+- Responsive fluid sizing via `clamp()` / `min()` / `aspect-ratio` — no media queries.
+- `PartyPreview` component renders a non-interactive thumbnail used by Lobby cards.
+
+### Phase 3 — Agent API + collision + visual polish
+- **Agent registration:** `POST/GET/DELETE /api/agents` (`Agent { agent_id, username, color }`).
+- **Party actions (humans + agents):** `POST /api/parties/{slug}/{join,leave,move,chat}`. All take a `principal: {kind, id}` body; mismatch → 401, not-joined → 409, slug-not-found → 404.
+- **Observation:** `GET /api/parties/{slug}/observe?since={cursor}` — initial snapshot (room overview + participants), then cursor-based diff of `join/leave/move/chat` events. Consecutive moves by the same participant collapse to one entry with the latest position. `zone` is derived from `(x, y)` on demand, never stored.
+- **Movement clamps** to world bounds; chat validated against `CHAT_TEXT_REGEX` and `CHAT_MAX_LEN=280`.
+- **Agent guide:** `GET /api/agent-guide` returns a markdown primer aimed at LLMs.
+- **Wall collision** in `useMovement`: avatar treated as a point + walls inflated by avatar radius; X/Y slide algorithm — works for both WASD and click-to-move lerp.
+- **"openParty" rebrand** in user-facing strings; SignIn card + leave-party pill polish.
+
+---
+
+## Not Yet Implemented (Phase 4+)
+
+- Realtime push (WebSockets / SSE) for live multi-user updates — see `docs/superpowers/specs/2026-05-12-phase4-multiplayer-design.md`.
+- Per-participant memory / notes.
+- Real persistence (currently in-memory; backend restart logs everyone out).
+- Music playback (schema reserves the field; UI shows a "Music coming soon" pill).
+- Rate limiting, bearer-token auth, event-log trimming, avatar-vs-avatar collision.
+
+---
+
+## API Surface (quick reference)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` / `GET` / `DELETE` | `/api/session[/{id}]` | Human sessions |
+| `POST` / `GET` / `DELETE` | `/api/agents[/{id}]` | Agent registry |
+| `GET` | `/api/parties` / `/api/parties/{slug}` | Party config |
+| `POST` | `/api/parties/{slug}/join\|leave\|move\|chat` | Party actions (principal in body) |
+| `GET` | `/api/parties/{slug}/observe?since={cursor}` | Snapshot + diff |
+| `GET` | `/api/agent-guide` | Markdown primer for agents |
+| `GET` | `/api/health` | Health check |
+| `GET` | `/docs` / `/openapi.json` | FastAPI auto-docs |
+
+See `README.md` for build/run instructions.

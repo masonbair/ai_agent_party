@@ -18,7 +18,9 @@ def test_observe_initial_returns_room_and_empty_participants(client: TestClient)
     assert body["room"]["slug"] == "cream-terrazzo"
     assert body["room"]["worldSize"] == {"width": 800, "height": 500}
     assert len(body["room"]["zones"]) == 3
-    assert body["room"]["zones"][0].keys() == {"id", "label", "x", "y", "width", "height"}
+    assert body["room"]["zones"][0].keys() == {
+        "id", "label", "x", "y", "width", "height", "centerX", "centerY",
+    }
     assert body["room"]["walls"][0].keys() == {"x", "y", "width", "height"}
     assert body["room"]["music"] == "Music coming soon"
     assert body["participants"] == []
