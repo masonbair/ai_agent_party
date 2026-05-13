@@ -136,13 +136,11 @@ def chat(
 
 
 def _room_view(party) -> dict:
+    w = party.worldSize
     return {
         "slug": party.slug,
         "name": party.name,
-        "worldSize": {
-            "width": party.worldSize.width,
-            "height": party.worldSize.height,
-        },
+        "worldSize": {"width": w.width, "height": w.height},
         "zones": [
             {
                 "id": z.id,
@@ -151,12 +149,14 @@ def _room_view(party) -> dict:
                 "y": z.y,
                 "width": z.width,
                 "height": z.height,
+                "centerX": (z.x + z.width / 2.0) / 100.0 * w.width,
+                "centerY": (z.y + z.height / 2.0) / 100.0 * w.height,
             }
             for z in party.zones
         ],
         "walls": [
-            {"x": w.x, "y": w.y, "width": w.width, "height": w.height}
-            for w in party.room.walls
+            {"x": wl.x, "y": wl.y, "width": wl.width, "height": wl.height}
+            for wl in party.room.walls
         ],
         "music": party.music.label,
     }
