@@ -60,6 +60,7 @@ describe('Lobby', () => {
     });
   });
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     localStorage.clear();
   });
@@ -111,24 +112,6 @@ describe('Lobby', () => {
     }
     vi.stubGlobal('WebSocket', FakeWS);
 
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : (input as URL).toString();
-      if (url.endsWith('/api/session/sid-1')) {
-        return new Response(
-          JSON.stringify({ session_id: 'sid-1', username: 'Alice', color: '#ff6b9d' }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
-      }
-      if (url.endsWith('/api/parties')) {
-        return new Response(JSON.stringify({ parties: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      throw new Error(`unexpected fetch: ${url}`);
-    });
-
-    localStorage.setItem('session_id', 'sid-1');
     render(
       <MemoryRouter initialEntries={['/lobby']}>
         <Routes>
@@ -137,11 +120,7 @@ describe('Lobby', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText(/Pick a party/);
+    expect(await screen.findByText(/Cream Terrazzo Lounge/i)).toBeInTheDocument();
     expect(seen.some((u) => u.includes('/api/session/ws'))).toBe(true);
-
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-    localStorage.clear();
   });
 });
