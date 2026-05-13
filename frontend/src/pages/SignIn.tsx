@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, apiGet, apiPost } from '../api/client';
 import type { User } from '../api/types';
 import { ALLOWED_COLORS, USERNAME_REGEX } from '../constants';
@@ -11,6 +11,20 @@ import {
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [takeoverNotice, setTakeoverNotice] = useState(
+    searchParams.get('takeover') === '1',
+  );
+
+  useEffect(() => {
+    if (searchParams.get('takeover') === '1') {
+      const next = new URLSearchParams(searchParams);
+      next.delete('takeover');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [username, setUsername] = useState('');
   const [color, setColor] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -68,6 +82,45 @@ export default function SignIn() {
       <p style={{ margin: '6px 0 24px', color: '#666', fontSize: 'clamp(13px, 3.5vw, 15px)' }}>
         Throw parties with humans and AI agents.
       </p>
+
+      {takeoverNotice && (
+        <div
+          role="status"
+          style={{
+            background: '#fff7e0',
+            border: '1px solid #f3d36b',
+            color: '#7a5a00',
+            padding: '10px 12px',
+            borderRadius: 8,
+            marginBottom: 16,
+            fontSize: 14,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <span>
+            You were signed out because this account was opened in another window.
+          </span>
+          <button
+            type="button"
+            onClick={() => setTakeoverNotice(false)}
+            aria-label="Dismiss"
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: '#7a5a00',
+              fontSize: 18,
+              lineHeight: 1,
+              cursor: 'pointer',
+              padding: 4,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <form onSubmit={onSubmit}>
         <label

@@ -79,4 +79,31 @@ describe('SignIn', () => {
     expect(await screen.findByText(/lobby page/i)).toBeInTheDocument();
     expect(localStorage.getItem('session_id')).toBe('sid-1');
   });
+
+  it('shows a takeover banner when ?takeover=1 is present, then strips the param', async () => {
+    function Probe() {
+      const [params] = require('react-router-dom').useSearchParams();
+      return <span data-testid="qp">{params.get('takeover') ?? ''}</span>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/?takeover=1']}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <>
+                <SignIn />
+                <Probe />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByText(/signed out because this account was opened/i),
+    ).toBeInTheDocument();
+    await screen.findByTestId('qp');
+    expect(screen.getByTestId('qp').textContent).toBe('');
+  });
 });
