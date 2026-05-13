@@ -39,7 +39,7 @@ class PartyWorld:
 
     def join(self, participant: Participant) -> JoinEvent:
         self.participants[participant.id] = participant
-        ev = JoinEvent(seq=self._next_seq(), participant=participant)
+        ev = JoinEvent(seq=self._next_seq(), participant=participant, at=time.time())
         self._events.append(ev)
         return ev
 
@@ -47,7 +47,7 @@ class PartyWorld:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
         del self.participants[participant_id]
-        ev = LeaveEvent(seq=self._next_seq(), participant_id=participant_id)
+        ev = LeaveEvent(seq=self._next_seq(), participant_id=participant_id, at=time.time())
         self._events.append(ev)
         return ev
 
@@ -61,7 +61,7 @@ class PartyWorld:
         self.participants[participant_id] = current.model_copy(
             update={"x": cx, "y": cy}
         )
-        ev = MoveEvent(seq=self._next_seq(), participant_id=participant_id, x=cx, y=cy)
+        ev = MoveEvent(seq=self._next_seq(), participant_id=participant_id, x=cx, y=cy, at=time.time())
         self._events.append(ev)
         return ev
 
@@ -127,6 +127,7 @@ class PartyWorld:
                         "type": "join",
                         "seq": ev.seq,
                         "participant": self._participant_dict(ev.participant),
+                        "at": ev.at,
                     }
                 )
             elif isinstance(ev, LeaveEvent):
@@ -135,6 +136,7 @@ class PartyWorld:
                         "type": "leave",
                         "seq": ev.seq,
                         "participant_id": ev.participant_id,
+                        "at": ev.at,
                     }
                 )
             elif isinstance(ev, ChatEvent):
@@ -156,6 +158,7 @@ class PartyWorld:
                     "x": mv.x,
                     "y": mv.y,
                     "zone": self.derive_zone(mv.x, mv.y),
+                    "at": mv.at,
                 }
             )
         return {"events": out, "cursor": self.cursor}

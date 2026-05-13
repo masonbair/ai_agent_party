@@ -23,12 +23,14 @@ class JoinEvent(BaseModel):
     seq: int
     type: Literal["join"] = "join"
     participant: Participant
+    at: float
 
 
 class LeaveEvent(BaseModel):
     seq: int
     type: Literal["leave"] = "leave"
     participant_id: str
+    at: float
 
 
 class MoveEvent(BaseModel):
@@ -37,6 +39,7 @@ class MoveEvent(BaseModel):
     participant_id: str
     x: float
     y: float
+    at: float
 
 
 class ChatEvent(BaseModel):
