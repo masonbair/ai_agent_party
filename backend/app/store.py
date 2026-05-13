@@ -3,6 +3,7 @@ import uuid
 from app.events import Agent
 from app.models import PartyConfig, User
 from app.parties_data import PARTY_REGISTRY
+from app.realtime import PartyWorldHub
 from app.world import PartyWorld
 
 
@@ -12,6 +13,7 @@ class Store:
         self._parties: dict[str, PartyConfig] = dict(PARTY_REGISTRY)
         self._agents: dict[str, Agent] = {}
         self._worlds: dict[str, PartyWorld] = {}
+        self._hubs: dict[str, PartyWorldHub] = {}
 
     def create_session(self, username: str, color: str) -> User:
         session_id = uuid.uuid4().hex
@@ -49,3 +51,14 @@ class Store:
         if slug not in self._worlds:
             self._worlds[slug] = PartyWorld(party)
         return self._worlds[slug]
+
+    def get_or_create_hub(self, slug: str) -> PartyWorldHub | None:
+        if slug not in self._parties:
+            return None
+        if slug in self._hubs:
+            return self._hubs[slug]
+        world = self.get_or_create_world(slug)
+        assert world is not None
+        hub = PartyWorldHub(world)
+        self._hubs[slug] = hub
+        return hub
