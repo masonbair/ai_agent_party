@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SessionIdProvider } from '../src/contexts/SessionIdContext';
 import Party from '../src/pages/Party';
 
 class MockWebSocket {
@@ -122,11 +123,13 @@ describe('Party', () => {
 
   it('renders party space, zones, avatar, walls, and music placeholder', async () => {
     render(
-      <MemoryRouter initialEntries={['/party/cream-terrazzo']}>
-        <Routes>
-          <Route path="/party/:slug" element={<Party />} />
-        </Routes>
-      </MemoryRouter>,
+      <SessionIdProvider>
+        <MemoryRouter initialEntries={['/party/cream-terrazzo']}>
+          <Routes>
+            <Route path="/party/:slug" element={<Party />} />
+          </Routes>
+        </MemoryRouter>
+      </SessionIdProvider>,
     );
 
     expect(await screen.findByLabelText('zone-dance')).toBeInTheDocument();
@@ -138,12 +141,14 @@ describe('Party', () => {
 
   it('redirects to /lobby when slug is unknown', async () => {
     render(
-      <MemoryRouter initialEntries={['/party/unknown']}>
-        <Routes>
-          <Route path="/party/:slug" element={<Party />} />
-          <Route path="/lobby" element={<div>Lobby page</div>} />
-        </Routes>
-      </MemoryRouter>,
+      <SessionIdProvider>
+        <MemoryRouter initialEntries={['/party/unknown']}>
+          <Routes>
+            <Route path="/party/:slug" element={<Party />} />
+            <Route path="/lobby" element={<div>Lobby page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </SessionIdProvider>,
     );
 
     expect(await screen.findByText(/lobby page/i)).toBeInTheDocument();
@@ -152,11 +157,13 @@ describe('Party', () => {
   it('POSTs to /join on mount and /leave on unmount', async () => {
     const fetchSpy = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     const { unmount } = render(
-      <MemoryRouter initialEntries={['/party/cream-terrazzo']}>
-        <Routes>
-          <Route path="/party/:slug" element={<Party />} />
-        </Routes>
-      </MemoryRouter>,
+      <SessionIdProvider>
+        <MemoryRouter initialEntries={['/party/cream-terrazzo']}>
+          <Routes>
+            <Route path="/party/:slug" element={<Party />} />
+          </Routes>
+        </MemoryRouter>
+      </SessionIdProvider>,
     );
 
     // Wait for the party config + join call.

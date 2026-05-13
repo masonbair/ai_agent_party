@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, apiGet } from '../api/client';
+import { useSessionId } from '../contexts/SessionIdContext';
 import type { User } from '../api/types';
 
 const STORAGE_KEY = 'session_id';
@@ -23,26 +24,27 @@ type State =
   | { status: 'anon' };
 
 export function useSession(): State {
+  const { sessionId, setSessionId } = useSessionId();
   const [state, setState] = useState<State>({ status: 'loading' });
   const navigate = useNavigate();
 
   useEffect(() => {
-    const id = getStoredSessionId();
-    if (!id) {
+    if (!sessionId) {
       setState({ status: 'anon' });
       navigate('/', { replace: true });
       return;
     }
-    apiGet<User>(`/api/session/${id}`)
+    setState({ status: 'loading' });
+    apiGet<User>(`/api/session/${sessionId}`)
       .then((user) => setState({ status: 'authed', user }))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
-          clearStoredSessionId();
+          setSessionId(null);
         }
         setState({ status: 'anon' });
         navigate('/', { replace: true });
       });
-  }, [navigate]);
+  }, [sessionId, navigate, setSessionId]);
 
   return state;
 }

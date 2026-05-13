@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ApiError, apiGet, apiPost } from '../api/client';
+import { ApiError, apiPost } from '../api/client';
 import type { User } from '../api/types';
 import { ALLOWED_COLORS, USERNAME_REGEX } from '../constants';
-import {
-  clearStoredSessionId,
-  getStoredSessionId,
-  setStoredSessionId,
-} from '../hooks/useSession';
+import { useSessionId } from '../contexts/SessionIdContext';
+import { useSession } from '../hooks/useSession';
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -15,6 +12,8 @@ export default function SignIn() {
   const [takeoverNotice, setTakeoverNotice] = useState(
     searchParams.get('takeover') === '1',
   );
+  const { setSessionId } = useSessionId();
+  const session = useSession();
 
   useEffect(() => {
     if (searchParams.get('takeover') === '1') {
@@ -32,16 +31,10 @@ export default function SignIn() {
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    const id = getStoredSessionId();
-    if (!id) return;
-    apiGet<User>(`/api/session/${id}`)
-      .then(() => navigate('/lobby', { replace: true }))
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 404) {
-          clearStoredSessionId();
-        }
-      });
-  }, [navigate]);
+    if (session.status === 'authed') {
+      navigate('/lobby', { replace: true });
+    }
+  }, [session.status, navigate]);
 
   const usernameTouched = username.length > 0;
   const usernameValid = USERNAME_REGEX.test(username);
@@ -54,7 +47,7 @@ export default function SignIn() {
     setServerError(null);
     try {
       const user = await apiPost<User>('/api/session', { username, color });
-      setStoredSessionId(user.session_id);
+      setSessionId(user.session_id);
       navigate('/lobby');
     } catch (err) {
       const message =
