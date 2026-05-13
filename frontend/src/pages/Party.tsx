@@ -3,14 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PartySpace from '../components/PartySpace';
 import { ApiError, apiGet } from '../api/client';
 import type { PartyConfig } from '../api/types';
-import { useSession, clearStoredSessionId } from '../hooks/useSession';
+import { useSession } from '../hooks/useSession';
 import { joinParty, leaveParty, moveInParty, type Principal } from '../api/party';
 import { useRealtimeParty } from '../hooks/useRealtimeParty';
-import { useSessionPresence } from '../hooks/useSessionPresence';
+import { useSessionId } from '../contexts/SessionIdContext';
 
 export default function Party() {
   const session = useSession();
   const navigate = useNavigate();
+  const { setSessionId } = useSessionId();
   const { slug } = useParams<{ slug: string }>();
   const [party, setParty] = useState<PartyConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,14 +37,9 @@ export default function Party() {
     : null;
 
   const handleTakeover = useCallback(() => {
-    clearStoredSessionId();
+    setSessionId(null);
     navigate('/?takeover=1', { replace: true });
-  }, [navigate]);
-
-  useSessionPresence({
-    sessionId: session.status === 'authed' ? session.user.session_id : null,
-    onEvicted: handleTakeover,
-  });
+  }, [navigate, setSessionId]);
 
   const { participants } = useRealtimeParty(
     ready && principal
