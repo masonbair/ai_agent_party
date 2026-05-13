@@ -4,20 +4,6 @@ import { ApiError, apiGet } from '../api/client';
 import { useSessionId } from '../contexts/SessionIdContext';
 import type { User } from '../api/types';
 
-const STORAGE_KEY = 'session_id';
-
-export function getStoredSessionId(): string | null {
-  return localStorage.getItem(STORAGE_KEY);
-}
-
-export function setStoredSessionId(id: string): void {
-  localStorage.setItem(STORAGE_KEY, id);
-}
-
-export function clearStoredSessionId(): void {
-  localStorage.removeItem(STORAGE_KEY);
-}
-
 type State =
   | { status: 'loading' }
   | { status: 'authed'; user: User }
