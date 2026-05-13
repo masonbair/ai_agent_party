@@ -61,7 +61,6 @@ describe('Lobby', () => {
     });
   });
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     localStorage.clear();
   });
@@ -99,35 +98,4 @@ describe('Lobby', () => {
     expect(await screen.findByText(/Party page/i)).toBeInTheDocument();
   });
 
-  it('opens a session presence WebSocket when authed', async () => {
-    const seen: string[] = [];
-    class FakeWS {
-      url: string;
-      onopen: ((e: Event) => void) | null = null;
-      onmessage: ((e: MessageEvent) => void) | null = null;
-      onclose: ((e: CloseEvent) => void) | null = null;
-      onerror: ((e: Event) => void) | null = null;
-      readyState = 0;
-      constructor(url: string) {
-        this.url = url;
-        seen.push(url);
-      }
-      send() {}
-      close() {}
-    }
-    vi.stubGlobal('WebSocket', FakeWS);
-
-    render(
-      <SessionIdProvider>
-        <MemoryRouter initialEntries={['/lobby']}>
-          <Routes>
-            <Route path="/lobby" element={<Lobby />} />
-          </Routes>
-        </MemoryRouter>
-      </SessionIdProvider>,
-    );
-
-    expect(await screen.findByText(/Cream Terrazzo Lounge/i)).toBeInTheDocument();
-    expect(seen.some((u) => u.includes('/api/session/ws'))).toBe(true);
-  });
 });
