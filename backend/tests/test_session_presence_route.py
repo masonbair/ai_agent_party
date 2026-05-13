@@ -28,3 +28,17 @@ def test_session_ws_second_connect_evicts_first(client: TestClient) -> None:
             assert frame == {"type": "evicted", "reason": "takeover"}
             with pytest.raises(WebSocketDisconnect):
                 ws_a.receive_json()
+
+
+def test_session_ws_rejects_unknown_session_id(client: TestClient) -> None:
+    with client.websocket_connect("/api/session/ws") as ws:
+        ws.send_json({"type": "auth", "session_id": "does-not-exist"})
+        frame = ws.receive_json()
+        assert frame == {"type": "error", "detail": "invalid session"}
+
+
+def test_session_ws_rejects_non_auth_first_frame(client: TestClient) -> None:
+    with client.websocket_connect("/api/session/ws") as ws:
+        ws.send_json({"type": "ping"})
+        frame = ws.receive_json()
+        assert frame == {"type": "error", "detail": "invalid session"}
