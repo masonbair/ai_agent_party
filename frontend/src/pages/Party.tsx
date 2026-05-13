@@ -4,6 +4,8 @@ import PartySpace from '../components/PartySpace';
 import { ApiError, apiGet } from '../api/client';
 import type { PartyConfig } from '../api/types';
 import { useSession } from '../hooks/useSession';
+import { joinParty, leaveParty, moveInParty, type Principal } from '../api/party';
+import { useRealtimeParty } from '../hooks/useRealtimeParty';
 
 export default function Party() {
   const session = useSession();
@@ -27,9 +29,36 @@ export default function Party() {
       });
   }, [slug, session.status, navigate]);
 
+  const ready = session.status === 'authed' && party !== null;
+  const principal: Principal | null = ready
+    ? { kind: 'human', id: session.user.session_id }
+    : null;
+
+  const { participants } = useRealtimeParty(
+    ready && principal
+      ? { slug: party!.slug, principal }
+      : { slug: '', principal: { kind: 'human', id: '' } },
+  );
+
+  useEffect(() => {
+    if (!ready || !principal || !party) return;
+    const slugForCleanup = party.slug;
+    const pForCleanup = principal;
+    joinParty(slugForCleanup, pForCleanup).catch(() => {});
+    return () => {
+      leaveParty(slugForCleanup, pForCleanup).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, party?.slug, principal?.id]);
+
   if (session.status !== 'authed') return null;
   if (error && !party) return <p role="alert">{error}</p>;
   if (!party) return <p>Loading party…</p>;
+
+  const onMove = (x: number, y: number) => {
+    if (!principal) return;
+    moveInParty(party.slug, principal, x, y).catch(() => {});
+  };
 
   return (
     <main>
@@ -68,7 +97,12 @@ export default function Party() {
           ← Leave party
         </button>
       </header>
-      <PartySpace party={party} user={session.user} />
+      <PartySpace
+        party={party}
+        user={session.user}
+        participants={participants}
+        onMove={onMove}
+      />
     </main>
   );
 }
