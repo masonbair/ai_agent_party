@@ -4,6 +4,13 @@ broadcasts each event to every subscribed socket.
 The hub is transport-agnostic: subscribers only need ``send_json`` and
 ``close`` coroutines, which lets the route layer pass a real FastAPI
 ``WebSocket`` and tests pass an in-memory fake.
+
+World events are emitted synchronously by ``PartyWorld`` (which may be
+running in a worker thread when called from a sync FastAPI route via
+``TestClient``). To bridge into the asyncio world reliably we capture
+the event loop the hub was first observed on (when ``subscribe`` is
+called from an async context) and dispatch via either ``create_task``
+(same-thread) or ``run_coroutine_threadsafe`` (cross-thread).
 """
 
 from __future__ import annotations
@@ -41,9 +48,19 @@ class PartyWorldHub:
         self.world = world
         self.subscribers: set[SocketLike] = set()
         self._pending: list[asyncio.Task] = []
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._unsub = world.on_event(self._on_event)
 
+    def _capture_loop(self) -> None:
+        if self._loop is not None:
+            return
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._loop = None
+
     def subscribe(self, sock: SocketLike) -> None:
+        self._capture_loop()
         self.subscribers.add(sock)
 
     def unsubscribe(self, sock: SocketLike) -> None:
@@ -52,14 +69,31 @@ class PartyWorldHub:
     def _on_event(self, event: Event) -> None:
         payload = _serialise_event(event)
         # Snapshot subscribers so concurrent unsubscribe is safe.
-        for sock in list(self.subscribers):
-            try:
-                task = asyncio.create_task(self._send_or_drop(sock, payload))
-            except RuntimeError:
-                # No running loop (e.g. event emitted from sync test code).
-                # Fall back to scheduling on the default loop if possible.
-                continue
-            self._pending.append(task)
+        snapshot = list(self.subscribers)
+        if not snapshot:
+            return
+
+        # Determine where to schedule the coroutine.
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+
+        for sock in snapshot:
+            coro = self._send_or_drop(sock, payload)
+            if running is not None:
+                # Same thread / loop — schedule directly.
+                task = running.create_task(coro)
+                self._pending.append(task)
+            elif self._loop is not None:
+                # Sync caller from another thread (e.g. TestClient running a
+                # sync route handler in a worker thread). Hop onto the loop
+                # the hub was first observed on.
+                asyncio.run_coroutine_threadsafe(coro, self._loop)
+            else:
+                # No loop anywhere — drop the coroutine to avoid a
+                # "never awaited" warning while preserving safety.
+                coro.close()
 
     async def _send_or_drop(self, sock: SocketLike, payload: dict) -> None:
         try:
@@ -72,7 +106,7 @@ class PartyWorldHub:
                 pass
 
     async def drain(self) -> None:
-        """Wait for any pending send tasks to finish (test helper)."""
+        """Wait for any pending in-loop send tasks to finish (test helper)."""
         if not self._pending:
             return
         pending = self._pending
