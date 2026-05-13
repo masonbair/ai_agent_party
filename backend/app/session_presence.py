@@ -19,15 +19,23 @@ class StoreLike(Protocol):
 class SessionPresenceHub:
     """Tracks one live WebSocket per ``session_id``.
 
-    A second ``subscribe`` for the same id evicts the prior socket:
-    sends ``{"type":"evicted","reason":"takeover"}``, closes it, and
-    removes the participant from every world it was in.
+    A second ``subscribe`` for the same id evicts the prior socket
+    immediately: sends ``{"type":"evicted","reason":"takeover"}``, closes
+    it, and removes the participant from every world.
+
+    A clean ``unsubscribe`` schedules ``world.leave`` after
+    ``GRACE_SECONDS`` so that brief reconnects do not boot the user from
+    a world they were in. A new ``subscribe`` for the same id cancels
+    the pending leave.
     """
+
+    GRACE_SECONDS: float = 3.0
 
     def __init__(self, store: StoreLike) -> None:
         self._store = store
         self._by_session: dict[str, SocketLike] = {}
         self._pending: list[asyncio.Task] = []
+        self._pending_leaves: dict[str, asyncio.TimerHandle] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
 
     def _capture_loop(self) -> None:
@@ -40,6 +48,9 @@ class SessionPresenceHub:
 
     def subscribe(self, sock: SocketLike, session_id: str) -> None:
         self._capture_loop()
+        timer = self._pending_leaves.pop(session_id, None)
+        if timer is not None:
+            timer.cancel()
         old = self._by_session.get(session_id)
         if old is not None and old is not sock:
             self._evict(old, session_id)
@@ -48,6 +59,28 @@ class SessionPresenceHub:
     def unsubscribe(self, sock: SocketLike, session_id: str) -> None:
         if self._by_session.get(session_id) is sock:
             del self._by_session[session_id]
+            self._schedule_leave(session_id)
+
+    def _schedule_leave(self, session_id: str) -> None:
+        if self._loop is None:
+            return
+        existing = self._pending_leaves.pop(session_id, None)
+        if existing is not None:
+            existing.cancel()
+        handle = self._loop.call_later(
+            self.GRACE_SECONDS,
+            self._run_leave,
+            session_id,
+        )
+        self._pending_leaves[session_id] = handle
+
+    def _run_leave(self, session_id: str) -> None:
+        self._pending_leaves.pop(session_id, None)
+        for world in self._store.worlds():
+            try:
+                world.leave(session_id)
+            except Exception:
+                pass
 
     def _evict(self, old: SocketLike, session_id: str) -> None:
         self._dispatch(self._send_evict_and_close(old))

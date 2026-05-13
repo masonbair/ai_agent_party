@@ -114,3 +114,55 @@ async def test_presence_hub_evict_tolerates_missing_participant() -> None:
     await hub.drain()
 
     assert {"type": "evicted", "reason": "takeover"} in a.sent
+
+
+@pytest.mark.asyncio
+async def test_clean_unsubscribe_schedules_leave_after_grace() -> None:
+    world = PartyWorld(CREAM_TERRAZZO)
+    world.join(_alice())
+    store = FakeStoreWithWorlds([world])
+    hub = SessionPresenceHub(store)
+    hub.GRACE_SECONDS = 0.05  # speed up the test
+
+    a = FakeSocket()
+    hub.subscribe(a, "sid-1")
+    hub.unsubscribe(a, "sid-1")
+
+    await asyncio.sleep(0.15)
+    assert "sid-1" not in world.participants
+
+
+@pytest.mark.asyncio
+async def test_resubscribe_within_grace_cancels_leave() -> None:
+    world = PartyWorld(CREAM_TERRAZZO)
+    world.join(_alice())
+    store = FakeStoreWithWorlds([world])
+    hub = SessionPresenceHub(store)
+    hub.GRACE_SECONDS = 0.1
+
+    a = FakeSocket()
+    b = FakeSocket()
+    hub.subscribe(a, "sid-1")
+    hub.unsubscribe(a, "sid-1")
+    await asyncio.sleep(0.02)
+    hub.subscribe(b, "sid-1")
+
+    await asyncio.sleep(0.15)
+    assert "sid-1" in world.participants
+
+
+@pytest.mark.asyncio
+async def test_eviction_still_leaves_immediately() -> None:
+    world = PartyWorld(CREAM_TERRAZZO)
+    world.join(_alice())
+    store = FakeStoreWithWorlds([world])
+    hub = SessionPresenceHub(store)
+    hub.GRACE_SECONDS = 10.0  # ensure the grace-path is not what removes Alice
+
+    a = FakeSocket()
+    b = FakeSocket()
+    hub.subscribe(a, "sid-1")
+    hub.subscribe(b, "sid-1")  # evicts a
+    await hub.drain()
+
+    assert "sid-1" not in world.participants
