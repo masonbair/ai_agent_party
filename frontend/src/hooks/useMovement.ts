@@ -15,6 +15,8 @@ type Options = {
   speed: number;
   walls?: MovementWall[];
   start?: Point;
+  onMove?: (x: number, y: number) => void;
+  moveThrottleMs?: number;
 };
 
 const KEY_TO_DIR: Record<string, Point> = {
@@ -179,10 +181,19 @@ export function useMovement(opts: Options) {
   const posRef = useRef<Point>(position);
   const lastTimeRef = useRef<number | null>(null);
   const wallsRef = useRef<Rect[]>(inflateWalls(opts.walls, worldWidth, worldHeight));
+  const onMoveRef = useRef(opts.onMove);
+  const lastEmitRef = useRef<{ time: number; x: number; y: number }>({
+    time: 0,
+    x: NaN,
+    y: NaN,
+  });
+  const throttleMsRef = useRef(opts.moveThrottleMs ?? 100);
+  throttleMsRef.current = opts.moveThrottleMs ?? 100;
 
   posRef.current = position;
   targetRef.current = target;
   wallsRef.current = inflateWalls(opts.walls, worldWidth, worldHeight);
+  onMoveRef.current = opts.onMove;
 
   function setTarget(p: Point | null) {
     if (p === null) {
@@ -295,6 +306,17 @@ export function useMovement(opts: Options) {
       if (clamped.x !== x || clamped.y !== y) {
         posRef.current = clamped;
         setPosition(clamped);
+        const nowMs =
+          typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (
+          onMoveRef.current &&
+          (clamped.x !== lastEmitRef.current.x ||
+            clamped.y !== lastEmitRef.current.y) &&
+          nowMs - lastEmitRef.current.time >= throttleMsRef.current
+        ) {
+          lastEmitRef.current = { time: nowMs, x: clamped.x, y: clamped.y };
+          onMoveRef.current(clamped.x, clamped.y);
+        }
       }
       rafId = requestAnimationFrame(loop);
     }

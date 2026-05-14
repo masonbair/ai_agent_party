@@ -45,3 +45,12 @@ export type PartyConfig = {
 export type PartiesListResponse = {
   parties: PartyConfig[];
 };
+
+export type Participant = {
+  id: string;
+  kind: 'human' | 'agent';
+  username: string;
+  color: string;
+  x: number;
+  y: number;
+};
