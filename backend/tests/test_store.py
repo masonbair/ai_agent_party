@@ -68,3 +68,24 @@ def test_store_hub_wraps_the_same_world_used_by_get_or_create_world() -> None:
     hub = store.get_or_create_hub("cream-terrazzo")
     assert hub is not None
     assert hub.world is world
+
+
+def test_store_worlds_returns_initialized_worlds() -> None:
+    from app.store import Store
+
+    store = Store()
+    assert list(store.worlds()) == []
+    w = store.get_or_create_world("cream-terrazzo")
+    assert w is not None
+    assert list(store.worlds()) == [w]
+
+
+def test_store_session_presence_is_lazy_and_idempotent() -> None:
+    from app.store import Store
+    from app.session_presence import SessionPresenceHub
+
+    store = Store()
+    hub1 = store.session_presence
+    hub2 = store.session_presence
+    assert isinstance(hub1, SessionPresenceHub)
+    assert hub1 is hub2

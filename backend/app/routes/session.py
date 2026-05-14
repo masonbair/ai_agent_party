@@ -1,4 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 
 from app.models import CreateSessionRequest, User
 from app.store import Store
@@ -30,3 +38,40 @@ def delete_session(session_id: str, store: Store = Depends(_store_dep)) -> Respo
     if not store.delete_session(session_id):
         raise HTTPException(status_code=404, detail="session not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.websocket("/ws")
+async def session_ws(
+    websocket: WebSocket,
+    store: Store = Depends(_store_dep),
+) -> None:
+    await websocket.accept()
+
+    try:
+        frame = await websocket.receive_json()
+    except WebSocketDisconnect:
+        return
+    except Exception:
+        await websocket.close()
+        return
+
+    if not isinstance(frame, dict) or frame.get("type") != "auth":
+        await websocket.send_json({"type": "error", "detail": "invalid session"})
+        await websocket.close()
+        return
+
+    session_id = frame.get("session_id")
+    if not isinstance(session_id, str) or store.get_session(session_id) is None:
+        await websocket.send_json({"type": "error", "detail": "invalid session"})
+        await websocket.close()
+        return
+
+    hub = store.session_presence
+    hub.subscribe(websocket, session_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        hub.unsubscribe(websocket, session_id)

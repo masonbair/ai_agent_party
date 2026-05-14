@@ -37,21 +37,21 @@ def get_party(
     return party
 
 
-def _validate_ws_principal(store: Store, frame: object) -> bool:
+def _validate_ws_principal(store: Store, frame: object) -> Principal | None:
     if not isinstance(frame, dict) or frame.get("type") != "auth":
-        return False
+        return None
     raw = frame.get("principal")
     if not isinstance(raw, dict):
-        return False
+        return None
     try:
         principal = Principal(**raw)
     except ValidationError:
-        return False
+        return None
     try:
         resolve_principal(store, principal)
     except HTTPException:
-        return False
-    return True
+        return None
+    return principal
 
 
 @router.websocket("/{slug}/ws")
@@ -66,7 +66,6 @@ async def party_ws(
         return
     await websocket.accept()
 
-    # First frame must be a valid {"type": "auth", "principal": ...}.
     try:
         frame = await websocket.receive_json()
     except WebSocketDisconnect:
@@ -75,7 +74,8 @@ async def party_ws(
         await websocket.close()
         return
 
-    if not _validate_ws_principal(store, frame):
+    principal = _validate_ws_principal(store, frame)
+    if principal is None:
         await websocket.send_json({"type": "error", "detail": "invalid principal"})
         await websocket.close()
         return
@@ -93,13 +93,13 @@ async def party_ws(
             "cursor": snap["cursor"],
         }
     )
-    hub.subscribe(websocket)
+
+    principal_key = f"{principal.kind}:{principal.id}"
+    hub.subscribe(websocket, principal_key=principal_key, participant_id=principal.id)
     try:
         while True:
-            # We don't act on client frames after auth in this phase, but we
-            # need to read so the socket stays responsive to close frames.
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass
     finally:
-        hub.unsubscribe(websocket)
+        hub.unsubscribe(websocket, principal_key=principal_key)

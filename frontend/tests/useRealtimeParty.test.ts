@@ -206,4 +206,30 @@ describe('useRealtimeParty', () => {
     );
     expect(result.current.participants).toHaveLength(0);
   });
+
+  it('invokes onEvicted, closes, and suppresses reconnect on an evicted frame', async () => {
+    const onEvicted = vi.fn();
+    renderHook(() =>
+      useRealtimeParty({
+        slug: 'cream-terrazzo',
+        principal: selfPrincipal,
+        onEvicted,
+      }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws = MockWebSocket.instances[0];
+    act(() => ws.receive({ type: 'snapshot', room: {}, participants: [], cursor: 0 }));
+
+    act(() => ws.receive({ type: 'evicted', reason: 'takeover' }));
+
+    expect(onEvicted).toHaveBeenCalledTimes(1);
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1100));
+    });
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
 });

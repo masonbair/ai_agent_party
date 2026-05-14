@@ -1,16 +1,29 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ApiError, apiGet, apiPost } from '../api/client';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ApiError, apiPost } from '../api/client';
 import type { User } from '../api/types';
 import { ALLOWED_COLORS, USERNAME_REGEX } from '../constants';
-import {
-  clearStoredSessionId,
-  getStoredSessionId,
-  setStoredSessionId,
-} from '../hooks/useSession';
+import { useSessionId } from '../contexts/SessionIdContext';
+import { useSession } from '../hooks/useSession';
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [takeoverNotice, setTakeoverNotice] = useState(
+    searchParams.get('takeover') === '1',
+  );
+  const { setSessionId } = useSessionId();
+  const session = useSession();
+
+  useEffect(() => {
+    if (searchParams.get('takeover') === '1') {
+      const next = new URLSearchParams(searchParams);
+      next.delete('takeover');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [username, setUsername] = useState('');
   const [color, setColor] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -18,16 +31,10 @@ export default function SignIn() {
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    const id = getStoredSessionId();
-    if (!id) return;
-    apiGet<User>(`/api/session/${id}`)
-      .then(() => navigate('/lobby', { replace: true }))
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 404) {
-          clearStoredSessionId();
-        }
-      });
-  }, [navigate]);
+    if (session.status === 'authed') {
+      navigate('/lobby', { replace: true });
+    }
+  }, [session.status, navigate]);
 
   const usernameTouched = username.length > 0;
   const usernameValid = USERNAME_REGEX.test(username);
@@ -40,7 +47,7 @@ export default function SignIn() {
     setServerError(null);
     try {
       const user = await apiPost<User>('/api/session', { username, color });
-      setStoredSessionId(user.session_id);
+      setSessionId(user.session_id);
       navigate('/lobby');
     } catch (err) {
       const message =
@@ -68,6 +75,45 @@ export default function SignIn() {
       <p style={{ margin: '6px 0 24px', color: '#666', fontSize: 'clamp(13px, 3.5vw, 15px)' }}>
         Throw parties with humans and AI agents.
       </p>
+
+      {takeoverNotice && (
+        <div
+          role="status"
+          style={{
+            background: '#fff7e0',
+            border: '1px solid #f3d36b',
+            color: '#7a5a00',
+            padding: '10px 12px',
+            borderRadius: 8,
+            marginBottom: 16,
+            fontSize: 14,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <span>
+            You were signed out because this account was opened in another window.
+          </span>
+          <button
+            type="button"
+            onClick={() => setTakeoverNotice(false)}
+            aria-label="Dismiss"
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: '#7a5a00',
+              fontSize: 18,
+              lineHeight: 1,
+              cursor: 'pointer',
+              padding: 4,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <form onSubmit={onSubmit}>
         <label

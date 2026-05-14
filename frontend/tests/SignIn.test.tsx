@@ -2,16 +2,19 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SessionIdProvider } from '../src/contexts/SessionIdContext';
 import SignIn from '../src/pages/SignIn';
 
 function renderSignIn() {
   return render(
-    <MemoryRouter initialEntries={['/']}>
-      <Routes>
-        <Route path="/" element={<SignIn />} />
-        <Route path="/lobby" element={<div>Lobby page</div>} />
-      </Routes>
-    </MemoryRouter>,
+    <SessionIdProvider>
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<SignIn />} />
+          <Route path="/lobby" element={<div>Lobby page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </SessionIdProvider>,
   );
 }
 
@@ -78,5 +81,34 @@ describe('SignIn', () => {
 
     expect(await screen.findByText(/lobby page/i)).toBeInTheDocument();
     expect(localStorage.getItem('session_id')).toBe('sid-1');
+  });
+
+  it('shows a takeover banner when ?takeover=1 is present, then strips the param', async () => {
+    function Probe() {
+      const [params] = require('react-router-dom').useSearchParams();
+      return <span data-testid="qp">{params.get('takeover') ?? ''}</span>;
+    }
+    render(
+      <SessionIdProvider>
+        <MemoryRouter initialEntries={['/?takeover=1']}>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <>
+                  <SignIn />
+                  <Probe />
+                </>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </SessionIdProvider>,
+    );
+    expect(
+      await screen.findByText(/signed out because this account was opened/i),
+    ).toBeInTheDocument();
+    await screen.findByTestId('qp');
+    expect(screen.getByTestId('qp').textContent).toBe('');
   });
 });

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SessionIdProvider } from '../src/contexts/SessionIdContext';
 import Lobby from '../src/pages/Lobby';
 
 const sessionResponse = {
@@ -66,12 +67,14 @@ describe('Lobby', () => {
 
   it('renders a card per party with a mini preview', async () => {
     render(
-      <MemoryRouter initialEntries={['/lobby']}>
-        <Routes>
-          <Route path="/lobby" element={<Lobby />} />
-          <Route path="/party/:slug" element={<div>Party page</div>} />
-        </Routes>
-      </MemoryRouter>,
+      <SessionIdProvider>
+        <MemoryRouter initialEntries={['/lobby']}>
+          <Routes>
+            <Route path="/lobby" element={<Lobby />} />
+            <Route path="/party/:slug" element={<div>Party page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </SessionIdProvider>,
     );
 
     expect(await screen.findByText(/Cream Terrazzo Lounge/i)).toBeInTheDocument();
@@ -80,16 +83,19 @@ describe('Lobby', () => {
 
   it('navigates to /party/:slug when a card is clicked', async () => {
     render(
-      <MemoryRouter initialEntries={['/lobby']}>
-        <Routes>
-          <Route path="/lobby" element={<Lobby />} />
-          <Route path="/party/:slug" element={<div>Party page</div>} />
-        </Routes>
-      </MemoryRouter>,
+      <SessionIdProvider>
+        <MemoryRouter initialEntries={['/lobby']}>
+          <Routes>
+            <Route path="/lobby" element={<Lobby />} />
+            <Route path="/party/:slug" element={<div>Party page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </SessionIdProvider>,
     );
 
     const card = await screen.findByRole('button', { name: /cream terrazzo lounge/i });
     await userEvent.click(card);
     expect(await screen.findByText(/Party page/i)).toBeInTheDocument();
   });
+
 });

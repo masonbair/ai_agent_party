@@ -42,11 +42,15 @@ class PartyWorldHub:
     Each appended world event is dispatched to every subscriber. Sockets
     that raise during ``send_json`` are dropped and closed so a single
     misbehaving client cannot stall the world.
+
+    Tracks one live socket per ``principal_key`` (``"<kind>:<id>"``);
+    a second ``subscribe`` for the same key evicts the prior socket.
     """
 
     def __init__(self, world: PartyWorld) -> None:
         self.world = world
         self.subscribers: set[SocketLike] = set()
+        self._by_principal: dict[str, SocketLike] = {}
         self._pending: list[asyncio.Task] = []
         self._loop: asyncio.AbstractEventLoop | None = None
         self._unsub = world.on_event(self._on_event)
@@ -59,47 +63,67 @@ class PartyWorldHub:
         except RuntimeError:
             self._loop = None
 
-    def subscribe(self, sock: SocketLike) -> None:
+    def subscribe(
+        self, sock: SocketLike, principal_key: str, participant_id: str
+    ) -> None:
         self._capture_loop()
+        old = self._by_principal.get(principal_key)
+        if old is not None and old is not sock:
+            self._evict(old, participant_id)
+        self._by_principal[principal_key] = sock
         self.subscribers.add(sock)
 
-    def unsubscribe(self, sock: SocketLike) -> None:
+    def unsubscribe(self, sock: SocketLike, principal_key: str) -> None:
         self.subscribers.discard(sock)
+        if self._by_principal.get(principal_key) is sock:
+            del self._by_principal[principal_key]
 
-    def _on_event(self, event: Event) -> None:
-        payload = _serialise_event(event)
-        # Snapshot subscribers so concurrent unsubscribe is safe.
-        snapshot = list(self.subscribers)
-        if not snapshot:
-            return
+    def _evict(self, old: SocketLike, participant_id: str) -> None:
+        self.subscribers.discard(old)
+        self._dispatch(self._send_evict_and_close(old))
+        try:
+            self.world.leave(participant_id)
+        except Exception:
+            pass
 
-        # Determine where to schedule the coroutine.
+    async def _send_evict_and_close(self, sock: SocketLike) -> None:
+        try:
+            await sock.send_json({"type": "evicted", "reason": "takeover"})
+        except Exception:
+            pass
+        try:
+            await sock.close()
+        except Exception:
+            pass
+
+    def _dispatch(self, coro) -> None:
         try:
             running = asyncio.get_running_loop()
         except RuntimeError:
             running = None
+        if running is not None:
+            self._pending.append(running.create_task(coro))
+        elif self._loop is not None:
+            asyncio.run_coroutine_threadsafe(coro, self._loop)
+        else:
+            coro.close()
 
+    def _on_event(self, event: Event) -> None:
+        payload = _serialise_event(event)
+        snapshot = list(self.subscribers)
+        if not snapshot:
+            return
         for sock in snapshot:
-            coro = self._send_or_drop(sock, payload)
-            if running is not None:
-                # Same thread / loop — schedule directly.
-                task = running.create_task(coro)
-                self._pending.append(task)
-            elif self._loop is not None:
-                # Sync caller from another thread (e.g. TestClient running a
-                # sync route handler in a worker thread). Hop onto the loop
-                # the hub was first observed on.
-                asyncio.run_coroutine_threadsafe(coro, self._loop)
-            else:
-                # No loop anywhere — drop the coroutine to avoid a
-                # "never awaited" warning while preserving safety.
-                coro.close()
+            self._dispatch(self._send_or_drop(sock, payload))
 
     async def _send_or_drop(self, sock: SocketLike, payload: dict) -> None:
         try:
             await sock.send_json(payload)
         except Exception:
             self.subscribers.discard(sock)
+            stale = [k for k, v in self._by_principal.items() if v is sock]
+            for k in stale:
+                del self._by_principal[k]
             try:
                 await sock.close()
             except Exception:
@@ -116,3 +140,4 @@ class PartyWorldHub:
     def teardown(self) -> None:
         self._unsub()
         self.subscribers.clear()
+        self._by_principal.clear()

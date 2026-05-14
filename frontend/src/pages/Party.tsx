@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PartySpace from '../components/PartySpace';
 import { ApiError, apiGet } from '../api/client';
@@ -6,10 +6,12 @@ import type { PartyConfig } from '../api/types';
 import { useSession } from '../hooks/useSession';
 import { joinParty, leaveParty, moveInParty, type Principal } from '../api/party';
 import { useRealtimeParty } from '../hooks/useRealtimeParty';
+import { useSessionId } from '../contexts/SessionIdContext';
 
 export default function Party() {
   const session = useSession();
   const navigate = useNavigate();
+  const { setSessionId } = useSessionId();
   const { slug } = useParams<{ slug: string }>();
   const [party, setParty] = useState<PartyConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,9 +36,14 @@ export default function Party() {
     ? { kind: 'human', id: session.user.session_id }
     : null;
 
+  const handleTakeover = useCallback(() => {
+    setSessionId(null);
+    navigate('/?takeover=1', { replace: true });
+  }, [navigate, setSessionId]);
+
   const { participants } = useRealtimeParty(
     ready && principal
-      ? { slug: party!.slug, principal }
+      ? { slug: party!.slug, principal, onEvicted: handleTakeover }
       : { slug: '', principal: { kind: 'human', id: '' } },
   );
 

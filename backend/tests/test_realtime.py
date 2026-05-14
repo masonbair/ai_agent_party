@@ -40,7 +40,7 @@ async def test_hub_broadcasts_to_subscribers() -> None:
     world = PartyWorld(CREAM_TERRAZZO)
     hub = PartyWorldHub(world)
     sock = FakeSocket()
-    hub.subscribe(sock)
+    hub.subscribe(sock, principal_key="human:s-alice", participant_id="s-alice")
     world.join(_alice())
     await asyncio.sleep(0)
     await hub.drain()
@@ -55,8 +55,8 @@ async def test_hub_drops_misbehaving_subscriber() -> None:
     world = PartyWorld(CREAM_TERRAZZO)
     hub = PartyWorldHub(world)
     good, bad = FakeSocket(), FakeSocket(fail_on=0)
-    hub.subscribe(good)
-    hub.subscribe(bad)
+    hub.subscribe(good, principal_key="human:good", participant_id="s-alice")
+    hub.subscribe(bad, principal_key="human:bad", participant_id="s-alice")
     world.join(_alice())
     await hub.drain()
     assert bad.closed
@@ -70,11 +70,11 @@ async def test_hub_unsubscribe_stops_delivery() -> None:
     world = PartyWorld(CREAM_TERRAZZO)
     hub = PartyWorldHub(world)
     sock = FakeSocket()
-    hub.subscribe(sock)
+    hub.subscribe(sock, principal_key="human:s-alice", participant_id="s-alice")
     world.join(_alice())
     await hub.drain()
     assert len(sock.sent) == 1
-    hub.unsubscribe(sock)
+    hub.unsubscribe(sock, principal_key="human:s-alice")
     world.move("s-alice", 100.0, 100.0)
     await hub.drain()
     assert len(sock.sent) == 1  # unchanged
