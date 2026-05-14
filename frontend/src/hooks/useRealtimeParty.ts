@@ -1,3 +1,4 @@
+// frontend/src/hooks/useRealtimeParty.ts
 import { useEffect, useRef, useState } from 'react';
 import type { Participant } from '../api/types';
 import type { Principal } from '../api/party';
@@ -10,6 +11,12 @@ type Options = {
 
 type Status = 'connecting' | 'open' | 'closed';
 
+export type Bubble = { text: string; expiresAt: number };
+export type Bubbles = Record<string, Bubble>;
+
+export const BUBBLE_LIFETIME_MS = 5000;
+const BUBBLE_TICK_MS = 250;
+
 function wsUrlFor(slug: string): string {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return `${proto}://${window.location.host}/api/parties/${slug}/ws`;
@@ -17,10 +24,28 @@ function wsUrlFor(slug: string): string {
 
 export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [bubbles, setBubbles] = useState<Bubbles>({});
   const [status, setStatus] = useState<Status>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
   const backoffRef = useRef(1000);
   const evictedRef = useRef(false);
+
+  // Expiry tick: prunes bubbles whose expiresAt has passed.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBubbles((prev) => {
+        const now = Date.now();
+        let changed = false;
+        const next: Bubbles = {};
+        for (const [k, b] of Object.entries(prev)) {
+          if (b.expiresAt > now) next[k] = b;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, BUBBLE_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!slug || !principal.id) return;
@@ -67,14 +92,29 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
           } else if (ev.type === 'leave') {
             const id = (ev as unknown as { participant_id: string }).participant_id;
             setParticipants((prev) => prev.filter((q) => q.id !== id));
+            setBubbles((prev) => {
+              if (!(id in prev)) return prev;
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
           } else if (ev.type === 'move') {
             const m = ev as unknown as { participant_id: string; x: number; y: number };
-            if (m.participant_id === principal.id) return; // ignore self-echo
+            if (m.participant_id === principal.id) return;
             setParticipants((prev) =>
               prev.map((q) =>
                 q.id === m.participant_id ? { ...q, x: m.x, y: m.y } : q,
               ),
             );
+          } else if (ev.type === 'chat') {
+            const c = ev as unknown as { participant_id: string; text: string };
+            setBubbles((prev) => ({
+              ...prev,
+              [c.participant_id]: {
+                text: c.text,
+                expiresAt: Date.now() + BUBBLE_LIFETIME_MS,
+              },
+            }));
           }
         }
       };
@@ -87,9 +127,7 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
         reconnectTimer = setTimeout(connect, delay);
       };
 
-      ws.onerror = () => {
-        // onclose handler will run next; no extra cleanup here.
-      };
+      ws.onerror = () => {};
     }
 
     connect();
@@ -100,5 +138,5 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
     };
   }, [slug, principal.id, principal.kind]);
 
-  return { participants, status };
+  return { participants, status, bubbles };
 }
