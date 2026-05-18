@@ -42,7 +42,7 @@ export default function ChatBubble({
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         opacity: fading ? 0 : 1,
-        transition: 'opacity 500ms ease-out',
+        transition: 'left 150ms linear, top 150ms linear, opacity 500ms ease-out',
         zIndex: 5,
       }}
     >
