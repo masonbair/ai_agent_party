@@ -356,3 +356,30 @@ def test_react_unknown_actor_raises() -> None:
     w = _world_with_modules()
     with pytest.raises(ParticipantNotInPartyError):
         w.react("ghost", "❤️")
+
+
+# --- Lighting (Task 6) ---
+
+
+def test_set_lighting_updates_state_and_emits_event() -> None:
+    from app.events import LightingChangedEvent
+
+    w = _world_with_modules()
+    _join_modules(w, "p1")
+    ev = w.set_lighting("p1", "night")
+    assert isinstance(ev, LightingChangedEvent)
+    assert w.lighting == "night"
+    assert ev.changed_by == "p1"
+
+
+def test_set_lighting_rejects_unknown_preset() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1")
+    with pytest.raises(ValueError):
+        w.set_lighting("p1", "rainbow")
+
+
+def test_set_lighting_requires_participant() -> None:
+    w = _world_with_modules()
+    with pytest.raises(ParticipantNotInPartyError):
+        w.set_lighting("ghost", "day")

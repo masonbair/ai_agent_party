@@ -10,10 +10,13 @@ from app.events import (
     MoveEvent,
     Participant,
     Reaction,
+    LightingChangedEvent,
     ReactionEvent,
     StickyNote,
     Stroke,
 )
+
+_LIGHTING_PRESETS = ("day", "dusk", "night", "party")
 from app.models import (
     DrawBoardModule,
     LightingModule,
@@ -161,6 +164,22 @@ class PartyWorld:
             emoji=cleaned,
             expires_at=expires_at,
             at=now,
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
+
+    def set_lighting(self, changed_by: str, preset: str) -> LightingChangedEvent:
+        if changed_by not in self.participants:
+            raise ParticipantNotInPartyError(changed_by)
+        if preset not in _LIGHTING_PRESETS:
+            raise ValueError(f"unknown lighting preset {preset!r}")
+        self.lighting = preset
+        ev = LightingChangedEvent(
+            seq=self._next_seq(),
+            preset=preset,
+            changed_by=changed_by,
+            at=time.time(),
         )
         self._events.append(ev)
         self._emit(ev)
