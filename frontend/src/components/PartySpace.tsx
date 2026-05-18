@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   LightingPreset,
   ModuleSnapshot,
@@ -16,8 +16,9 @@ import Wall from './Wall';
 import Zone from './Zone';
 import { LightingOverlay } from './LightingOverlay';
 import { ReactionLayer } from './ReactionLayer';
-import { ReactionPalette } from './ReactionPalette';
-import { Module } from './modules/Module';
+import { RadialReactionPicker } from './RadialReactionPicker';
+import { Module, isInZone } from './modules/Module';
+import { ModuleModal } from './modules/ModuleModal';
 
 const SPEED = 220; // logical units / sec
 
@@ -46,6 +47,8 @@ type Props = {
   realtimeStatus?: 'connecting' | 'open' | 'closed';
 };
 
+type PlacedModule = Extract<ModuleSnapshot, { kind: 'stickynotes' | 'drawboard' }>;
+
 export default function PartySpace({
   party,
   user,
@@ -68,8 +71,9 @@ export default function PartySpace({
     moveThrottleMs: 100,
   });
   const floorRef = useRef<HTMLDivElement>(null);
+  const [openModuleId, setOpenModuleId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  // Seed initial state (modules, lighting, active reactions) via /observe.
   useEffect(() => {
     if (!applyObserveInitial) return;
     let cancelled = false;
@@ -98,11 +102,44 @@ export default function PartySpace({
     setTarget({ x: logicalX, y: logicalY });
   }
 
-  // If participants is provided and non-empty, render everyone (overriding the
-  // local-only view). The local user's x/y is overridden with the hook's
-  // `position` so the local avatar stays visually responsive even before the
-  // server echoes a move. Otherwise fall back to the single-player path:
-  // render only the local user.
+  const myPosition = { x: position.x, y: position.y };
+
+  // Keyboard: r toggles the radial reaction picker; e opens the nearest
+  // module if you're inside its interaction zone; Esc closes either.
+  useEffect(() => {
+    if (!principal) return;
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      const k = e.key.toLowerCase();
+      if (k === 'r') {
+        if (openModuleId) return;
+        e.preventDefault();
+        setPickerOpen((p) => !p);
+        return;
+      }
+      if (k === 'escape') {
+        if (pickerOpen) setPickerOpen(false);
+        if (openModuleId) setOpenModuleId(null);
+        return;
+      }
+      if (k === 'e') {
+        if (pickerOpen || openModuleId || !modules) return;
+        for (const m of modules) {
+          if (m.kind === 'stickynotes' || m.kind === 'drawboard') {
+            if (isInZone(m, myPosition)) {
+              e.preventDefault();
+              setOpenModuleId(m.id);
+              return;
+            }
+          }
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [principal, modules, myPosition, openModuleId, pickerOpen]);
+
   const renderList: Participant[] =
     participants && participants.length > 0
       ? participants.map((p) =>
@@ -119,7 +156,19 @@ export default function PartySpace({
           },
         ];
 
-  const myPosition = { x: position.x, y: position.y };
+  const placedModules = (modules ?? []).filter(
+    (m): m is PlacedModule => m.kind === 'stickynotes' || m.kind === 'drawboard',
+  );
+  const openModule = openModuleId
+    ? placedModules.find((m) => m.id === openModuleId) ?? null
+    : null;
+
+  // Reactions picker is anchored to the local avatar. Convert world coords
+  // (0..width / 0..height) to percent of the floor for absolute positioning.
+  const anchorPercent = {
+    x: (position.x / width) * 100,
+    y: (position.y / height) * 100,
+  };
 
   return (
     <div
@@ -152,17 +201,14 @@ export default function PartySpace({
         {party.room.walls.map((w, i) => (
           <Wall key={i} wall={w} />
         ))}
-        {modules && principal
-          ? modules.map((m) => (
-              <Module
-                key={m.id}
-                mod={m}
-                principal={principal}
-                slug={party.slug}
-                myPosition={myPosition}
-              />
-            ))
-          : null}
+        {placedModules.map((m) => (
+          <Module
+            key={m.id}
+            mod={m}
+            myPosition={myPosition}
+            onOpen={(id) => setOpenModuleId(id)}
+          />
+        ))}
         {renderList.map((p) => (
           <Avatar
             key={p.id}
@@ -180,13 +226,38 @@ export default function PartySpace({
         ) : null}
         {lighting ? <LightingOverlay preset={lighting} /> : null}
         <MusicPill label={party.music.label} />
+        {principal ? (
+          <RadialReactionPicker
+            open={pickerOpen && realtimeStatus !== 'closed'}
+            anchorPercent={anchorPercent}
+            onPick={(emoji) => {
+              void react(party.slug, principal, emoji);
+            }}
+            onClose={() => setPickerOpen(false)}
+          />
+        ) : null}
       </div>
       {principal ? (
-        <ReactionPalette
-          disabled={realtimeStatus !== undefined && realtimeStatus !== 'open'}
-          onSelect={(emoji) => {
-            void react(party.slug, principal, emoji);
+        <div
+          aria-live="polite"
+          style={{
+            margin: '8px auto 0',
+            textAlign: 'center',
+            fontSize: 12,
+            color: '#555',
+            letterSpacing: 0.4,
           }}
+        >
+          press <kbd>R</kbd> to react · walk near a board and press <kbd>E</kbd> to interact
+        </div>
+      ) : null}
+      {openModule && principal ? (
+        <ModuleModal
+          mod={openModule}
+          principal={principal}
+          slug={party.slug}
+          inZone={isInZone(openModule, myPosition)}
+          onClose={() => setOpenModuleId(null)}
         />
       ) : null}
     </div>

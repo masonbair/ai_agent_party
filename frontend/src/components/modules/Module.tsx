@@ -1,19 +1,17 @@
 import type { ModuleSnapshot } from '../../api/types';
-import type { Principal } from '../../api/party';
-import { StickyWall } from './StickyWall';
-import { DrawBoard } from './DrawBoard';
+import { ModuleStructure } from './ModuleStructure';
 
 type Props = {
   mod: ModuleSnapshot;
-  principal: Principal;
-  slug: string;
   myPosition: { x: number; y: number } | null;
+  onOpen: (moduleId: string) => void;
 };
 
-function isInZone(
+export function isInZone(
   mod: ModuleSnapshot,
   pos: { x: number; y: number } | null,
 ): boolean {
+  if (mod.kind === 'lighting') return false;
   if (!pos) return false;
   const r = mod.interactionRect;
   return (
@@ -21,17 +19,12 @@ function isInZone(
   );
 }
 
-export function Module({ mod, principal, slug, myPosition }: Props) {
+// In-world wrapper. Renders the visible structure; clicking it opens the
+// full editor modal (managed by PartySpace).
+export function Module({ mod, myPosition, onOpen }: Props) {
+  if (mod.kind !== 'stickynotes' && mod.kind !== 'drawboard') return null;
   const inZone = isInZone(mod, myPosition);
-  if (mod.kind === 'stickynotes') {
-    return (
-      <StickyWall mod={mod} principal={principal} slug={slug} inZone={inZone} />
-    );
-  }
-  if (mod.kind === 'drawboard') {
-    return (
-      <DrawBoard mod={mod} principal={principal} slug={slug} inZone={inZone} />
-    );
-  }
-  return null;
+  return (
+    <ModuleStructure mod={mod} inZone={inZone} onOpen={() => onOpen(mod.id)} />
+  );
 }
