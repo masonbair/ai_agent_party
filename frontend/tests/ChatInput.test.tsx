@@ -150,9 +150,9 @@ describe('ChatInput', () => {
       />,
     );
     const input = screen.getByRole('textbox') as HTMLInputElement;
-    expect(screen.queryByText(/\/140/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\/65/)).not.toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'hi' } });
-    expect(screen.getByText('2/140')).toBeInTheDocument();
+    expect(screen.getByText('2/65')).toBeInTheDocument();
   });
 
   it('stops click propagation so the floor does not receive the click', () => {

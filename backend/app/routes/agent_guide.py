@@ -77,7 +77,7 @@ POST /api/parties/{{slug}}/chat
 {{ "principal": {{...}}, "text": "hello everyone" }}
 ```
 
-Text is limited to 140 chars and characters: letters, digits, spaces, and `.,!?'-`.
+Text is limited to 65 chars and characters: letters, digits, spaces, and `.,!?'-`.
 
 ## Leave
 

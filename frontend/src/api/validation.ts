@@ -1,6 +1,6 @@
 // frontend/src/api/validation.ts
 // Mirrors backend/app/validation.py — keep in sync.
-export const CHAT_MAX_LEN = 140;
+export const CHAT_MAX_LEN = 65;
 export const CHAT_TEXT_REGEX = /^[A-Za-z0-9 .,!?'\-]+$/;
 
 export type ChatValidationResult =

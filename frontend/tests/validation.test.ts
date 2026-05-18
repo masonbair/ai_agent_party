@@ -8,7 +8,7 @@ import {
 
 describe('chat validation', () => {
   it('exports the same max length as the backend', () => {
-    expect(CHAT_MAX_LEN).toBe(140);
+    expect(CHAT_MAX_LEN).toBe(65);
   });
 
   it('accepts allowed characters', () => {
