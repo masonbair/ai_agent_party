@@ -1,5 +1,5 @@
 // frontend/src/components/ChatInput.tsx
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { chatInParty, type Principal } from '../api/party';
 import { CHAT_MAX_LEN, validateChatText } from '../api/validation';
 
@@ -15,12 +15,42 @@ const REASON_MESSAGES: Record<string, string> = {
   invalid_chars: 'Message contains disallowed characters',
 };
 
+const FOCUS_KEY = 't';
+
 export default function ChatInput({ slug, principal, disabled }: Props) {
   const [value, setValue] = useState('');
   const [error, setError] = useState<string>('');
   const [sending, setSending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function onWindowKeyDown(e: KeyboardEvent) {
+      if (e.key.toLowerCase() !== FOCUS_KEY) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (t instanceof HTMLElement) {
+        if (
+          t.isContentEditable ||
+          t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.tagName === 'SELECT'
+        ) {
+          return;
+        }
+      }
+      if (disabled) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+    }
+    window.addEventListener('keydown', onWindowKeyDown);
+    return () => window.removeEventListener('keydown', onWindowKeyDown);
+  }, [disabled]);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      inputRef.current?.blur();
+      return;
+    }
     if (e.key !== 'Enter') return;
     if (sending || disabled) return;
     const result = validateChatText(value);
@@ -44,6 +74,8 @@ export default function ChatInput({ slug, principal, disabled }: Props) {
 
   return (
     <div
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
         left: 12,
@@ -56,11 +88,14 @@ export default function ChatInput({ slug, principal, disabled }: Props) {
       }}
     >
       <input
+        ref={inputRef}
         type="text"
         value={value}
         disabled={disabled || sending}
         title={disabled ? 'Reconnecting…' : undefined}
-        placeholder={disabled ? 'Reconnecting…' : 'Say something…'}
+        placeholder={
+          disabled ? 'Reconnecting…' : 'Say something… (press T to chat, Esc to exit)'
+        }
         maxLength={CHAT_MAX_LEN}
         onChange={(e) => {
           setValue(e.target.value);

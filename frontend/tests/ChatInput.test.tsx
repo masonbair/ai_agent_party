@@ -82,4 +82,77 @@ describe('ChatInput', () => {
     const input = screen.getByRole('textbox') as HTMLInputElement;
     expect(input.disabled).toBe(true);
   });
+
+  it('exposes the keybind hint in the placeholder', () => {
+    render(
+      <ChatInput
+        slug="cream-terrazzo"
+        principal={{ kind: 'human', id: 'me' }}
+        disabled={false}
+      />,
+    );
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    expect(input.placeholder).toMatch(/press t/i);
+  });
+
+  it('focuses the input when T is pressed on the window', () => {
+    render(
+      <ChatInput
+        slug="cream-terrazzo"
+        principal={{ kind: 'human', id: 'me' }}
+        disabled={false}
+      />,
+    );
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    expect(input).not.toHaveFocus();
+    fireEvent.keyDown(window, { key: 't' });
+    expect(input).toHaveFocus();
+  });
+
+  it('does not hijack T when the user is already typing in an input', () => {
+    render(
+      <>
+        <input data-testid="other" />
+        <ChatInput
+          slug="cream-terrazzo"
+          principal={{ kind: 'human', id: 'me' }}
+          disabled={false}
+        />
+      </>,
+    );
+    const other = screen.getByTestId('other') as HTMLInputElement;
+    other.focus();
+    fireEvent.keyDown(other, { key: 't' });
+    expect(other).toHaveFocus();
+  });
+
+  it('blurs on Escape', () => {
+    render(
+      <ChatInput
+        slug="cream-terrazzo"
+        principal={{ kind: 'human', id: 'me' }}
+        disabled={false}
+      />,
+    );
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    input.focus();
+    expect(input).toHaveFocus();
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input).not.toHaveFocus();
+  });
+
+  it('stops click propagation so the floor does not receive the click', () => {
+    const onFloorClick = vi.fn();
+    render(
+      <div onClick={onFloorClick}>
+        <ChatInput
+          slug="cream-terrazzo"
+          principal={{ kind: 'human', id: 'me' }}
+          disabled={false}
+        />
+      </div>,
+    );
+    fireEvent.click(screen.getByRole('textbox'));
+    expect(onFloorClick).not.toHaveBeenCalled();
+  });
 });
