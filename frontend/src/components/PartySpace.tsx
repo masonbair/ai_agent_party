@@ -104,8 +104,8 @@ export default function PartySpace({
 
   const myPosition = { x: position.x, y: position.y };
 
-  // Keyboard: r toggles the radial reaction picker; e opens the nearest
-  // module if you're inside its interaction zone; Esc closes either.
+  // r opens the radial reaction picker (picker owns its own r/Esc to close);
+  // e opens the nearest in-range module; Esc closes an open module.
   useEffect(() => {
     if (!principal) return;
     function onKey(e: KeyboardEvent) {
@@ -113,13 +113,13 @@ export default function PartySpace({
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       const k = e.key.toLowerCase();
       if (k === 'r') {
-        if (openModuleId) return;
+        if (openModuleId || pickerOpen) return;
         e.preventDefault();
-        setPickerOpen((p) => !p);
+        setPickerOpen(true);
         return;
       }
       if (k === 'escape') {
-        if (pickerOpen) setPickerOpen(false);
+        if (pickerOpen) return; // picker handles its own Escape
         if (openModuleId) setOpenModuleId(null);
         return;
       }
