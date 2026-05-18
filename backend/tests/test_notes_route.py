@@ -12,7 +12,7 @@ def _join(client: TestClient, name: str = "alice", color: str = "#ff6b9d", x: fl
 
 
 def test_create_note_happy_path(client: TestClient) -> None:
-    sid = _join(client, x=100, y=100)
+    sid = _join(client, x=110, y=445)
     r = client.post(
         "/api/parties/cream-terrazzo/modules/sticky-1/notes",
         json={
@@ -29,7 +29,7 @@ def test_create_note_happy_path(client: TestClient) -> None:
 
 
 def test_patch_note_only_author(client: TestClient) -> None:
-    sid = _join(client, x=100, y=100)
+    sid = _join(client, x=110, y=445)
     r = client.post(
         "/api/parties/cream-terrazzo/modules/sticky-1/notes",
         json={
@@ -41,7 +41,7 @@ def test_patch_note_only_author(client: TestClient) -> None:
         },
     )
     note_id = r.json()["note"]["id"]
-    sid2 = _join(client, name="bob", color="#4dd0e1", x=100, y=100)
+    sid2 = _join(client, name="bob", color="#4dd0e1", x=110, y=445)
     r3 = client.patch(
         f"/api/parties/cream-terrazzo/modules/sticky-1/notes/{note_id}",
         json={"principal": {"kind": "human", "id": sid2}, "text": "hax"},
@@ -50,7 +50,7 @@ def test_patch_note_only_author(client: TestClient) -> None:
 
 
 def test_delete_note_happy_path(client: TestClient) -> None:
-    sid = _join(client, x=100, y=100)
+    sid = _join(client, x=110, y=445)
     r = client.post(
         "/api/parties/cream-terrazzo/modules/sticky-1/notes",
         json={
@@ -71,7 +71,7 @@ def test_delete_note_happy_path(client: TestClient) -> None:
 
 
 def test_create_note_not_in_zone_409(client: TestClient) -> None:
-    sid = _join(client, name="carla", color="#81c784", x=700, y=400)
+    sid = _join(client, name="carla", color="#81c784", x=400, y=250)
     r = client.post(
         "/api/parties/cream-terrazzo/modules/sticky-1/notes",
         json={

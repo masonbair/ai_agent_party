@@ -5,8 +5,8 @@ def _join_near_draw(
     client: TestClient,
     name: str = "alice",
     color: str = "#ff6b9d",
-    x: float = 640,
-    y: float = 160,
+    x: float = 700,
+    y: float = 445,
 ) -> str:
     r = client.post("/api/session", json={"username": name, "color": color})
     sid = r.json()["session_id"]
@@ -66,8 +66,8 @@ def test_clear_solo_clears_immediately(client: TestClient) -> None:
 
 
 def test_clear_two_voters_progressive(client: TestClient) -> None:
-    s1 = _join_near_draw(client, name="alice", color="#ff6b9d", x=640, y=160)
-    s2 = _join_near_draw(client, name="bob", color="#4dd0e1", x=620, y=180)
+    s1 = _join_near_draw(client, name="alice", color="#ff6b9d", x=700, y=445)
+    s2 = _join_near_draw(client, name="bob", color="#4dd0e1", x=690, y=440)
     r1 = client.post(
         "/api/parties/cream-terrazzo/modules/draw-1/clear",
         json={"principal": {"kind": "human", "id": s1}},

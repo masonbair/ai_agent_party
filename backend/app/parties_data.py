@@ -73,10 +73,14 @@ CREAM_TERRAZZO = PartyConfig(
             Wall(x=75.0, y=40.0, width=25.0, height=1.2, color="#8b6f47"),
         ],
     ),
+    # Modules sit at the bottom edge of the room, clear of every zone:
+    # snacks spans x=224..576 and ends at y=460, so the bottom-left
+    # (x=20..200, y=410..480) and bottom-right (x=620..780, y=410..480)
+    # corners are free.
     modules=[
         LightingModule(preset="dusk"),
-        StickyNoteModule(id="sticky-1", x=60, y=60, w=200, h=140),
-        DrawBoardModule(id="draw-1", x=540, y=60, w=200, h=160),
+        StickyNoteModule(id="sticky-1", x=20, y=410, w=180, h=70),
+        DrawBoardModule(id="draw-1", x=620, y=410, w=160, h=70),
     ],
 )
 
