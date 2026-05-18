@@ -6,8 +6,6 @@ type Props = {
   onOpen: () => void;
 };
 
-// In-world piece of "furniture". Click or press E (handled in PartySpace) to
-// open the full editor in a modal.
 export function ModuleStructure({ mod, inZone, onOpen }: Props) {
   const isSticky = mod.kind === 'stickynotes';
   const label = isSticky ? 'NOTE BOARD' : 'WHITE BOARD';

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { REACTION_EMOJI, type ReactionEmoji } from '../api/types';
 
 type Props = {
@@ -10,9 +10,6 @@ type Props = {
 
 const RADIUS_PX = 76;
 
-// 12 emoji distributed around the player's avatar. Mouse hover or WASD /
-// arrow keys move the highlight; Enter or click commits. Only rendered for
-// the local user.
 export function RadialReactionPicker({
   open,
   anchorPercent,
@@ -20,7 +17,6 @@ export function RadialReactionPicker({
   onClose,
 }: Props) {
   const [selected, setSelected] = useState(0);
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +58,6 @@ export function RadialReactionPicker({
 
   return (
     <div
-      ref={containerRef}
       role="menu"
       aria-label="React"
       data-testid="radial-reaction-picker"

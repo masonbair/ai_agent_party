@@ -19,8 +19,6 @@ export function isInZone(
   );
 }
 
-// In-world wrapper. Renders the visible structure; clicking it opens the
-// full editor modal (managed by PartySpace).
 export function Module({ mod, myPosition, onOpen }: Props) {
   if (mod.kind !== 'stickynotes' && mod.kind !== 'drawboard') return null;
   const inZone = isInZone(mod, myPosition);

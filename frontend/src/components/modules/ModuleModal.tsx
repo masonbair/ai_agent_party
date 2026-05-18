@@ -12,8 +12,6 @@ type Props = {
   onClose: () => void;
 };
 
-// Fullscreen modal that wraps the StickyWall or DrawBoard editor. The party
-// floor is blurred behind. Esc or backdrop click closes.
 export function ModuleModal({ mod, principal, slug, inZone, onClose }: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
