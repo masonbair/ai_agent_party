@@ -1,6 +1,9 @@
 # AI-generated context (regenerate on demand)
 .ai/context/
 
+# Git worktrees
+.worktrees/
+
 # OS files
 .DS_Store
 Thumbs.db
