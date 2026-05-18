@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useRealtimeParty } from '../src/hooks/useRealtimeParty';
+import { useRealtimeParty, BUBBLE_LIFETIME_MS } from '../src/hooks/useRealtimeParty';
 import type { Principal } from '../src/api/party';
 
 class MockWebSocket {
@@ -231,5 +231,96 @@ describe('useRealtimeParty', () => {
       await new Promise((r) => setTimeout(r, 1100));
     });
     expect(MockWebSocket.instances).toHaveLength(1);
+  });
+});
+
+function chatFrame(participant_id: string, text: string, seq: number) {
+  return {
+    type: 'event',
+    cursor: seq,
+    event: {
+      type: 'chat',
+      seq,
+      participant_id,
+      text,
+      at: 1700000000 + seq,
+    },
+  };
+}
+
+describe('useRealtimeParty — chat bubbles', () => {
+  it('starts with no bubbles', async () => {
+    const { result } = renderHook(() =>
+      useRealtimeParty({ slug: 'cream-terrazzo', principal: selfPrincipal }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.bubbles).toEqual({});
+  });
+
+  it('adds a bubble on chat event', async () => {
+    const { result } = renderHook(() =>
+      useRealtimeParty({ slug: 'cream-terrazzo', principal: selfPrincipal }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws = MockWebSocket.instances[0];
+    act(() => ws.receive(chatFrame('them', 'hi', 5)));
+    expect(result.current.bubbles['them']?.text).toBe('hi');
+    expect(result.current.bubbles['them']?.expiresAt).toBeGreaterThan(Date.now());
+  });
+
+  it('replaces a previous bubble from the same participant', async () => {
+    const { result } = renderHook(() =>
+      useRealtimeParty({ slug: 'cream-terrazzo', principal: selfPrincipal }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws = MockWebSocket.instances[0];
+    act(() => {
+      ws.receive(chatFrame('them', 'first', 1));
+      ws.receive(chatFrame('them', 'second', 2));
+    });
+    expect(result.current.bubbles['them']?.text).toBe('second');
+  });
+
+  it('prunes a bubble when its owner leaves', async () => {
+    const { result } = renderHook(() =>
+      useRealtimeParty({ slug: 'cream-terrazzo', principal: selfPrincipal }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws = MockWebSocket.instances[0];
+    act(() => {
+      ws.receive(chatFrame('them', 'hi', 1));
+      ws.receive({
+        type: 'event',
+        cursor: 2,
+        event: { type: 'leave', seq: 2, participant_id: 'them', at: 1700000001 },
+      });
+    });
+    expect(result.current.bubbles['them']).toBeUndefined();
+  });
+
+  it('sets expiresAt to roughly BUBBLE_LIFETIME_MS in the future', async () => {
+    const { result } = renderHook(() =>
+      useRealtimeParty({ slug: 'cream-terrazzo', principal: selfPrincipal }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws = MockWebSocket.instances[0];
+    const before = Date.now();
+    act(() => ws.receive(chatFrame('them', 'hi', 1)));
+    const after = Date.now();
+    const bubble = result.current.bubbles['them'];
+    expect(bubble).toBeDefined();
+    // Allow generous slack for slow test runs.
+    expect(bubble!.expiresAt).toBeGreaterThanOrEqual(before + BUBBLE_LIFETIME_MS - 50);
+    expect(bubble!.expiresAt).toBeLessThanOrEqual(after + BUBBLE_LIFETIME_MS + 50);
   });
 });
