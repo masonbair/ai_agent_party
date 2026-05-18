@@ -593,3 +593,34 @@ def test_snapshot_includes_module_state() -> None:
     assert len(mods["sticky-1"]["approachSlots"]) == 6
     assert mods["draw-1"]["strokes"] == []
     assert mods["draw-1"]["vote"]["votes"] == 0
+
+
+# --- observe_since module events (Task 15) ---
+
+
+def test_observe_since_emits_reaction_and_lighting_events() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    before = w.cursor
+    w.react("p1", "❤️")
+    w.set_lighting("p1", "night")
+    out = w.observe_since(before)
+    types = [e["type"] for e in out["events"]]
+    assert "reaction" in types
+    assert "lighting_changed" in types
+
+
+def test_observe_since_emits_note_and_stroke_events() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    before = w.cursor
+    w.create_note("p1", "sticky-1", "hi", "yellow", x=0, y=0)
+    out = w.observe_since(before)
+    types = [e["type"] for e in out["events"]]
+    assert "note_created" in types
+
+    w.move("p1", x=640, y=160)
+    before = w.cursor
+    w.add_stroke("p1", "draw-1", {"color": "#ff6b9d", "width": "thin", "points": [{"x": 0, "y": 0}]})
+    out = w.observe_since(before)
+    assert any(e["type"] == "stroke_added" for e in out["events"])

@@ -602,10 +602,14 @@ class PartyWorld:
             since = 0
         tail = self._events[since:]
         latest_move_by_pid: dict[str, MoveEvent] = {}
+        latest_vote_by_module: dict[str, VoteChangedEvent] = {}
         out: list[dict] = []
         for ev in tail:
             if isinstance(ev, MoveEvent):
                 latest_move_by_pid[ev.participant_id] = ev
+                continue
+            if isinstance(ev, VoteChangedEvent):
+                latest_vote_by_module[ev.module_id] = ev
                 continue
             if isinstance(ev, JoinEvent):
                 out.append(
@@ -616,36 +620,13 @@ class PartyWorld:
                         "at": ev.at,
                     }
                 )
-            elif isinstance(ev, LeaveEvent):
-                out.append(
-                    {
-                        "type": "leave",
-                        "seq": ev.seq,
-                        "participant_id": ev.participant_id,
-                        "at": ev.at,
-                    }
-                )
-            elif isinstance(ev, ChatEvent):
-                out.append(
-                    {
-                        "type": "chat",
-                        "seq": ev.seq,
-                        "participant_id": ev.participant_id,
-                        "text": ev.text,
-                        "at": ev.at,
-                    }
-                )
-        for pid, mv in latest_move_by_pid.items():
-            out.append(
-                {
-                    "type": "move",
-                    "seq": mv.seq,
-                    "participant_id": pid,
-                    "x": mv.x,
-                    "y": mv.y,
-                    "zone": self.derive_zone(mv.x, mv.y),
-                    "at": mv.at,
-                }
-            )
+            else:
+                out.append(ev.model_dump())
+        for mv in latest_move_by_pid.values():
+            d = mv.model_dump()
+            d["zone"] = self.derive_zone(mv.x, mv.y)
+            out.append(d)
+        for v in latest_vote_by_module.values():
+            out.append(v.model_dump())
         out.sort(key=lambda e: e["seq"])
         return {"events": out, "cursor": self.cursor}
