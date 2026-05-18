@@ -23,8 +23,6 @@ from app.events import (
     StrokeAddedEvent,
     StrokeDroppedEvent,
 )
-
-_LIGHTING_PRESETS = ("day", "dusk", "night", "party")
 from app.models import (
     DrawBoardModule,
     LightingModule,
@@ -45,6 +43,8 @@ from app.validation import (
     validate_reaction_emoji,
     validate_stroke,
 )
+
+_LIGHTING_PRESETS = ("day", "dusk", "night", "party")
 
 
 class ParticipantNotInPartyError(LookupError):
