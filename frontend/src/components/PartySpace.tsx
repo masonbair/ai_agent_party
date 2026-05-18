@@ -2,6 +2,8 @@ import { useRef } from 'react';
 import type { Participant, PartyConfig, User } from '../api/types';
 import { useMovement } from '../hooks/useMovement';
 import Avatar from './Avatar';
+import ChatBubble from './ChatBubble';
+import ChatInput from './ChatInput';
 import MusicPill from './MusicPill';
 import Wall from './Wall';
 import Zone from './Zone';
@@ -13,9 +15,22 @@ type Props = {
   user: User;
   participants?: Participant[];
   onMove?: (x: number, y: number) => void;
+  bubbles?: Record<string, { text: string; expiresAt: number }>;
+  slug: string;
+  principal: { kind: 'human' | 'agent'; id: string };
+  status: 'connecting' | 'open' | 'closed';
 };
 
-export default function PartySpace({ party, user, participants, onMove }: Props) {
+export default function PartySpace({
+  party,
+  user,
+  participants,
+  onMove,
+  bubbles,
+  slug,
+  principal,
+  status,
+}: Props) {
   const { width, height } = party.worldSize;
   const { position, setTarget } = useMovement({
     worldWidth: width,
@@ -100,6 +115,22 @@ export default function PartySpace({ party, user, participants, onMove }: Props)
           />
         ))}
         <MusicPill label={party.music.label} />
+        {Object.entries(bubbles ?? {}).map(([participantId, bubble]) => {
+          const speaker = renderList.find((p) => p.id === participantId);
+          if (!speaker) return null;
+          return (
+            <ChatBubble
+              key={participantId}
+              text={bubble.text}
+              x={speaker.x}
+              y={speaker.y}
+              worldWidth={width}
+              worldHeight={height}
+              expiresAt={bubble.expiresAt}
+            />
+          );
+        })}
+        <ChatInput slug={slug} principal={principal} disabled={status !== 'open'} />
       </div>
     </div>
   );
