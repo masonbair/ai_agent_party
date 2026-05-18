@@ -1,21 +1,63 @@
-import { useRef } from 'react';
-import type { Participant, PartyConfig, User } from '../api/types';
+import { useEffect, useRef } from 'react';
+import type {
+  LightingPreset,
+  ModuleSnapshot,
+  Participant,
+  PartyConfig,
+  User,
+} from '../api/types';
+import type { Principal } from '../api/party';
 import { useMovement } from '../hooks/useMovement';
+import { apiGet } from '../api/client';
+import { react } from '../api/modules';
 import Avatar from './Avatar';
 import MusicPill from './MusicPill';
 import Wall from './Wall';
 import Zone from './Zone';
+import { LightingOverlay } from './LightingOverlay';
+import { ReactionLayer } from './ReactionLayer';
+import { ReactionPalette } from './ReactionPalette';
+import { Module } from './modules/Module';
 
 const SPEED = 220; // logical units / sec
+
+type ObserveResponse = {
+  modules?: ModuleSnapshot[];
+  lighting?: LightingPreset;
+  active_reactions?: { actor_id: string; emoji: string; expires_at: number }[];
+};
+
+type ApplyObserveInitial = (payload: {
+  modules: ModuleSnapshot[];
+  lighting: LightingPreset;
+  active_reactions: { actor_id: string; emoji: string; expires_at: number }[];
+}) => void;
 
 type Props = {
   party: PartyConfig;
   user: User;
   participants?: Participant[];
   onMove?: (x: number, y: number) => void;
+  principal?: Principal;
+  modules?: ModuleSnapshot[];
+  lighting?: LightingPreset;
+  reactions?: Map<string, { emoji: string; expiresAt: number }>;
+  applyObserveInitial?: ApplyObserveInitial;
+  realtimeStatus?: 'connecting' | 'open' | 'closed';
 };
 
-export default function PartySpace({ party, user, participants, onMove }: Props) {
+export default function PartySpace({
+  party,
+  user,
+  participants,
+  onMove,
+  principal,
+  modules,
+  lighting,
+  reactions,
+  applyObserveInitial,
+  realtimeStatus,
+}: Props) {
   const { width, height } = party.worldSize;
   const { position, setTarget } = useMovement({
     worldWidth: width,
@@ -26,6 +68,27 @@ export default function PartySpace({ party, user, participants, onMove }: Props)
     moveThrottleMs: 100,
   });
   const floorRef = useRef<HTMLDivElement>(null);
+
+  // Seed initial state (modules, lighting, active reactions) via /observe.
+  useEffect(() => {
+    if (!applyObserveInitial) return;
+    let cancelled = false;
+    apiGet<ObserveResponse>(`/api/parties/${party.slug}/observe`)
+      .then((r) => {
+        if (cancelled) return;
+        applyObserveInitial({
+          modules: r.modules ?? [],
+          lighting: r.lighting ?? 'day',
+          active_reactions: r.active_reactions ?? [],
+        });
+      })
+      .catch(() => {
+        /* observe is best-effort for module seeding */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [party.slug, applyObserveInitial]);
 
   function onClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = floorRef.current?.getBoundingClientRect();
@@ -55,6 +118,8 @@ export default function PartySpace({ party, user, participants, onMove }: Props)
             y: position.y,
           },
         ];
+
+  const myPosition = { x: position.x, y: position.y };
 
   return (
     <div
@@ -87,6 +152,17 @@ export default function PartySpace({ party, user, participants, onMove }: Props)
         {party.room.walls.map((w, i) => (
           <Wall key={i} wall={w} />
         ))}
+        {modules && principal
+          ? modules.map((m) => (
+              <Module
+                key={m.id}
+                mod={m}
+                principal={principal}
+                slug={party.slug}
+                myPosition={myPosition}
+              />
+            ))
+          : null}
         {renderList.map((p) => (
           <Avatar
             key={p.id}
@@ -99,8 +175,20 @@ export default function PartySpace({ party, user, participants, onMove }: Props)
             variant={p.id === user.session_id ? 'self' : 'other'}
           />
         ))}
+        {reactions ? (
+          <ReactionLayer reactions={reactions} participants={renderList} />
+        ) : null}
+        {lighting ? <LightingOverlay preset={lighting} /> : null}
         <MusicPill label={party.music.label} />
       </div>
+      {principal ? (
+        <ReactionPalette
+          disabled={realtimeStatus !== undefined && realtimeStatus !== 'open'}
+          onSelect={(emoji) => {
+            void react(party.slug, principal, emoji);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
