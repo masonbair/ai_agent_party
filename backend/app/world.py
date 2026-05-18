@@ -10,6 +10,7 @@ from app.events import (
     MoveEvent,
     Participant,
     Reaction,
+    ReactionEvent,
     StickyNote,
     Stroke,
 )
@@ -22,8 +23,10 @@ from app.models import (
 )
 from app.validation import (
     INTERACTION_MARGIN,
+    REACTION_LIFETIME_SECONDS,
     SLOT_OCCUPIED_RADIUS,
     validate_chat_text,
+    validate_reaction_emoji,
 )
 
 
@@ -138,6 +141,26 @@ class PartyWorld:
             participant_id=participant_id,
             text=cleaned,
             at=time.time(),
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
+
+    def react(self, participant_id: str, emoji: str) -> ReactionEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        cleaned = validate_reaction_emoji(emoji)
+        now = time.time()
+        expires_at = now + REACTION_LIFETIME_SECONDS
+        self.active_reactions[participant_id] = Reaction(
+            actor_id=participant_id, emoji=cleaned, expires_at=expires_at,
+        )
+        ev = ReactionEvent(
+            seq=self._next_seq(),
+            actor_id=participant_id,
+            emoji=cleaned,
+            expires_at=expires_at,
+            at=now,
         )
         self._events.append(ev)
         self._emit(ev)

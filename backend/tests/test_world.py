@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from app.events import ChatEvent, JoinEvent, LeaveEvent, MoveEvent, Participant
@@ -307,3 +309,50 @@ def test_slot_occupancy_uses_radius() -> None:
     assert occ[0] is True
     occ2 = w.slot_occupancy("sticky-1", [(sx + SLOT_OCCUPIED_RADIUS + 1, sy)])
     assert occ2[0] is False
+
+
+# --- Reactions (Task 5) ---
+
+from app.events import ReactionEvent
+from app.validation import REACTION_LIFETIME_SECONDS
+
+
+def _join_modules(w: PartyWorld, pid: str, x: float = 100, y: float = 100) -> None:
+    w.join(Participant(
+        id=pid, kind="human", username="u" + pid, color="#ff6b9d",
+        x=x, y=y, joined_at=time.time(),
+    ))
+
+
+def test_react_emits_event_and_records_active_reaction() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1")
+    ev = w.react("p1", "❤️")
+    assert isinstance(ev, ReactionEvent)
+    assert ev.emoji == "❤️"
+    assert "p1" in w.active_reactions
+    assert w.active_reactions["p1"].emoji == "❤️"
+    assert abs((ev.expires_at - ev.at) - REACTION_LIFETIME_SECONDS) < 1e-6
+
+
+def test_react_replaces_existing_reaction_same_actor() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1")
+    w.react("p1", "❤️")
+    w.react("p1", "🎉")
+    assert w.active_reactions["p1"].emoji == "🎉"
+
+
+def test_react_unknown_emoji_raises() -> None:
+    from app.validation import ReactionValidationError
+
+    w = _world_with_modules()
+    _join_modules(w, "p1")
+    with pytest.raises(ReactionValidationError):
+        w.react("p1", "💩")
+
+
+def test_react_unknown_actor_raises() -> None:
+    w = _world_with_modules()
+    with pytest.raises(ParticipantNotInPartyError):
+        w.react("ghost", "❤️")
