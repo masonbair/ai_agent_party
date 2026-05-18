@@ -9,9 +9,22 @@ from app.events import (
     LeaveEvent,
     MoveEvent,
     Participant,
+    Reaction,
+    StickyNote,
+    Stroke,
 )
-from app.models import PartyConfig
-from app.validation import validate_chat_text
+from app.models import (
+    DrawBoardModule,
+    LightingModule,
+    PartyConfig,
+    PlacedModule,
+    StickyNoteModule,
+)
+from app.validation import (
+    INTERACTION_MARGIN,
+    SLOT_OCCUPIED_RADIUS,
+    validate_chat_text,
+)
 
 
 class ParticipantNotInPartyError(LookupError):
@@ -27,6 +40,19 @@ class PartyWorld:
             party.room.walls, party.worldSize
         )
         self._listeners: list[Callable[[Event], None]] = []
+        self.lighting: str = "day"
+        self.notes_by_module: dict[str, list[StickyNote]] = {}
+        self.strokes_by_module: dict[str, list[Stroke]] = {}
+        self.votes_by_module: dict[str, dict[str, float]] = {}
+        self.active_reactions: dict[str, Reaction] = {}
+        for m in party.modules:
+            if isinstance(m, LightingModule):
+                self.lighting = m.preset
+            elif isinstance(m, StickyNoteModule):
+                self.notes_by_module[m.id] = []
+            elif isinstance(m, DrawBoardModule):
+                self.strokes_by_module[m.id] = []
+                self.votes_by_module[m.id] = {}
 
     def on_event(
         self, callback: Callable[[Event], None]
@@ -116,6 +142,61 @@ class PartyWorld:
         self._events.append(ev)
         self._emit(ev)
         return ev
+
+    def _placed_module(self, module_id: str) -> PlacedModule | None:
+        for m in self._party.modules:
+            if isinstance(m, (StickyNoteModule, DrawBoardModule)) and m.id == module_id:
+                return m
+        return None
+
+    def in_zone(self, module_id: str, x: float, y: float) -> bool:
+        m = self._placed_module(module_id)
+        if m is None:
+            return False
+        margin = INTERACTION_MARGIN
+        return (
+            m.x - margin <= x <= m.x + m.w + margin
+            and m.y - margin <= y <= m.y + m.h + margin
+        )
+
+    def approach_slots(self, module_id: str) -> list[tuple[float, float]]:
+        m = self._placed_module(module_id)
+        if m is None:
+            return []
+        margin = INTERACTION_MARGIN
+        ix, iy = m.x - margin, m.y - margin
+        iw, ih = m.w + 2 * margin, m.h + 2 * margin
+        cx, cy = ix + iw / 2, iy + ih / 2
+        wcx = self._party.worldSize.width / 2
+        wcy = self._party.worldSize.height / 2
+        dx, dy = wcx - cx, wcy - cy
+        slots: list[tuple[float, float]] = []
+        if abs(dx) >= abs(dy):
+            edge_x = ix + iw if dx > 0 else ix
+            for i in range(6):
+                slots.append((edge_x, iy + ih * (i + 0.5) / 6))
+        else:
+            edge_y = iy + ih if dy > 0 else iy
+            for i in range(6):
+                slots.append((ix + iw * (i + 0.5) / 6, edge_y))
+        return slots
+
+    def slot_occupancy(
+        self,
+        module_id: str,
+        positions: list[tuple[float, float]] | None = None,
+    ) -> list[bool]:
+        if positions is None:
+            positions = [(p.x, p.y) for p in self.participants.values()]
+        slots = self.approach_slots(module_id)
+        r2 = SLOT_OCCUPIED_RADIUS ** 2
+        out: list[bool] = []
+        for sx, sy in slots:
+            occupied = any(
+                (px - sx) ** 2 + (py - sy) ** 2 <= r2 for px, py in positions
+            )
+            out.append(occupied)
+        return out
 
     def derive_zone(self, x: float, y: float) -> str | None:
         w = self._party.worldSize

@@ -232,3 +232,78 @@ def test_on_event_listener_exception_does_not_break_world() -> None:
     ev = w.join(_alice())
     assert ev.seq == 1
     assert len(received) == 1
+
+
+# --- Module state (Task 4) ---
+
+from app.models import (
+    DrawBoardModule,
+    LightingModule,
+    Music,
+    PartyConfig,
+    Room,
+    StickyNoteModule,
+    Theme,
+    WorldSize,
+)
+
+
+def _world_with_modules() -> PartyWorld:
+    cfg = PartyConfig(
+        slug="t",
+        name="t",
+        description="",
+        theme=Theme(floor="#fff", accent="#000"),
+        zones=[],
+        music=Music(url=None, label="x"),
+        worldSize=WorldSize(width=800, height=500),
+        room=Room(border="1px solid", walls=[]),
+        modules=[
+            LightingModule(preset="dusk"),
+            StickyNoteModule(id="sticky-1", x=80, y=60, w=240, h=160),
+            DrawBoardModule(id="draw-1", x=480, y=60, w=320, h=200),
+        ],
+    )
+    return PartyWorld(cfg)
+
+
+def test_world_initialises_module_state_from_config() -> None:
+    w = _world_with_modules()
+    assert w.lighting == "dusk"
+    assert "sticky-1" in w.notes_by_module and w.notes_by_module["sticky-1"] == []
+    assert "draw-1" in w.strokes_by_module and w.strokes_by_module["draw-1"] == []
+    assert w.votes_by_module["draw-1"] == {}
+    assert w.active_reactions == {}
+
+
+def test_in_zone_uses_interaction_margin() -> None:
+    from app.validation import INTERACTION_MARGIN
+
+    w = _world_with_modules()
+    assert w.in_zone("sticky-1", 80 - INTERACTION_MARGIN + 0.1, 60)
+    assert w.in_zone("sticky-1", 80 + 120, 60 + 80)
+    assert not w.in_zone("sticky-1", 80 - INTERACTION_MARGIN - 1, 60)
+    assert not w.in_zone("nonexistent", 0, 0)
+
+
+def test_approach_slots_lie_on_interaction_edge() -> None:
+    from app.validation import INTERACTION_MARGIN as M
+
+    w = _world_with_modules()
+    slots = w.approach_slots("sticky-1")
+    assert len(slots) == 6
+    for x, y in slots:
+        assert 80 - M <= x <= 80 + 240 + M
+        assert 60 - M <= y <= 60 + 160 + M
+
+
+def test_slot_occupancy_uses_radius() -> None:
+    from app.validation import SLOT_OCCUPIED_RADIUS
+
+    w = _world_with_modules()
+    slots = w.approach_slots("sticky-1")
+    sx, sy = slots[0]
+    occ = w.slot_occupancy("sticky-1", [(sx + SLOT_OCCUPIED_RADIUS - 1, sy)])
+    assert occ[0] is True
+    occ2 = w.slot_occupancy("sticky-1", [(sx + SLOT_OCCUPIED_RADIUS + 1, sy)])
+    assert occ2[0] is False
