@@ -54,3 +54,84 @@ export type Participant = {
   x: number;
   y: number;
 };
+
+export type ReactionEmoji =
+  | '❤️'
+  | '😂'
+  | '👀'
+  | '🎉'
+  | '👍'
+  | '👋'
+  | '🤔'
+  | '😮'
+  | '🔥'
+  | '✨'
+  | '😴'
+  | '🫶';
+
+export const REACTION_EMOJI: ReadonlyArray<ReactionEmoji> = [
+  '❤️',
+  '😂',
+  '👀',
+  '🎉',
+  '👍',
+  '👋',
+  '🤔',
+  '😮',
+  '🔥',
+  '✨',
+  '😴',
+  '🫶',
+];
+
+export type LightingPreset = 'day' | 'dusk' | 'night' | 'party';
+
+export type StickyNote = {
+  id: string;
+  module_id: string;
+  author_id: string;
+  author_kind: 'human' | 'agent';
+  text: string;
+  color: 'yellow' | 'pink' | 'blue' | 'green';
+  x: number;
+  y: number;
+  created_at: number;
+};
+
+export type Stroke = {
+  id: string;
+  module_id: string;
+  author_id: string;
+  author_kind: 'human' | 'agent';
+  color: string;
+  width: 'thin' | 'med' | 'thick';
+  points: { x: number; y: number }[];
+  created_at: number;
+};
+
+export type ApproachSlot = { x: number; y: number; occupied: boolean };
+
+export type ModuleSnapshot =
+  | {
+      id: string;
+      kind: 'stickynotes';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      interactionRect: { x: number; y: number; w: number; h: number };
+      approachSlots: ApproachSlot[];
+      notes: StickyNote[];
+    }
+  | {
+      id: string;
+      kind: 'drawboard';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      interactionRect: { x: number; y: number; w: number; h: number };
+      approachSlots: ApproachSlot[];
+      strokes: Stroke[];
+      vote: { votes: number; needed: number };
+    };
