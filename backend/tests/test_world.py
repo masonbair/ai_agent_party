@@ -507,3 +507,70 @@ def test_add_stroke_evicts_oldest_at_cap() -> None:
     assert dropped[0].stroke_id == first_id
     assert all(s.id != first_id for s in w.strokes_by_module["draw-1"])
     assert len(w.strokes_by_module["draw-1"]) == STROKES_PER_BOARD_MAX
+
+
+# --- Vote-to-clear (Task 9) ---
+
+from app.events import BoardClearedEvent, VoteChangedEvent
+
+
+def test_solo_vote_clears_immediately() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    raw = {"color": "#ff6b9d", "width": "thin", "points": [{"x": 0, "y": 0}]}
+    w.add_stroke("p1", "draw-1", raw)
+    received: list = []
+    unsub = w.on_event(received.append)
+    result = w.vote_clear("p1", "draw-1")
+    unsub()
+    assert result["cleared"] is True
+    assert w.strokes_by_module["draw-1"] == []
+    assert any(isinstance(e, BoardClearedEvent) for e in received)
+    assert w.votes_by_module["draw-1"] == {}
+
+
+def test_two_voters_need_both() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p2", x=620, y=180)
+    w.add_stroke("p1", "draw-1", {"color": "#ff6b9d", "width": "thin", "points": [{"x": 0, "y": 0}]})
+    r1 = w.vote_clear("p1", "draw-1")
+    assert r1["cleared"] is False
+    assert r1["votes"] == 1 and r1["needed"] == 2
+    r2 = w.vote_clear("p2", "draw-1")
+    assert r2["cleared"] is True
+    assert w.strokes_by_module["draw-1"] == []
+
+
+def test_vote_dropped_when_voter_walks_away() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p2", x=620, y=180)
+    w.vote_clear("p1", "draw-1")
+    w.move("p1", x=10, y=10)
+    assert "p1" not in w.votes_by_module["draw-1"]
+    r = w.vote_clear("p2", "draw-1")
+    assert r["cleared"] is True
+
+
+def test_expired_vote_does_not_count() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p2", x=620, y=180)
+    w.vote_clear("p1", "draw-1")
+    w.votes_by_module["draw-1"]["p1"] = time.time() - 1
+    r = w.vote_clear("p2", "draw-1")
+    assert r["cleared"] is False
+    assert r["votes"] == 1 and r["needed"] == 2
+
+
+def test_vote_changed_event_emitted_on_progress() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p2", x=620, y=180)
+    received: list = []
+    unsub = w.on_event(received.append)
+    w.vote_clear("p1", "draw-1")
+    unsub()
+    vc = [e for e in received if isinstance(e, VoteChangedEvent)]
+    assert vc and vc[-1].votes == 1 and vc[-1].needed == 2

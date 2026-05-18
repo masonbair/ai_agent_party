@@ -12,10 +12,12 @@ from app.events import (
     Participant,
     Reaction,
     LightingChangedEvent,
+    BoardClearedEvent,
     NoteCreatedEvent,
     NoteDeletedEvent,
     NoteUpdatedEvent,
     ReactionEvent,
+    VoteChangedEvent,
     StickyNote,
     Stroke,
     StrokeAddedEvent,
@@ -36,6 +38,7 @@ from app.validation import (
     REACTION_LIFETIME_SECONDS,
     SLOT_OCCUPIED_RADIUS,
     STROKES_PER_BOARD_MAX,
+    VOTE_TTL_SECONDS,
     validate_chat_text,
     validate_note_color,
     validate_note_text,
@@ -136,6 +139,7 @@ class PartyWorld:
         ev = LeaveEvent(seq=self._next_seq(), participant_id=participant_id, at=time.time())
         self._events.append(ev)
         self._emit(ev)
+        self._recompute_all_drawboard_votes(time.time())
         return ev
 
     def move(self, participant_id: str, x: float, y: float) -> MoveEvent:
@@ -160,6 +164,7 @@ class PartyWorld:
         )
         self._events.append(ev)
         self._emit(ev)
+        self._recompute_all_drawboard_votes(time.time())
         return ev
 
     def chat(self, participant_id: str, text: str) -> ChatEvent:
@@ -338,6 +343,73 @@ class PartyWorld:
                 self._emit(ev)
                 return ev
         raise KeyError(note_id)
+
+    def _zone_population(self, module_id: str) -> list[str]:
+        return [
+            pid
+            for pid, p in self.participants.items()
+            if self.in_zone(module_id, p.x, p.y)
+        ]
+
+    def _prune_votes(self, module_id: str, now: float) -> None:
+        votes = self.votes_by_module.get(module_id)
+        if votes is None:
+            return
+        in_zone = set(self._zone_population(module_id))
+        stale = [
+            aid for aid, exp in votes.items()
+            if exp <= now or aid not in in_zone
+        ]
+        for aid in stale:
+            del votes[aid]
+
+    def _tally_and_maybe_clear(
+        self, module_id: str, voter_id: str | None, now: float
+    ) -> dict:
+        self._prune_votes(module_id, now)
+        population = self._zone_population(module_id)
+        votes = self.votes_by_module[module_id]
+        active = len(votes)
+        needed = (len(population) // 2) + 1 if population else 1
+        if active > len(population) / 2 and active > 0:
+            self.strokes_by_module[module_id] = []
+            self.votes_by_module[module_id] = {}
+            ev = BoardClearedEvent(
+                seq=self._next_seq(),
+                module_id=module_id,
+                cleared_by=voter_id or "system",
+                at=now,
+            )
+            self._events.append(ev)
+            self._emit(ev)
+            return {"votes": 0, "needed": 1, "cleared": True}
+        ev = VoteChangedEvent(
+            seq=self._next_seq(),
+            module_id=module_id,
+            votes=active,
+            needed=needed,
+            at=now,
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return {"votes": active, "needed": needed, "cleared": False}
+
+    def vote_clear(self, participant_id: str, module_id: str) -> dict:
+        m = self._require_placed(module_id)
+        if not isinstance(m, DrawBoardModule):
+            raise KeyError(module_id)
+        self._require_in_zone(participant_id, module_id)
+        now = time.time()
+        self.votes_by_module[module_id][participant_id] = now + VOTE_TTL_SECONDS
+        return self._tally_and_maybe_clear(module_id, participant_id, now)
+
+    def _recompute_all_drawboard_votes(self, now: float) -> None:
+        for module_id in list(self.votes_by_module.keys()):
+            before = set(self.votes_by_module[module_id].keys())
+            self._prune_votes(module_id, now)
+            after = set(self.votes_by_module[module_id].keys())
+            if before != after:
+                self._tally_and_maybe_clear(module_id, voter_id=None, now=now)
 
     def add_stroke(
         self, participant_id: str, module_id: str, raw: dict
