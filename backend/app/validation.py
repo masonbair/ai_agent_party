@@ -17,7 +17,7 @@ ALLOWED_COLORS: tuple[str, ...] = (
     "#a1887f",  # taupe
 )
 
-CHAT_MAX_LEN = 280
+CHAT_MAX_LEN = 140
 CHAT_TEXT_REGEX = re.compile(r"^[A-Za-z0-9 .,!?'\-]+$")
 
 

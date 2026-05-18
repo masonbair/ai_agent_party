@@ -141,6 +141,20 @@ describe('ChatInput', () => {
     expect(input).not.toHaveFocus();
   });
 
+  it('shows a live char counter once the user starts typing', () => {
+    render(
+      <ChatInput
+        slug="cream-terrazzo"
+        principal={{ kind: 'human', id: 'me' }}
+        disabled={false}
+      />,
+    );
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    expect(screen.queryByText(/\/140/)).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'hi' } });
+    expect(screen.getByText('2/140')).toBeInTheDocument();
+  });
+
   it('stops click propagation so the floor does not receive the click', () => {
     const onFloorClick = vi.fn();
     render(

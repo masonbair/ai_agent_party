@@ -128,6 +128,21 @@ export default function ChatInput({ slug, principal, disabled }: Props) {
           {error}
         </div>
       )}
+      {value.length > 0 && (
+        <div
+          aria-live="polite"
+          style={{
+            fontSize: 11,
+            color: value.length >= CHAT_MAX_LEN - 20 ? '#b86b00' : '#6a6a6a',
+            background: 'rgba(255,255,255,0.85)',
+            padding: '1px 8px',
+            borderRadius: 6,
+            alignSelf: 'flex-end',
+          }}
+        >
+          {value.length}/{CHAT_MAX_LEN}
+        </div>
+      )}
     </div>
   );
 }
