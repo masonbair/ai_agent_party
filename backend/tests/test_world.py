@@ -383,3 +383,75 @@ def test_set_lighting_requires_participant() -> None:
     w = _world_with_modules()
     with pytest.raises(ParticipantNotInPartyError):
         w.set_lighting("ghost", "day")
+
+
+# --- Sticky notes (Task 7) ---
+
+from app.events import NoteCreatedEvent, NoteDeletedEvent, NoteUpdatedEvent, StickyNote
+
+
+def test_create_note_emits_event_and_stores_note() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    ev = w.create_note("p1", "sticky-1", "hi", "yellow", x=10, y=10)
+    assert isinstance(ev, NoteCreatedEvent)
+    assert ev.note.text == "hi"
+    assert ev.note.author_id == "p1"
+    assert ev.note.author_kind == "human"
+    assert w.notes_by_module["sticky-1"][0].id == ev.note.id
+
+
+def test_create_note_clamps_local_coordinates() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    ev = w.create_note("p1", "sticky-1", "hi", "yellow", x=-50, y=999)
+    assert ev.note.x == 0.0 and ev.note.y == 160.0
+
+
+def test_create_note_requires_being_in_zone() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=700, y=400)
+    with pytest.raises(PartyWorld.NotInRangeError):
+        w.create_note("p1", "sticky-1", "hi", "yellow", x=0, y=0)
+
+
+def test_create_note_rejects_unknown_module() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    with pytest.raises(KeyError):
+        w.create_note("p1", "sticky-nope", "hi", "yellow", x=0, y=0)
+
+
+def test_create_note_enforces_per_user_limit() -> None:
+    from app.validation import NOTES_PER_USER_MAX
+
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    for i in range(NOTES_PER_USER_MAX):
+        w.create_note("p1", "sticky-1", f"n{i}", "yellow", x=0, y=0)
+    with pytest.raises(PartyWorld.LimitReachedError):
+        w.create_note("p1", "sticky-1", "one too many", "yellow", x=0, y=0)
+
+
+def test_update_note_only_author() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    _join_modules(w, "p2", x=200, y=140)
+    ev = w.create_note("p1", "sticky-1", "hi", "yellow", x=0, y=0)
+    upd = w.update_note("p1", "sticky-1", ev.note.id, text="bye")
+    assert isinstance(upd, NoteUpdatedEvent)
+    assert upd.note.text == "bye"
+    with pytest.raises(PartyWorld.NotAuthorError):
+        w.update_note("p2", "sticky-1", ev.note.id, text="hax")
+
+
+def test_delete_note_only_author() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    _join_modules(w, "p2", x=200, y=140)
+    ev = w.create_note("p1", "sticky-1", "hi", "yellow", x=0, y=0)
+    with pytest.raises(PartyWorld.NotAuthorError):
+        w.delete_note("p2", "sticky-1", ev.note.id)
+    out = w.delete_note("p1", "sticky-1", ev.note.id)
+    assert isinstance(out, NoteDeletedEvent)
+    assert w.notes_by_module["sticky-1"] == []

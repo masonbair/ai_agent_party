@@ -1,4 +1,5 @@
 import time
+import uuid
 from typing import Callable
 
 from app.collision import Rect, inflate_walls, slide
@@ -11,6 +12,9 @@ from app.events import (
     Participant,
     Reaction,
     LightingChangedEvent,
+    NoteCreatedEvent,
+    NoteDeletedEvent,
+    NoteUpdatedEvent,
     ReactionEvent,
     StickyNote,
     Stroke,
@@ -26,9 +30,12 @@ from app.models import (
 )
 from app.validation import (
     INTERACTION_MARGIN,
+    NOTES_PER_USER_MAX,
     REACTION_LIFETIME_SECONDS,
     SLOT_OCCUPIED_RADIUS,
     validate_chat_text,
+    validate_note_color,
+    validate_note_text,
     validate_reaction_emoji,
 )
 
@@ -37,7 +44,23 @@ class ParticipantNotInPartyError(LookupError):
     pass
 
 
+class NotInRangeError(LookupError):
+    pass
+
+
+class LimitReachedError(LookupError):
+    pass
+
+
+class NotAuthorError(LookupError):
+    pass
+
+
 class PartyWorld:
+    NotInRangeError = NotInRangeError
+    LimitReachedError = LimitReachedError
+    NotAuthorError = NotAuthorError
+
     def __init__(self, party: PartyConfig) -> None:
         self._party = party
         self.participants: dict[str, Participant] = {}
@@ -184,6 +207,133 @@ class PartyWorld:
         self._events.append(ev)
         self._emit(ev)
         return ev
+
+    def _require_placed(self, module_id: str) -> PlacedModule:
+        m = self._placed_module(module_id)
+        if m is None:
+            raise KeyError(module_id)
+        return m
+
+    def _require_in_zone(self, participant_id: str, module_id: str) -> None:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        p = self.participants[participant_id]
+        if not self.in_zone(module_id, p.x, p.y):
+            raise NotInRangeError(module_id)
+
+    def _clamp_local(
+        self, m: PlacedModule, x: float, y: float
+    ) -> tuple[float, float]:
+        return (max(0.0, min(m.w, float(x))), max(0.0, min(m.h, float(y))))
+
+    def create_note(
+        self,
+        participant_id: str,
+        module_id: str,
+        text: str,
+        color: str,
+        x: float,
+        y: float,
+    ) -> NoteCreatedEvent:
+        m = self._require_placed(module_id)
+        if not isinstance(m, StickyNoteModule):
+            raise KeyError(f"module {module_id} is not stickynotes")
+        self._require_in_zone(participant_id, module_id)
+        cleaned_text = validate_note_text(text)
+        cleaned_color = validate_note_color(color)
+        notes = self.notes_by_module[module_id]
+        own = sum(1 for n in notes if n.author_id == participant_id)
+        if own >= NOTES_PER_USER_MAX:
+            raise LimitReachedError(module_id)
+        lx, ly = self._clamp_local(m, x, y)
+        participant = self.participants[participant_id]
+        note = StickyNote(
+            id=uuid.uuid4().hex,
+            module_id=module_id,
+            author_id=participant_id,
+            author_kind=participant.kind,
+            text=cleaned_text,
+            color=cleaned_color,
+            x=lx,
+            y=ly,
+            created_at=time.time(),
+        )
+        notes.append(note)
+        ev = NoteCreatedEvent(
+            seq=self._next_seq(),
+            module_id=module_id,
+            note=note,
+            at=note.created_at,
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
+
+    def update_note(
+        self,
+        participant_id: str,
+        module_id: str,
+        note_id: str,
+        *,
+        text: str | None = None,
+        color: str | None = None,
+        x: float | None = None,
+        y: float | None = None,
+    ) -> NoteUpdatedEvent:
+        m = self._require_placed(module_id)
+        if not isinstance(m, StickyNoteModule):
+            raise KeyError(module_id)
+        self._require_in_zone(participant_id, module_id)
+        notes = self.notes_by_module[module_id]
+        for i, n in enumerate(notes):
+            if n.id == note_id:
+                if n.author_id != participant_id:
+                    raise NotAuthorError(note_id)
+                fields: dict = {}
+                if text is not None:
+                    fields["text"] = validate_note_text(text)
+                if color is not None:
+                    fields["color"] = validate_note_color(color)
+                if x is not None or y is not None:
+                    nx = n.x if x is None else x
+                    ny = n.y if y is None else y
+                    lx, ly = self._clamp_local(m, nx, ny)
+                    fields["x"] = lx
+                    fields["y"] = ly
+                updated = n.model_copy(update=fields)
+                notes[i] = updated
+                ev = NoteUpdatedEvent(
+                    seq=self._next_seq(),
+                    module_id=module_id,
+                    note=updated,
+                    at=time.time(),
+                )
+                self._events.append(ev)
+                self._emit(ev)
+                return ev
+        raise KeyError(note_id)
+
+    def delete_note(
+        self, participant_id: str, module_id: str, note_id: str
+    ) -> NoteDeletedEvent:
+        self._require_placed(module_id)
+        self._require_in_zone(participant_id, module_id)
+        notes = self.notes_by_module[module_id]
+        for i, n in enumerate(notes):
+            if n.id == note_id:
+                if n.author_id != participant_id:
+                    raise NotAuthorError(note_id)
+                del notes[i]
+                ev = NoteDeletedEvent(
+                    seq=self._next_seq(),
+                    module_id=module_id,
+                    note_id=note_id,
+                    at=time.time(),
+                )
+                self._events.append(ev)
+                self._emit(ev)
+                return ev
+        raise KeyError(note_id)
 
     def _placed_module(self, module_id: str) -> PlacedModule | None:
         for m in self._party.modules:
