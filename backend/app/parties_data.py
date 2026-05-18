@@ -1,4 +1,15 @@
-from app.models import Music, PartyConfig, Room, Theme, Wall, WorldSize, Zone
+from app.models import (
+    DrawBoardModule,
+    LightingModule,
+    Music,
+    PartyConfig,
+    Room,
+    StickyNoteModule,
+    Theme,
+    Wall,
+    WorldSize,
+    Zone,
+)
 
 CREAM_TERRAZZO = PartyConfig(
     slug="cream-terrazzo",
@@ -62,6 +73,11 @@ CREAM_TERRAZZO = PartyConfig(
             Wall(x=75.0, y=40.0, width=25.0, height=1.2, color="#8b6f47"),
         ],
     ),
+    modules=[
+        LightingModule(preset="dusk"),
+        StickyNoteModule(id="sticky-1", x=60, y=60, w=200, h=140),
+        DrawBoardModule(id="draw-1", x=540, y=60, w=200, h=160),
+    ],
 )
 
 SPEAKEASY = PartyConfig(
