@@ -534,12 +534,67 @@ class PartyWorld:
             "zone": self.derive_zone(p.x, p.y),
         }
 
+    def _module_snapshot(self, m: PlacedModule) -> dict:
+        margin = INTERACTION_MARGIN
+        ir = {
+            "x": m.x - margin,
+            "y": m.y - margin,
+            "w": m.w + 2 * margin,
+            "h": m.h + 2 * margin,
+        }
+        slots = self.approach_slots(m.id)
+        occ = self.slot_occupancy(m.id)
+        slots_out = [
+            {"x": x, "y": y, "occupied": o} for (x, y), o in zip(slots, occ)
+        ]
+        base: dict = {
+            "id": m.id,
+            "kind": m.kind,
+            "x": m.x,
+            "y": m.y,
+            "w": m.w,
+            "h": m.h,
+            "interactionRect": ir,
+            "approachSlots": slots_out,
+        }
+        if isinstance(m, StickyNoteModule):
+            base["notes"] = [n.model_dump() for n in self.notes_by_module[m.id]]
+        else:
+            base["strokes"] = [
+                s.model_dump() for s in self.strokes_by_module[m.id]
+            ]
+            now = time.time()
+            self._prune_votes(m.id, now)
+            population = self._zone_population(m.id)
+            active = len(self.votes_by_module[m.id])
+            needed = (len(population) // 2) + 1 if population else 1
+            base["vote"] = {"votes": active, "needed": needed}
+        return base
+
     def snapshot(self) -> dict:
+        now = time.time()
+        active_reactions = [
+            r.model_dump()
+            for r in self.active_reactions.values()
+            if r.expires_at > now
+        ]
+        self.active_reactions = {
+            aid: r
+            for aid, r in self.active_reactions.items()
+            if r.expires_at > now
+        }
+        placed = [
+            m for m in self._party.modules
+            if isinstance(m, (StickyNoteModule, DrawBoardModule))
+        ]
         return {
             "participants": [
                 self._participant_dict(p) for p in self.participants.values()
             ],
             "cursor": self.cursor,
+            "lighting": self.lighting,
+            "modules": [self._module_snapshot(m) for m in placed],
+            "active_reactions": active_reactions,
         }
 
     def observe_since(self, since: int) -> dict:

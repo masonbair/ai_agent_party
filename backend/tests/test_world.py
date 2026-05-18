@@ -574,3 +574,22 @@ def test_vote_changed_event_emitted_on_progress() -> None:
     unsub()
     vc = [e for e in received if isinstance(e, VoteChangedEvent)]
     assert vc and vc[-1].votes == 1 and vc[-1].needed == 2
+
+
+# --- Snapshot includes modules (Task 10) ---
+
+
+def test_snapshot_includes_module_state() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=200, y=140)
+    w.create_note("p1", "sticky-1", "hi", "yellow", x=0, y=0)
+    snap = w.snapshot()
+    assert snap["lighting"] == "dusk"
+    assert snap["active_reactions"] == []
+    mods = {m["id"]: m for m in snap["modules"]}
+    assert mods["sticky-1"]["kind"] == "stickynotes"
+    assert len(mods["sticky-1"]["notes"]) == 1
+    assert mods["sticky-1"]["interactionRect"]["w"] == 240 + 2 * 24
+    assert len(mods["sticky-1"]["approachSlots"]) == 6
+    assert mods["draw-1"]["strokes"] == []
+    assert mods["draw-1"]["vote"]["votes"] == 0
