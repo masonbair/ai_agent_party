@@ -455,3 +455,55 @@ def test_delete_note_only_author() -> None:
     out = w.delete_note("p1", "sticky-1", ev.note.id)
     assert isinstance(out, NoteDeletedEvent)
     assert w.notes_by_module["sticky-1"] == []
+
+
+# --- Drawboard strokes (Task 8) ---
+
+from app.events import StrokeAddedEvent, StrokeDroppedEvent
+from app.validation import STROKES_PER_BOARD_MAX
+
+
+def test_add_stroke_emits_event_and_stores_stroke() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    raw = {"color": "#ff6b9d", "width": "med", "points": [{"x": 1, "y": 1}, {"x": 5, "y": 5}]}
+    ev = w.add_stroke("p1", "draw-1", raw)
+    assert isinstance(ev, StrokeAddedEvent)
+    assert ev.stroke.author_id == "p1"
+    assert w.strokes_by_module["draw-1"][0].id == ev.stroke.id
+
+
+def test_add_stroke_requires_in_zone() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=10, y=10)
+    raw = {"color": "#ff6b9d", "width": "med", "points": [{"x": 0, "y": 0}]}
+    with pytest.raises(PartyWorld.NotInRangeError):
+        w.add_stroke("p1", "draw-1", raw)
+
+
+def test_add_stroke_validation_errors_propagate() -> None:
+    from app.validation import StrokeValidationError
+
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    with pytest.raises(StrokeValidationError):
+        w.add_stroke("p1", "draw-1", {"color": "rebeccapurple", "width": "med", "points": [{"x": 0, "y": 0}]})
+
+
+def test_add_stroke_evicts_oldest_at_cap() -> None:
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    raw = {"color": "#ff6b9d", "width": "thin", "points": [{"x": 0, "y": 0}]}
+    first_id = w.add_stroke("p1", "draw-1", raw).stroke.id
+    for _ in range(STROKES_PER_BOARD_MAX - 1):
+        w.add_stroke("p1", "draw-1", raw)
+    assert len(w.strokes_by_module["draw-1"]) == STROKES_PER_BOARD_MAX
+    received: list = []
+    unsub = w.on_event(received.append)
+    w.add_stroke("p1", "draw-1", raw)
+    unsub()
+    dropped = [e for e in received if isinstance(e, StrokeDroppedEvent)]
+    assert len(dropped) == 1
+    assert dropped[0].stroke_id == first_id
+    assert all(s.id != first_id for s in w.strokes_by_module["draw-1"])
+    assert len(w.strokes_by_module["draw-1"]) == STROKES_PER_BOARD_MAX

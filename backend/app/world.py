@@ -18,6 +18,8 @@ from app.events import (
     ReactionEvent,
     StickyNote,
     Stroke,
+    StrokeAddedEvent,
+    StrokeDroppedEvent,
 )
 
 _LIGHTING_PRESETS = ("day", "dusk", "night", "party")
@@ -33,10 +35,12 @@ from app.validation import (
     NOTES_PER_USER_MAX,
     REACTION_LIFETIME_SECONDS,
     SLOT_OCCUPIED_RADIUS,
+    STROKES_PER_BOARD_MAX,
     validate_chat_text,
     validate_note_color,
     validate_note_text,
     validate_reaction_emoji,
+    validate_stroke,
 )
 
 
@@ -334,6 +338,49 @@ class PartyWorld:
                 self._emit(ev)
                 return ev
         raise KeyError(note_id)
+
+    def add_stroke(
+        self, participant_id: str, module_id: str, raw: dict
+    ) -> StrokeAddedEvent:
+        m = self._require_placed(module_id)
+        if not isinstance(m, DrawBoardModule):
+            raise KeyError(f"module {module_id} is not drawboard")
+        self._require_in_zone(participant_id, module_id)
+        cleaned = validate_stroke(raw, m.w, m.h)
+        participant = self.participants[participant_id]
+        stroke = Stroke(
+            id=uuid.uuid4().hex,
+            module_id=module_id,
+            author_id=participant_id,
+            author_kind=participant.kind,
+            color=cleaned["color"],
+            width=cleaned["width"],
+            points=cleaned["points"],
+            created_at=time.time(),
+        )
+        strokes = self.strokes_by_module[module_id]
+        dropped: Stroke | None = None
+        if len(strokes) >= STROKES_PER_BOARD_MAX:
+            dropped = strokes.pop(0)
+        strokes.append(stroke)
+        ev = StrokeAddedEvent(
+            seq=self._next_seq(),
+            module_id=module_id,
+            stroke=stroke,
+            at=stroke.created_at,
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        if dropped is not None:
+            drop_ev = StrokeDroppedEvent(
+                seq=self._next_seq(),
+                module_id=module_id,
+                stroke_id=dropped.id,
+                at=time.time(),
+            )
+            self._events.append(drop_ev)
+            self._emit(drop_ev)
+        return ev
 
     def _placed_module(self, module_id: str) -> PlacedModule | None:
         for m in self._party.modules:
