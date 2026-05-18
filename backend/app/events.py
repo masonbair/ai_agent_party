@@ -50,4 +50,33 @@ class ChatEvent(BaseModel):
     at: float
 
 
+class StickyNote(BaseModel):
+    id: str
+    module_id: str
+    author_id: str
+    author_kind: Literal["human", "agent"]
+    text: str
+    color: Literal["yellow", "pink", "blue", "green"]
+    x: float
+    y: float
+    created_at: float
+
+
+class Stroke(BaseModel):
+    id: str
+    module_id: str
+    author_id: str
+    author_kind: Literal["human", "agent"]
+    color: str
+    width: Literal["thin", "med", "thick"]
+    points: list[dict]
+    created_at: float
+
+
+class Reaction(BaseModel):
+    actor_id: str
+    emoji: str
+    expires_at: float
+
+
 Event = JoinEvent | LeaveEvent | MoveEvent | ChatEvent
