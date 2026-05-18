@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   LightingPreset,
   ModuleSnapshot,
@@ -41,7 +41,7 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
   const backoffRef = useRef(1000);
   const evictedRef = useRef(false);
 
-  function applyObserveInitial(payload: ObservePayload) {
+  const applyObserveInitial = useCallback((payload: ObservePayload) => {
     setModules(payload.modules ?? []);
     if (payload.lighting) setLighting(payload.lighting);
     const m = new Map<string, ReactionState>();
@@ -49,7 +49,7 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
       m.set(r.actor_id, { emoji: r.emoji, expiresAt: r.expires_at * 1000 });
     }
     setReactions(m);
-  }
+  }, []);
 
   useEffect(() => {
     if (!slug || !principal.id) return;
