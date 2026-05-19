@@ -74,6 +74,12 @@ class PartyWorld:
         self.strokes_by_module: dict[str, list[Stroke]] = {}
         self.votes_by_module: dict[str, dict[str, float]] = {}
         self.active_reactions: dict[str, Reaction] = {}
+        # Last (active_votes, needed) emitted per drawboard. Used to suppress
+        # duplicate vote_changed events when participants move without
+        # changing the tally — and to detect population-only changes (someone
+        # walked into / out of a board with a vote in flight) so the displayed
+        # 'needed' updates without requiring a new vote.
+        self._last_vote_state: dict[str, tuple[int, int]] = {}
         for m in party.modules:
             if isinstance(m, LightingModule):
                 self.lighting = m.preset
@@ -82,6 +88,7 @@ class PartyWorld:
             elif isinstance(m, DrawBoardModule):
                 self.strokes_by_module[m.id] = []
                 self.votes_by_module[m.id] = {}
+                self._last_vote_state[m.id] = (0, 1)
 
     def on_event(
         self, callback: Callable[[Event], None]
@@ -123,6 +130,7 @@ class PartyWorld:
         ev = JoinEvent(seq=self._next_seq(), participant=participant, at=time.time())
         self._events.append(ev)
         self._emit(ev)
+        self._recompute_all_drawboard_votes(time.time())
         return ev
 
     def leave(self, participant_id: str) -> LeaveEvent:
@@ -375,8 +383,6 @@ class PartyWorld:
             )
             self._events.append(cleared_ev)
             self._emit(cleared_ev)
-            # Post-clear tally so clients see 0 / current-population rather
-            # than a stale 0 / 1: the people on the board didn't disappear.
             post_needed = (len(population) // 2) + 1 if population else 1
             tally_ev = VoteChangedEvent(
                 seq=self._next_seq(),
@@ -387,16 +393,20 @@ class PartyWorld:
             )
             self._events.append(tally_ev)
             self._emit(tally_ev)
+            self._last_vote_state[module_id] = (0, post_needed)
             return {"votes": 0, "needed": post_needed, "cleared": True}
-        ev = VoteChangedEvent(
-            seq=self._next_seq(),
-            module_id=module_id,
-            votes=active,
-            needed=needed,
-            at=now,
-        )
-        self._events.append(ev)
-        self._emit(ev)
+        state = (active, needed)
+        if self._last_vote_state.get(module_id) != state:
+            self._last_vote_state[module_id] = state
+            ev = VoteChangedEvent(
+                seq=self._next_seq(),
+                module_id=module_id,
+                votes=active,
+                needed=needed,
+                at=now,
+            )
+            self._events.append(ev)
+            self._emit(ev)
         return {"votes": active, "needed": needed, "cleared": False}
 
     def vote_clear(self, participant_id: str, module_id: str) -> dict:
@@ -409,12 +419,11 @@ class PartyWorld:
         return self._tally_and_maybe_clear(module_id, participant_id, now)
 
     def _recompute_all_drawboard_votes(self, now: float) -> None:
+        # Always re-tally after movement / join / leave: the displayed needed
+        # depends on in-zone population, and the dedupe inside
+        # _tally_and_maybe_clear keeps this from emitting duplicate events.
         for module_id in list(self.votes_by_module.keys()):
-            before = set(self.votes_by_module[module_id].keys())
-            self._prune_votes(module_id, now)
-            after = set(self.votes_by_module[module_id].keys())
-            if before != after:
-                self._tally_and_maybe_clear(module_id, voter_id=None, now=now)
+            self._tally_and_maybe_clear(module_id, voter_id=None, now=now)
 
     def add_stroke(
         self, participant_id: str, module_id: str, raw: dict

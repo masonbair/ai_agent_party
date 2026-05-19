@@ -647,3 +647,97 @@ def test_post_clear_tally_reflects_remaining_population() -> None:
     assert len(tally) >= 1
     final = tally[-1]
     assert final.votes == 0 and final.needed == 2
+
+
+def test_tally_updates_when_walker_enters_active_vote_zone() -> None:
+    """When someone joins or walks INTO an active-vote zone, the tally's
+    needed must reflect the new in-zone population. draw-1 fixture is
+    (480, 60, 320, 200); interior points around (640, 160)."""
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p_inzone", x=620, y=180)
+    _join_modules(w, "p2", x=10, y=10)
+    w.add_stroke("p1", "draw-1", {
+        "color": "#ff6b9d", "width": "thin", "points": [{"x": 0, "y": 0}],
+    })
+    r1 = w.vote_clear("p1", "draw-1")
+    assert r1 == {"votes": 1, "needed": 2, "cleared": False}
+
+    # p2 walks in via move(): pop 2 -> 3, needed 2 -> 2. Dedupe drops.
+    received: list = []
+    unsub = w.on_event(received.append)
+    w.move("p2", x=600, y=170)
+    unsub()
+    assert [e for e in received if isinstance(e, VoteChangedEvent)] == []
+
+    # A 4th in-zone participant joins -> pop 4, needed 3 (strict-maj).
+    received.clear()
+    unsub = w.on_event(received.append)
+    _join_modules(w, "p3", x=610, y=170)
+    unsub()
+    tally = [e for e in received if isinstance(e, VoteChangedEvent)]
+    assert tally and tally[-1].votes == 1 and tally[-1].needed == 3
+
+
+def test_tally_updates_when_someone_leaves_zone() -> None:
+    """Symmetric to join: leaving the zone re-tallies too."""
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p2", x=620, y=180)
+    _join_modules(w, "p3", x=610, y=170)
+    w.add_stroke("p1", "draw-1", {
+        "color": "#ff6b9d", "width": "thin", "points": [{"x": 0, "y": 0}],
+    })
+    # 3 in zone; needed = strict-maj(3) = 2.
+    r = w.vote_clear("p1", "draw-1")
+    assert r == {"votes": 1, "needed": 2, "cleared": False}
+
+    received: list = []
+    unsub = w.on_event(received.append)
+    # p2 walks out (non-voter): pop 3 -> 2, needed 2 -> 2 (still 2).
+    w.move("p2", x=10, y=10)
+    # p3 walks out: pop 2 -> 1, p1 alone with vote -> majority -> clear.
+    w.move("p3", x=10, y=10)
+    unsub()
+    assert [e for e in received if isinstance(e, BoardClearedEvent)]
+    last_tally = [e for e in received if isinstance(e, VoteChangedEvent)][-1]
+    assert last_tally.votes == 0 and last_tally.needed == 1
+
+
+def test_tally_updates_when_in_zone_user_leaves_via_leave_call() -> None:
+    """A participant calling leave() while in an active-vote zone
+    triggers the same re-tally as walking out."""
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p2", x=620, y=180)
+    _join_modules(w, "p3", x=610, y=170)
+    w.add_stroke("p1", "draw-1", {
+        "color": "#ff6b9d", "width": "thin", "points": [{"x": 0, "y": 0}],
+    })
+    r = w.vote_clear("p1", "draw-1")
+    assert r["needed"] == 2
+
+    received: list = []
+    unsub = w.on_event(received.append)
+    # p3 (non-voter) leaves the party entirely: pop 3 -> 2, needed unchanged.
+    w.leave("p3")
+    # p2 (non-voter) leaves: pop 2 -> 1, p1's vote becomes majority -> clear.
+    w.leave("p2")
+    unsub()
+    assert [e for e in received if isinstance(e, BoardClearedEvent)]
+
+
+def test_tally_not_re_emitted_when_state_unchanged() -> None:
+    """Movement that doesn't change population or votes shouldn't spam
+    vote_changed events."""
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p2", x=620, y=180)
+    w.vote_clear("p1", "draw-1")  # emits (1, 2)
+    received: list = []
+    unsub = w.on_event(received.append)
+    w.move("p1", x=645, y=160)
+    w.move("p1", x=640, y=160)
+    unsub()
+    spam = [e for e in received if isinstance(e, VoteChangedEvent)]
+    assert spam == []
