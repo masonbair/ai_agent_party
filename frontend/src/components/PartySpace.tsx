@@ -62,6 +62,9 @@ export default function PartySpace({
   realtimeStatus,
 }: Props) {
   const { width, height } = party.worldSize;
+  const [openModuleId, setOpenModuleId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const inputBlocked = pickerOpen || openModuleId !== null;
   const { position, setTarget } = useMovement({
     worldWidth: width,
     worldHeight: height,
@@ -69,10 +72,9 @@ export default function PartySpace({
     walls: party.room.walls,
     onMove,
     moveThrottleMs: 100,
+    paused: inputBlocked,
   });
   const floorRef = useRef<HTMLDivElement>(null);
-  const [openModuleId, setOpenModuleId] = useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!applyObserveInitial) return;
@@ -95,6 +97,7 @@ export default function PartySpace({
   }, [party.slug, applyObserveInitial]);
 
   function onClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (inputBlocked) return;
     const rect = floorRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return;
     const logicalX = ((e.clientX - rect.left) / rect.width) * width;
