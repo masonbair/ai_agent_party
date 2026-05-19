@@ -25,12 +25,10 @@ export function ModuleModal({ mod, principal, slug, inZone, onClose }: Props) {
   const accent = isSticky ? '#c89b4a' : '#3a5a8c';
   const title = isSticky ? 'Note Board' : 'White Board';
 
-  // Render the editor at a comfortable on-screen size; the stored stroke /
-  // note coordinates live in module-local space (0..mod.w / 0..mod.h) so the
-  // editor's own DOM remains at native module dimensions inside a scaled
-  // wrapper. This keeps existing pointer math correct.
-  const scale = isSticky ? 3.6 : 4.2;
-
+  // The editor renders at its own CSS size; stored coords are in module-local
+  // space (0..mod.w / 0..mod.h) and rendered via percentages so the same DOM
+  // is correct at any display size. The container caps to 85vw / 70vh while
+  // preserving the module's native aspect ratio.
   return (
     <div
       role="dialog"
@@ -57,12 +55,11 @@ export function ModuleModal({ mod, principal, slug, inZone, onClose }: Props) {
           borderRadius: 14,
           boxShadow: '0 30px 80px rgba(0,0,0,0.45)',
           padding: '14px 18px 20px',
-          maxWidth: '90vw',
-          maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
           border: `3px solid ${accent}`,
+          width: 'min(85vw, 900px)',
         }}
       >
         <header
@@ -105,7 +102,7 @@ export function ModuleModal({ mod, principal, slug, inZone, onClose }: Props) {
               style={{
                 background: 'transparent',
                 border: 'none',
-                fontSize: 18,
+                fontSize: 14,
                 cursor: 'pointer',
                 color: accent,
                 lineHeight: 1,
@@ -116,45 +113,34 @@ export function ModuleModal({ mod, principal, slug, inZone, onClose }: Props) {
           </div>
         </header>
         <div
-          // The editors are absolutely-positioned at mod.x/mod.y in their own
-          // CSS; we re-anchor them by offsetting the container so they appear
-          // at (0,0) inside a scaling wrapper.
           style={{
             position: 'relative',
-            width: mod.w * scale,
-            height: mod.h * scale,
+            width: '100%',
+            aspectRatio: `${mod.w} / ${mod.h}`,
+            maxHeight: '70vh',
             overflow: 'hidden',
             borderRadius: 8,
-            background: '#f7f5ef',
+            background: isSticky ? '#c89464' : '#fafafa',
+            border: `1px solid ${accent}33`,
           }}
         >
-          <div
-            style={{
-              position: 'absolute',
-              left: -mod.x * scale,
-              top: -mod.y * scale,
-              width: 0,
-              height: 0,
-              transformOrigin: 'top left',
-              transform: `scale(${scale})`,
-            }}
-          >
-            {mod.kind === 'stickynotes' ? (
-              <StickyWall
-                mod={mod}
-                principal={principal}
-                slug={slug}
-                inZone={inZone}
-              />
-            ) : (
-              <DrawBoard
-                mod={mod}
-                principal={principal}
-                slug={slug}
-                inZone={inZone}
-              />
-            )}
-          </div>
+          {mod.kind === 'stickynotes' ? (
+            <StickyWall
+              mod={mod}
+              principal={principal}
+              slug={slug}
+              inZone={inZone}
+              fill
+            />
+          ) : (
+            <DrawBoard
+              mod={mod}
+              principal={principal}
+              slug={slug}
+              inZone={inZone}
+              fill
+            />
+          )}
         </div>
       </div>
     </div>
