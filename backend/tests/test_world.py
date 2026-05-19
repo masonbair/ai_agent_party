@@ -624,3 +624,26 @@ def test_observe_since_emits_note_and_stroke_events() -> None:
     w.add_stroke("p1", "draw-1", {"color": "#ff6b9d", "width": "thin", "points": [{"x": 0, "y": 0}]})
     out = w.observe_since(before)
     assert any(e["type"] == "stroke_added" for e in out["events"])
+
+
+def test_post_clear_tally_reflects_remaining_population() -> None:
+    """After a clear, the vote tally should be 0/needed-for-current-pop,
+    not the stale 0/1 default."""
+    w = _world_with_modules()
+    _join_modules(w, "p1", x=640, y=160)
+    _join_modules(w, "p2", x=620, y=180)
+    # Both vote -> clears.
+    w.vote_clear("p1", "draw-1")
+    received: list = []
+    unsub = w.on_event(received.append)
+    result = w.vote_clear("p2", "draw-1")
+    unsub()
+    assert result == {"votes": 0, "needed": 2, "cleared": True}
+    # A vote_changed event should follow the board_cleared event with the
+    # population-correct tally so clients display 0/2 not 0/1.
+    cleared = [e for e in received if isinstance(e, BoardClearedEvent)]
+    tally = [e for e in received if isinstance(e, VoteChangedEvent)]
+    assert len(cleared) == 1
+    assert len(tally) >= 1
+    final = tally[-1]
+    assert final.votes == 0 and final.needed == 2

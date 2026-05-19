@@ -196,10 +196,13 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
             );
           } else if (ev.type === 'board_cleared') {
             const e2 = ev as unknown as { module_id: string };
+            // Only drop strokes here. The backend emits a vote_changed
+            // event right after with the correct tally for the current
+            // in-zone population; leave vote state for that to set.
             setModules((prev) =>
               prev.map((m) =>
                 m.id === e2.module_id && m.kind === 'drawboard'
-                  ? { ...m, strokes: [], vote: { votes: 0, needed: 1 } }
+                  ? { ...m, strokes: [] }
                   : m,
               ),
             );

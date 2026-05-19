@@ -367,15 +367,27 @@ class PartyWorld:
         if active > len(population) / 2 and active > 0:
             self.strokes_by_module[module_id] = []
             self.votes_by_module[module_id] = {}
-            ev = BoardClearedEvent(
+            cleared_ev = BoardClearedEvent(
                 seq=self._next_seq(),
                 module_id=module_id,
                 cleared_by=voter_id or "system",
                 at=now,
             )
-            self._events.append(ev)
-            self._emit(ev)
-            return {"votes": 0, "needed": 1, "cleared": True}
+            self._events.append(cleared_ev)
+            self._emit(cleared_ev)
+            # Post-clear tally so clients see 0 / current-population rather
+            # than a stale 0 / 1: the people on the board didn't disappear.
+            post_needed = (len(population) // 2) + 1 if population else 1
+            tally_ev = VoteChangedEvent(
+                seq=self._next_seq(),
+                module_id=module_id,
+                votes=0,
+                needed=post_needed,
+                at=now,
+            )
+            self._events.append(tally_ev)
+            self._emit(tally_ev)
+            return {"votes": 0, "needed": post_needed, "cleared": True}
         ev = VoteChangedEvent(
             seq=self._next_seq(),
             module_id=module_id,
