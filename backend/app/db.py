@@ -59,3 +59,51 @@ def init_db(path: str) -> sqlite3.Connection:
 def close_db(conn: sqlite3.Connection | None) -> None:
     if conn is not None:
         conn.close()
+
+
+MAX_HISTORY_LIMIT = 200
+
+
+def insert_broadcast(
+    conn: sqlite3.Connection,
+    *,
+    party_slug: str,
+    sender_kind: str,
+    sender_id: str,
+    sender_name: str,
+    text: str,
+    at: float,
+) -> int:
+    cur = conn.execute(
+        "INSERT INTO broadcast_messages "
+        "(party_slug, sender_kind, sender_id, sender_name, text, at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (party_slug, sender_kind, sender_id, sender_name, text, at),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def query_broadcast_history(
+    conn: sqlite3.Connection,
+    party_slug: str,
+    *,
+    before_id: int | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    capped = max(1, min(int(limit), MAX_HISTORY_LIMIT))
+    if before_id is None:
+        rows = conn.execute(
+            "SELECT id, party_slug, sender_kind, sender_id, sender_name, text, at "
+            "FROM broadcast_messages WHERE party_slug = ? "
+            "ORDER BY id DESC LIMIT ?",
+            (party_slug, capped),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, party_slug, sender_kind, sender_id, sender_name, text, at "
+            "FROM broadcast_messages WHERE party_slug = ? AND id < ? "
+            "ORDER BY id DESC LIMIT ?",
+            (party_slug, int(before_id), capped),
+        ).fetchall()
+    return [dict(r) for r in rows]
