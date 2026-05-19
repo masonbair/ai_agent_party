@@ -49,6 +49,13 @@ STROKE_MAX_POINTS = 200
 STROKES_PER_BOARD_MAX = 500
 STROKE_WIDTH_ALLOWLIST: tuple[str, ...] = ("thin", "med", "thick")
 
+# Whiteboard markers need dark colors that the avatar swatch list does not
+# carry. Strokes accept any avatar color plus these neutrals.
+STROKE_COLOR_ALLOWLIST: tuple[str, ...] = ALLOWED_COLORS + (
+    "#222222",  # marker black
+    "#1a3a6e",  # dark blue
+)
+
 NOTES_PER_USER_MAX = 10
 INTERACTION_MARGIN = 24.0
 SLOT_OCCUPIED_RADIUS = 32.0
@@ -96,7 +103,7 @@ def _clamp(v: float, lo: float, hi: float) -> float:
 
 
 def validate_stroke(raw: dict, board_w: float, board_h: float) -> dict:
-    if raw.get("color") not in ALLOWED_COLORS:
+    if raw.get("color") not in STROKE_COLOR_ALLOWLIST:
         raise StrokeValidationError("stroke color not in allow-list")
     if raw.get("width") not in STROKE_WIDTH_ALLOWLIST:
         raise StrokeValidationError("stroke width not in allow-list")

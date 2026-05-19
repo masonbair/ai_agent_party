@@ -18,7 +18,15 @@ const WIDTH_PX: Record<Stroke['width'], number> = {
   thick: 10,
 };
 
-const PALETTE = ['#ff6b9d', '#3a5a8c', '#4dd0e1', '#ffb74d', '#81c784', '#222'];
+// Must match backend STROKE_COLOR_ALLOWLIST.
+const PALETTE = [
+  '#222222', // marker black
+  '#1a3a6e', // dark blue
+  '#ff6b9d', // pink
+  '#4dd0e1', // teal
+  '#81c784', // green
+  '#ffb74d', // orange
+];
 
 function localFromPointer(
   e: React.PointerEvent<HTMLDivElement>,
