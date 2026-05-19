@@ -23,13 +23,13 @@ def test_set_lighting_happy_path(client: TestClient) -> None:
     assert obs["lighting"] == "night"
 
 
-def test_set_lighting_unknown_preset_400(client: TestClient) -> None:
+def test_set_lighting_unknown_preset_422(client: TestClient) -> None:
     sid = _join(client)
     r = client.post(
         "/api/parties/cream-terrazzo/lighting",
         json={"principal": {"kind": "human", "id": sid}, "preset": "rainbow"},
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_set_lighting_not_joined_409(client: TestClient) -> None:

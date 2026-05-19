@@ -43,7 +43,7 @@ def react(
         raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
     except ReactionValidationError as exc:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail=envelope("invalid_emoji", message=str(exc)),
         )
     return {"emoji": ev.emoji, "expires_at": ev.expires_at, "cursor": world.cursor}

@@ -32,7 +32,7 @@ def test_add_stroke_happy_path(client: TestClient) -> None:
     assert r.json()["stroke"]["author_id"] == sid
 
 
-def test_add_stroke_invalid_color_400(client: TestClient) -> None:
+def test_add_stroke_invalid_color_422(client: TestClient) -> None:
     sid = _join_near_draw(client)
     r = client.post(
         "/api/parties/cream-terrazzo/modules/draw-1/strokes",
@@ -43,7 +43,7 @@ def test_add_stroke_invalid_color_400(client: TestClient) -> None:
             "points": [{"x": 1, "y": 1}],
         },
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_clear_solo_clears_immediately(client: TestClient) -> None:

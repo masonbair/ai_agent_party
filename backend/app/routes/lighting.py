@@ -42,7 +42,7 @@ def set_lighting(
         raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
     except ValueError as exc:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail=envelope("invalid_preset", message=str(exc)),
         )
     return {"preset": ev.preset, "cursor": world.cursor}

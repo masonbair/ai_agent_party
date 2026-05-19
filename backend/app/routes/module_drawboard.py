@@ -43,7 +43,7 @@ def _map_errors(exc: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail=envelope("not_in_range"))
     if isinstance(exc, StrokeValidationError):
         return HTTPException(
-            status_code=400, detail=envelope("invalid_stroke", message=str(exc))
+            status_code=422, detail=envelope("invalid_stroke", message=str(exc))
         )
     if isinstance(exc, KeyError):
         return HTTPException(status_code=404, detail=envelope("not_found"))

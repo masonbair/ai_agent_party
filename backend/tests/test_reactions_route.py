@@ -21,13 +21,13 @@ def test_react_happy_path(client: TestClient) -> None:
     assert r.json()["emoji"] == "❤️"
 
 
-def test_react_unknown_emoji_400(client: TestClient) -> None:
+def test_react_unknown_emoji_422(client: TestClient) -> None:
     sid = _join(client)
     r = client.post(
         "/api/parties/cream-terrazzo/react",
         json={"principal": {"kind": "human", "id": sid}, "emoji": "💩"},
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_react_not_joined_409(client: TestClient) -> None:
