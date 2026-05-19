@@ -1,3 +1,4 @@
+import sqlite3
 import uuid
 
 from app.events import Agent
@@ -16,6 +17,7 @@ class Store:
         self._worlds: dict[str, PartyWorld] = {}
         self._hubs: dict[str, PartyWorldHub] = {}
         self._session_presence: SessionPresenceHub | None = None
+        self.db: sqlite3.Connection | None = None
 
     def create_session(self, username: str, color: str) -> User:
         session_id = uuid.uuid4().hex

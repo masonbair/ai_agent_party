@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app import db as db_module
 from app.main import app, get_store
 from app.routes import agents as agents_routes
 from app.routes import parties as parties_routes
@@ -11,7 +12,10 @@ from app.store import Store
 
 @pytest.fixture
 def store() -> Store:
-    return Store()
+    s = Store()
+    s.db = db_module.init_db(":memory:")
+    yield s
+    db_module.close_db(s.db)
 
 
 @pytest.fixture
