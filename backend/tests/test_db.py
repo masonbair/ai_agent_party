@@ -103,3 +103,91 @@ def test_query_broadcast_history_caps_limit(conn):
         _insert_broadcast(conn, text=f"m{i}", at=1000.0 + i)
     rows = db.query_broadcast_history(conn, "cream-terrazzo", limit=10_000)
     assert len(rows) == 200  # hard cap
+
+
+def _insert_dm(conn, **overrides):
+    args = dict(
+        thread_key="human:sess-1|human:sess-2",
+        sender_kind="human",
+        sender_id="sess-1",
+        sender_name="Alice",
+        text="hey",
+        at=time.time(),
+    )
+    args.update(overrides)
+    return db.insert_dm(conn, **args)
+
+
+def test_insert_dm_and_thread_history_roundtrip(conn):
+    rid = _insert_dm(conn, text="first")
+    assert isinstance(rid, int) and rid > 0
+    rows = db.query_thread_history(conn, "human:sess-1|human:sess-2")
+    assert len(rows) == 1
+    assert rows[0]["id"] == rid
+    assert rows[0]["text"] == "first"
+    assert rows[0]["sender_name"] == "Alice"
+
+
+def test_query_thread_history_newest_first_and_paginates(conn):
+    ids = [
+        _insert_dm(conn, text=f"d{i}", at=1000.0 + i)
+        for i in range(4)
+    ]
+    page1 = db.query_thread_history(conn, "human:sess-1|human:sess-2", limit=2)
+    assert [r["id"] for r in page1] == [ids[3], ids[2]]
+    page2 = db.query_thread_history(
+        conn,
+        "human:sess-1|human:sess-2",
+        before_id=page1[-1]["id"],
+        limit=2,
+    )
+    assert [r["id"] for r in page2] == [ids[1], ids[0]]
+
+
+def test_list_threads_for_returns_one_summary_per_thread(conn):
+    # Two threads involving sess-1.
+    _insert_dm(
+        conn,
+        thread_key="human:sess-1|human:sess-2",
+        sender_id="sess-1",
+        sender_name="Alice",
+        text="hi bob",
+        at=1000.0,
+    )
+    _insert_dm(
+        conn,
+        thread_key="human:sess-1|human:sess-2",
+        sender_id="sess-2",
+        sender_name="Bob",
+        text="hey alice",
+        at=1001.0,
+    )
+    _insert_dm(
+        conn,
+        thread_key="agent:agt-9|human:sess-1",
+        sender_id="agt-9",
+        sender_name="Sleuth",
+        sender_kind="agent",
+        text="curious?",
+        at=1002.0,
+    )
+    # An unrelated thread.
+    _insert_dm(
+        conn,
+        thread_key="human:sess-2|human:sess-3",
+        sender_id="sess-2",
+        sender_name="Bob",
+        text="not for alice",
+        at=1003.0,
+    )
+    summaries = db.list_threads_for(conn, "human:sess-1")
+    keys = {s["thread_key"] for s in summaries}
+    assert keys == {"human:sess-1|human:sess-2", "agent:agt-9|human:sess-1"}
+    by_key = {s["thread_key"]: s for s in summaries}
+    a = by_key["human:sess-1|human:sess-2"]
+    assert a["last_message"] == "hey alice"
+    assert a["last_at"] == 1001.0
+    assert a["other_principal_key"] == "human:sess-2"
+    b = by_key["agent:agt-9|human:sess-1"]
+    assert b["other_principal_key"] == "agent:agt-9"
+    assert b["other_name"] in {"Sleuth", "Alice"}  # see note in impl
