@@ -8,7 +8,9 @@ type Props = {
   onClose: () => void;
 };
 
-const RADIUS_PX = 76;
+const RADIUS_PX = 130;
+const BUTTON_PX = 78;
+const EMOJI_PX = 42;
 
 export function RadialReactionPicker({
   open,
@@ -91,21 +93,24 @@ export function RadialReactionPicker({
             }}
             style={{
               position: 'absolute',
-              left: cx - 22,
-              top: cy - 22,
-              width: 44,
-              height: 44,
+              left: cx - BUTTON_PX / 2,
+              top: cy - BUTTON_PX / 2,
+              width: BUTTON_PX,
+              height: BUTTON_PX,
               borderRadius: '50%',
               border: active ? '3px solid #ff6b9d' : '2px solid #d6d2c4',
-              background: active ? '#fff' : 'rgba(255,255,255,0.85)',
+              background: active ? '#fff' : 'rgba(255,255,255,0.9)',
               boxShadow: active
-                ? '0 0 0 4px rgba(255,107,157,0.25), 0 6px 14px rgba(0,0,0,0.25)'
-                : '0 4px 10px rgba(0,0,0,0.18)',
+                ? '0 0 0 5px rgba(255,107,157,0.25), 0 8px 18px rgba(0,0,0,0.3)'
+                : '0 5px 12px rgba(0,0,0,0.2)',
               cursor: 'pointer',
               pointerEvents: 'auto',
-              fontSize: 22,
-              lineHeight: '38px',
+              fontSize: EMOJI_PX,
+              lineHeight: 1,
               padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               transform: active ? 'scale(1.15)' : 'scale(1)',
               transition: 'transform 120ms ease, box-shadow 120ms ease',
             }}
