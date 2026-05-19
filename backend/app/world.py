@@ -51,22 +51,15 @@ class ParticipantNotInPartyError(LookupError):
     pass
 
 
-class NotInRangeError(LookupError):
-    pass
-
-
-class LimitReachedError(LookupError):
-    pass
-
-
-class NotAuthorError(LookupError):
-    pass
-
-
 class PartyWorld:
-    NotInRangeError = NotInRangeError
-    LimitReachedError = LimitReachedError
-    NotAuthorError = NotAuthorError
+    class NotInRangeError(LookupError):
+        pass
+
+    class LimitReachedError(LookupError):
+        pass
+
+    class NotAuthorError(LookupError):
+        pass
 
     def __init__(self, party: PartyConfig) -> None:
         self._party = party
@@ -228,7 +221,7 @@ class PartyWorld:
             raise ParticipantNotInPartyError(participant_id)
         p = self.participants[participant_id]
         if not self.in_zone(module_id, p.x, p.y):
-            raise NotInRangeError(module_id)
+            raise PartyWorld.NotInRangeError(module_id)
 
     def _clamp_local(
         self, m: PlacedModule, x: float, y: float
@@ -253,7 +246,7 @@ class PartyWorld:
         notes = self.notes_by_module[module_id]
         own = sum(1 for n in notes if n.author_id == participant_id)
         if own >= NOTES_PER_USER_MAX:
-            raise LimitReachedError(module_id)
+            raise PartyWorld.LimitReachedError(module_id)
         lx, ly = self._clamp_local(m, x, y)
         participant = self.participants[participant_id]
         note = StickyNote(
@@ -297,7 +290,7 @@ class PartyWorld:
         for i, n in enumerate(notes):
             if n.id == note_id:
                 if n.author_id != participant_id:
-                    raise NotAuthorError(note_id)
+                    raise PartyWorld.NotAuthorError(note_id)
                 fields: dict = {}
                 if text is not None:
                     fields["text"] = validate_note_text(text)
@@ -331,7 +324,7 @@ class PartyWorld:
         for i, n in enumerate(notes):
             if n.id == note_id:
                 if n.author_id != participant_id:
-                    raise NotAuthorError(note_id)
+                    raise PartyWorld.NotAuthorError(note_id)
                 del notes[i]
                 ev = NoteDeletedEvent(
                     seq=self._next_seq(),

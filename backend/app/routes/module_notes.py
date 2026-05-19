@@ -46,6 +46,16 @@ class DeleteNoteRequest(BaseModel):
     principal: Principal
 
 
+_NoteErrors = (
+    ParticipantNotInPartyError,
+    PartyWorld.NotInRangeError,
+    PartyWorld.LimitReachedError,
+    PartyWorld.NotAuthorError,
+    KeyError,
+    NoteValidationError,
+)
+
+
 def _map_world_errors(exc: Exception) -> HTTPException:
     if isinstance(exc, ParticipantNotInPartyError):
         return HTTPException(status_code=409, detail=NOT_IN_PARTY)
@@ -57,11 +67,9 @@ def _map_world_errors(exc: Exception) -> HTTPException:
         return HTTPException(status_code=403, detail=envelope("not_author"))
     if isinstance(exc, KeyError):
         return HTTPException(status_code=404, detail=envelope("not_found"))
-    if isinstance(exc, NoteValidationError):
-        return HTTPException(
-            status_code=422, detail=envelope("invalid_note", message=str(exc))
-        )
-    return HTTPException(status_code=500, detail=str(exc))
+    return HTTPException(
+        status_code=422, detail=envelope("invalid_note", message=str(exc))
+    )
 
 
 @router.post("/{slug}/modules/{module_id}/notes")
@@ -77,7 +85,7 @@ def create_note(
         ev = world.create_note(
             resolved.id, module_id, body.text, body.color, body.x, body.y
         )
-    except Exception as exc:
+    except _NoteErrors as exc:
         raise _map_world_errors(exc) from exc
     return {"note": ev.note.model_dump(), "cursor": world.cursor}
 
@@ -102,7 +110,7 @@ def update_note(
             x=body.x,
             y=body.y,
         )
-    except Exception as exc:
+    except _NoteErrors as exc:
         raise _map_world_errors(exc) from exc
     return {"note": ev.note.model_dump(), "cursor": world.cursor}
 
@@ -122,6 +130,6 @@ def delete_note(
     resolved = resolve_principal(store, body.principal)
     try:
         world.delete_note(resolved.id, module_id, note_id)
-    except Exception as exc:
+    except _NoteErrors as exc:
         raise _map_world_errors(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel
 
@@ -28,12 +30,20 @@ _MODULE_PATTERN = r"^[a-z0-9-]+$"
 class StrokeRequest(BaseModel):
     principal: Principal
     color: str
-    width: str
+    width: Literal["thin", "med", "thick"]
     points: list[dict]
 
 
 class ClearRequest(BaseModel):
     principal: Principal
+
+
+_DrawErrors = (
+    ParticipantNotInPartyError,
+    PartyWorld.NotInRangeError,
+    StrokeValidationError,
+    KeyError,
+)
 
 
 def _map_errors(exc: Exception) -> HTTPException:
@@ -45,9 +55,7 @@ def _map_errors(exc: Exception) -> HTTPException:
         return HTTPException(
             status_code=422, detail=envelope("invalid_stroke", message=str(exc))
         )
-    if isinstance(exc, KeyError):
-        return HTTPException(status_code=404, detail=envelope("not_found"))
-    return HTTPException(status_code=500, detail=str(exc))
+    return HTTPException(status_code=404, detail=envelope("not_found"))
 
 
 @router.post("/{slug}/modules/{module_id}/strokes")
@@ -62,7 +70,7 @@ def add_stroke(
     raw = {"color": body.color, "width": body.width, "points": body.points}
     try:
         ev = world.add_stroke(resolved.id, module_id, raw)
-    except Exception as exc:
+    except _DrawErrors as exc:
         raise _map_errors(exc) from exc
     return {"stroke": ev.stroke.model_dump(), "cursor": world.cursor}
 
@@ -78,6 +86,6 @@ def clear_board(
     resolved = resolve_principal(store, body.principal)
     try:
         result = world.vote_clear(resolved.id, module_id)
-    except Exception as exc:
+    except _DrawErrors as exc:
         raise _map_errors(exc) from exc
     return result
