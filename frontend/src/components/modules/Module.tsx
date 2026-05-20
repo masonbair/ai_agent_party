@@ -5,6 +5,8 @@ type Props = {
   mod: ModuleSnapshot;
   myPosition: { x: number; y: number } | null;
   onOpen: (moduleId: string) => void;
+  worldWidth?: number;
+  worldHeight?: number;
 };
 
 export function isInZone(
@@ -19,10 +21,16 @@ export function isInZone(
   );
 }
 
-export function Module({ mod, myPosition, onOpen }: Props) {
+export function Module({ mod, myPosition, onOpen, worldWidth, worldHeight }: Props) {
   if (mod.kind !== 'stickynotes' && mod.kind !== 'drawboard') return null;
   const inZone = isInZone(mod, myPosition);
   return (
-    <ModuleStructure mod={mod} inZone={inZone} onOpen={() => onOpen(mod.id)} />
+    <ModuleStructure
+      mod={mod}
+      inZone={inZone}
+      onOpen={() => onOpen(mod.id)}
+      worldWidth={worldWidth}
+      worldHeight={worldHeight}
+    />
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ModuleSnapshot, StickyNote } from '../../api/types';
 import type { Principal } from '../../api/party';
 import { createNote, deleteNote, patchNote } from '../../api/modules';
@@ -13,8 +13,8 @@ type Props = {
 };
 
 const COLORS: StickyNote['color'][] = ['yellow', 'pink', 'blue', 'green'];
-const NOTE_W_PCT = 22; // note card width as % of wall width
-const NOTE_H_PCT = 26; // note card height as % of wall height
+const NOTE_W_PCT = 22;
+const NOTE_H_PCT = 26;
 
 const SWATCH: Record<StickyNote['color'], string> = {
   yellow: '#fff4a3',
@@ -24,11 +24,11 @@ const SWATCH: Record<StickyNote['color'], string> = {
 };
 
 function localFromEvent(
-  e: React.MouseEvent<HTMLDivElement>,
+  e: { clientX: number; clientY: number },
+  rect: DOMRect,
   modW: number,
   modH: number,
 ): { x: number; y: number } {
-  const rect = e.currentTarget.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
   return {
     x: ((e.clientX - rect.left) / rect.width) * modW,
@@ -37,15 +37,22 @@ function localFromEvent(
 }
 
 export function StickyWall({ mod, principal, slug, inZone }: Props) {
+  const wallRef = useRef<HTMLDivElement>(null);
   const [drafting, setDrafting] = useState<{ x: number; y: number } | null>(
     null,
   );
   const [draftText, setDraftText] = useState('');
   const [draftColor, setDraftColor] = useState<StickyNote['color']>('yellow');
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   function handleWallClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (viewingId) {
+      setViewingId(null);
+      return;
+    }
     if (!inZone || drafting) return;
-    setDrafting(localFromEvent(e, mod.w, mod.h));
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDrafting(localFromEvent(e, rect, mod.w, mod.h));
   }
 
   async function submitDraft() {
@@ -68,6 +75,7 @@ export function StickyWall({ mod, principal, slug, inZone }: Props) {
 
   return (
     <div
+      ref={wallRef}
       className="sticky-wall"
       style={{
         position: 'absolute',
@@ -84,6 +92,11 @@ export function StickyWall({ mod, principal, slug, inZone }: Props) {
           modW={mod.w}
           modH={mod.h}
           canEdit={n.author_id === principal.id && inZone}
+          wallRef={wallRef}
+          viewing={viewingId === n.id}
+          anyViewing={viewingId !== null}
+          onView={() => setViewingId(n.id)}
+          onCloseView={() => setViewingId(null)}
           onDelete={async () => {
             await deleteNote(slug, mod.id, n.id, principal);
           }}
@@ -137,18 +150,30 @@ export function StickyWall({ mod, principal, slug, inZone }: Props) {
             zIndex: 2,
           }}
         >
-          <input
+          <textarea
             value={draftText}
             onChange={(e) => setDraftText(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault();
+                void submitDraft();
+              }
+            }}
             autoFocus
+            rows={3}
             style={{
               border: 'none',
               background: 'transparent',
               outline: 'none',
               fontSize: 14,
               padding: 2,
+              resize: 'none',
+              fontFamily: 'inherit',
+              width: '100%',
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
             }}
-            placeholder="type your note"
+            placeholder="type your note (Enter = newline, ⌘/Ctrl+Enter = save)"
           />
           <div style={{ display: 'flex', gap: 4 }}>
             {COLORS.map((c) => (
@@ -211,6 +236,11 @@ function NoteView({
   modW,
   modH,
   canEdit,
+  wallRef,
+  viewing,
+  anyViewing,
+  onView,
+  onCloseView,
   onDelete,
   onEdit,
 }: {
@@ -218,38 +248,135 @@ function NoteView({
   modW: number;
   modH: number;
   canEdit: boolean;
+  wallRef: React.RefObject<HTMLDivElement>;
+  viewing: boolean;
+  anyViewing: boolean;
+  onView: () => void;
+  onCloseView: () => void;
   onDelete: () => Promise<void>;
-  onEdit: (patch: { text?: string }) => Promise<void>;
+  onEdit: (patch: { text?: string; x?: number; y?: number }) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(note.text);
-  const common: React.CSSProperties = {
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
+    moved: boolean;
+  } | null>(null);
+
+  const displayX = dragPos ? dragPos.x : note.x;
+  const displayY = dragPos ? dragPos.y : note.y;
+
+  const baseStyle: React.CSSProperties = {
     position: 'absolute',
-    left: `${(note.x / modW) * 100}%`,
-    top: `${(note.y / modH) * 100}%`,
+    left: `${(displayX / modW) * 100}%`,
+    top: `${(displayY / modH) * 100}%`,
     width: `${NOTE_W_PCT}%`,
     minHeight: `${NOTE_H_PCT}%`,
     background: SWATCH[note.color],
     padding: 8,
     borderRadius: 3,
-    boxShadow: '0 3px 6px rgba(0,0,0,0.25)',
+    boxShadow: dragPos
+      ? '0 8px 18px rgba(0,0,0,0.35)'
+      : '0 3px 6px rgba(0,0,0,0.25)',
     fontSize: 13,
     color: '#222',
-    transform: 'rotate(-1deg)',
+    transform: dragPos ? 'rotate(-1deg) scale(1.04)' : 'rotate(-1deg)',
     overflow: 'hidden',
+    cursor: canEdit && !editing ? 'grab' : 'pointer',
+    touchAction: 'none',
+    userSelect: 'none',
+    zIndex: dragPos ? 3 : 1,
+    transition:
+      'left 220ms ease, top 220ms ease, width 220ms ease, ' +
+      'min-height 220ms ease, transform 220ms ease, ' +
+      'box-shadow 220ms ease, font-size 220ms ease, padding 220ms ease, ' +
+      'border-radius 220ms ease',
   };
+
+  const viewStyle: React.CSSProperties = viewing
+    ? {
+        left: '50%',
+        top: '50%',
+        width: '72%',
+        minHeight: '60%',
+        transform: 'translate(-50%, -50%) rotate(0deg) scale(1)',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.45)',
+        fontSize: 22,
+        padding: 24,
+        borderRadius: 8,
+        zIndex: 10,
+        cursor: 'default',
+      }
+    : anyViewing
+      ? { opacity: 0.55, pointerEvents: 'none' }
+      : {};
+
+  const common: React.CSSProperties = { ...baseStyle, ...viewStyle };
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (viewing || !canEdit || editing) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+    const rect = wallRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const local = localFromEvent(e, rect, modW, modH);
+    dragRef.current = {
+      pointerId: e.pointerId,
+      offsetX: local.x - note.x,
+      offsetY: local.y - note.y,
+      moved: false,
+    };
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    setDragPos({ x: note.x, y: note.y });
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const rect = wallRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const local = localFromEvent(e, rect, modW, modH);
+    const nx = Math.max(0, Math.min(modW, local.x - drag.offsetX));
+    const ny = Math.max(0, Math.min(modH, local.y - drag.offsetY));
+    drag.moved = true;
+    setDragPos({ x: nx, y: ny });
+  }
+
+  async function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    dragRef.current = null;
+    const finalPos = dragPos;
+    setDragPos(null);
+    if (drag.moved && finalPos) {
+      try {
+        await onEdit({ x: finalPos.x, y: finalPos.y });
+      } catch {
+        /* optimistic UI; server diff will reconcile */
+      }
+    }
+  }
+
   if (editing && canEdit) {
     return (
       <div onClick={(e) => e.stopPropagation()} style={common}>
-        <input
+        <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
+          rows={3}
           style={{
             width: '100%',
             border: 'none',
             background: 'transparent',
             outline: 'none',
             fontSize: 13,
+            resize: 'none',
+            fontFamily: 'inherit',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
           }}
         />
         <button
@@ -265,9 +392,35 @@ function NoteView({
     );
   }
   return (
-    <div onClick={(e) => e.stopPropagation()} style={common}>
-      <div style={{ wordBreak: 'break-word' }}>{note.text}</div>
-      {canEdit && (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        if (viewing) {
+          onCloseView();
+          return;
+        }
+        const target = e.target as HTMLElement;
+        if (target.closest('button')) return;
+        if (dragRef.current?.moved) return;
+        onView();
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={common}
+    >
+      <div
+        style={{
+          whiteSpace: 'pre-wrap',
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word',
+          lineHeight: 1.35,
+        }}
+      >
+        {note.text}
+      </div>
+      {canEdit && !viewing && (
         <div
           style={{
             position: 'absolute',

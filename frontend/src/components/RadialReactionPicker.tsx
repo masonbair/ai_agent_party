@@ -8,9 +8,10 @@ type Props = {
   onClose: () => void;
 };
 
-const RADIUS_PX = 130;
-const BUTTON_PX = 78;
-const EMOJI_PX = 42;
+const RADIUS_PX = 76;
+const BUTTON_PX = 44;
+const EMOJI_PX = 22;
+const ACTIVE_SCALE = 1.7;
 
 export function RadialReactionPicker({
   open,
@@ -111,7 +112,8 @@ export function RadialReactionPicker({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transform: active ? 'scale(1.15)' : 'scale(1)',
+              transform: active ? `scale(${ACTIVE_SCALE})` : 'scale(1)',
+              zIndex: active ? 2 : 1,
               transition: 'transform 120ms ease, box-shadow 120ms ease',
             }}
           >

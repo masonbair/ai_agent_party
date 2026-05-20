@@ -4,6 +4,8 @@ type Props = {
   mod: Extract<ModuleSnapshot, { kind: 'stickynotes' | 'drawboard' }>;
   inZone: boolean;
   onOpen: () => void;
+  worldWidth?: number;
+  worldHeight?: number;
 };
 
 const CORK_BG =
@@ -13,7 +15,13 @@ const CORK_BG =
 
 const WHITEBOARD_BG = 'linear-gradient(180deg, #fdfdfd 0%, #f1f3f6 100%)';
 
-export function ModuleStructure({ mod, inZone, onOpen }: Props) {
+export function ModuleStructure({
+  mod,
+  inZone,
+  onOpen,
+  worldWidth,
+  worldHeight,
+}: Props) {
   const isSticky = mod.kind === 'stickynotes';
   const label = isSticky ? 'NOTE BOARD' : 'WHITE BOARD';
   const itemCount =
@@ -34,10 +42,10 @@ export function ModuleStructure({ mod, inZone, onOpen }: Props) {
       data-testid={`module-structure-${mod.id}`}
       style={{
         position: 'absolute',
-        left: mod.x,
-        top: mod.y,
-        width: mod.w,
-        height: mod.h,
+        left: worldWidth ? `${(mod.x / worldWidth) * 100}%` : mod.x,
+        top: worldHeight ? `${(mod.y / worldHeight) * 100}%` : mod.y,
+        width: worldWidth ? `${(mod.w / worldWidth) * 100}%` : mod.w,
+        height: worldHeight ? `${(mod.h / worldHeight) * 100}%` : mod.h,
         padding: 0,
         cursor: inZone ? 'pointer' : 'default',
         border: 'none',
