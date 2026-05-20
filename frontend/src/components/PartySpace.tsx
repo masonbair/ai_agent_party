@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
+  ChatEvent,
   LightingPreset,
   ModuleSnapshot,
   Participant,
@@ -26,6 +27,7 @@ type ObserveResponse = {
   modules?: ModuleSnapshot[];
   lighting?: LightingPreset;
   active_reactions?: { actor_id: string; emoji: string; expires_at: number }[];
+  recent_chat?: ChatEvent[];
 };
 
 type ApplyObserveInitial = (payload: {
@@ -210,6 +212,8 @@ export default function PartySpace({
             mod={m}
             myPosition={myPosition}
             onOpen={(id) => setOpenModuleId(id)}
+            worldWidth={width}
+            worldHeight={height}
           />
         ))}
         {renderList.map((p) => (
@@ -225,7 +229,12 @@ export default function PartySpace({
           />
         ))}
         {reactions ? (
-          <ReactionLayer reactions={reactions} participants={renderList} />
+          <ReactionLayer
+            reactions={reactions}
+            participants={renderList}
+            worldWidth={width}
+            worldHeight={height}
+          />
         ) : null}
         {lighting ? <LightingOverlay preset={lighting} /> : null}
         <MusicPill label={party.music.label} />

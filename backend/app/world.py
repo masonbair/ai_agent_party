@@ -629,6 +629,16 @@ class PartyWorld:
             "active_reactions": active_reactions,
         }
 
+    def recent_chat(self, limit: int = 20) -> list[dict]:
+        out: list[dict] = []
+        for ev in reversed(self._events):
+            if isinstance(ev, ChatEvent):
+                out.append(ev.model_dump())
+                if len(out) >= limit:
+                    break
+        out.reverse()
+        return out
+
     def observe_since(self, since: int) -> dict:
         if since < 0:
             since = 0
