@@ -197,6 +197,6 @@ def observe(
             "modules": snap["modules"],
             "lighting": snap["lighting"],
             "active_reactions": snap["active_reactions"],
-            "recent_chat": world.recent_chat(20),
+            "recent_chat": world.recent_chat(),
         }
     return world.observe_since(since)

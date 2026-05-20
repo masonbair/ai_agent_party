@@ -34,6 +34,7 @@ from app.validation import (
     INTERACTION_MARGIN,
     NOTES_PER_USER_MAX,
     REACTION_LIFETIME_SECONDS,
+    RECENT_CHAT_LIMIT,
     SLOT_OCCUPIED_RADIUS,
     STROKES_PER_BOARD_MAX,
     VOTE_TTL_SECONDS,
@@ -629,7 +630,7 @@ class PartyWorld:
             "active_reactions": active_reactions,
         }
 
-    def recent_chat(self, limit: int = 20) -> list[dict]:
+    def recent_chat(self, limit: int = RECENT_CHAT_LIMIT) -> list[dict]:
         out: list[dict] = []
         for ev in reversed(self._events):
             if isinstance(ev, ChatEvent):

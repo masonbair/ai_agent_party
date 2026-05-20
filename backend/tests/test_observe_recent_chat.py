@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app.validation import RECENT_CHAT_LIMIT
+
 
 def _join(client: TestClient, name: str = "Alice", color: str = "#ff6b9d") -> str:
     r = client.post("/api/session", json={"username": name, "color": color})
@@ -35,7 +37,7 @@ def test_initial_observe_recent_chat_capped_at_20(client: TestClient) -> None:
             json={"principal": {"kind": "human", "id": sid}, "text": f"msg{i}"},
         )
     obs = client.get("/api/parties/cream-terrazzo/observe").json()
-    assert len(obs["recent_chat"]) == 20
+    assert len(obs["recent_chat"]) == RECENT_CHAT_LIMIT
     assert obs["recent_chat"][-1]["text"] == "msg24"
     assert obs["recent_chat"][0]["text"] == "msg5"
 

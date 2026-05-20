@@ -19,6 +19,7 @@ ALLOWED_COLORS: tuple[str, ...] = (
 
 CHAT_MAX_LEN = 280
 CHAT_TEXT_REGEX = re.compile(r"^[A-Za-z0-9 .,!?'\-]+$")
+RECENT_CHAT_LIMIT = 20
 
 
 class ChatValidationError(ValueError):
