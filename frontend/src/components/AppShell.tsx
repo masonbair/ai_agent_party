@@ -43,6 +43,21 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const inbox = useInbox({ principal, onEvicted });
 
+  useEffect(() => {
+    if (!drawerOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      if (inbox.openedKey) {
+        inbox.closeThread();
+      } else {
+        setDrawerOpen(false);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen, inbox.openedKey, inbox.closeThread]);
+
   const openDmWith = useCallback(
     async (
       recipient: { kind: 'human' | 'agent'; id: string },

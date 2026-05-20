@@ -105,7 +105,7 @@ export default function DmThreadView({
           );
         })}
       </div>
-      <DmComposer onSend={onSend} sendError={sendError} />
+      <DmComposer onSend={onSend} sendError={sendError} autoFocus />
     </div>
   );
 }

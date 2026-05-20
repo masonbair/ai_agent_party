@@ -39,40 +39,58 @@ export default function DmDrawer({
     : undefined;
 
   return (
-    <aside
-      aria-label="Direct messages drawer"
-      style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 'min(360px, 95vw)',
-        background: 'white',
-        boxShadow: '-4px 0 16px rgba(0,0,0,0.15)',
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 100,
-      }}
-    >
+    <>
+      <div
+        aria-hidden="true"
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 17, 22, 0.18)',
+          zIndex: 99,
+        }}
+      />
+      <aside
+        aria-label="Direct messages drawer"
+        role="dialog"
+        aria-modal="true"
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 'min(440px, 92vw)',
+          background: 'white',
+          boxShadow: '-12px 0 32px rgba(0, 0, 0, 0.18)',
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: 100,
+          borderLeft: '1px solid rgba(0,0,0,0.06)',
+        }}
+      >
       <header
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '10px 16px',
+          padding: '14px 18px',
           borderBottom: '1px solid rgba(0,0,0,0.06)',
         }}
       >
-        <strong>Direct messages</strong>
+        <strong style={{ fontSize: 16 }}>Direct messages</strong>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close direct messages"
+          title="Close (Esc)"
           style={{
             background: 'transparent',
             border: 'none',
-            fontSize: 20,
+            fontSize: 22,
+            lineHeight: 1,
             cursor: 'pointer',
+            color: '#555',
+            padding: 4,
           }}
         >
           ×
@@ -100,5 +118,6 @@ export default function DmDrawer({
         )}
       </div>
     </aside>
+    </>
   );
 }
