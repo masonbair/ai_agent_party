@@ -1,6 +1,8 @@
+import sqlite3
 import time
 from typing import Callable
 
+from app import db as db_module
 from app.collision import Rect, inflate_walls, slide
 from app.events import (
     ChatEvent,
@@ -19,8 +21,16 @@ class ParticipantNotInPartyError(LookupError):
 
 
 class PartyWorld:
-    def __init__(self, party: PartyConfig) -> None:
+    def __init__(
+        self,
+        party: PartyConfig,
+        *,
+        db_conn: sqlite3.Connection | None = None,
+        party_slug: str | None = None,
+    ) -> None:
         self._party = party
+        self._db = db_conn
+        self._party_slug = party_slug if party_slug is not None else party.slug
         self.participants: dict[str, Participant] = {}
         self._events: list[Event] = []
         self._wall_rects: list[Rect] = inflate_walls(
@@ -107,11 +117,24 @@ class PartyWorld:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
         cleaned = validate_chat_text(text)
+        at = time.time()
+        sender = self.participants[participant_id]
+        if self._db is not None:
+            # Persist FIRST so a DB failure raises and no live bubble is emitted.
+            db_module.insert_broadcast(
+                self._db,
+                party_slug=self._party_slug,
+                sender_kind=sender.kind,
+                sender_id=sender.id,
+                sender_name=sender.username,
+                text=cleaned,
+                at=at,
+            )
         ev = ChatEvent(
             seq=self._next_seq(),
             participant_id=participant_id,
             text=cleaned,
-            at=time.time(),
+            at=at,
         )
         self._events.append(ev)
         self._emit(ev)
