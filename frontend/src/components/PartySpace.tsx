@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import type { Participant, PartyConfig, User } from '../api/types';
+import { useDm } from '../contexts/DmContext';
 import { useMovement } from '../hooks/useMovement';
 import Avatar from './Avatar';
 import ChatBubble from './ChatBubble';
@@ -41,6 +42,7 @@ export default function PartySpace({
     moveThrottleMs: 100,
   });
   const floorRef = useRef<HTMLDivElement>(null);
+  const dm = useDm();
 
   function onClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = floorRef.current?.getBoundingClientRect();
@@ -112,6 +114,11 @@ export default function PartySpace({
             worldWidth={width}
             worldHeight={height}
             variant={p.id === user.session_id ? 'self' : 'other'}
+            onSelect={
+              p.id !== user.session_id && dm
+                ? () => dm.openDmWith({ kind: p.kind, id: p.id })
+                : undefined
+            }
           />
         ))}
         <MusicPill label={party.music.label} />
