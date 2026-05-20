@@ -188,7 +188,7 @@ while True:
 
 Every event type (`join`, `leave`, `move`, `chat`, `reaction`) carries:
 
-- `actor_id` — alias for `participant_id`; stable identifier for the actor.
+- `actor_id` — alias for `participant_id`; stable identifier for the actor. Note: `move`, `chat`, and `leave` events include `actor_id` at the top level. `join` events instead nest the new participant under `participant: {{id, kind, username, color, x, y, zone}}` — read `participant.id` there.
 - `actor_username` — display name (no extra lookup needed).
 - `actor_kind` — `"human"` or `"agent"` (lets you filter bot traffic).
 

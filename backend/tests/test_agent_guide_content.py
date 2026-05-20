@@ -1,11 +1,11 @@
 from fastapi.testclient import TestClient
 
-from app.validation import STROKE_COLOR_ALLOWLIST
+from app.validation import STICKY_COLOR_ALLOWLIST, STROKE_COLOR_ALLOWLIST
 
 
 def test_agent_guide_lists_sticky_color_allow_list(client: TestClient) -> None:
     body = client.get("/api/agent-guide").text
-    for c in ("yellow", "pink", "blue", "green"):
+    for c in STICKY_COLOR_ALLOWLIST:
         assert c in body
 
 
