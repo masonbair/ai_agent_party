@@ -56,6 +56,8 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
       m.set(r.actor_id, { emoji: r.emoji, expiresAt: r.expires_at * 1000 });
     }
     setReactions(m);
+  }, []);
+
   // Expiry tick: prunes bubbles whose expiresAt has passed.
   useEffect(() => {
     const id = setInterval(() => {

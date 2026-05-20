@@ -221,6 +221,12 @@ export function useMovement(opts: Options) {
     function clearKeys() {
       if (keysRef.current.size > 0) keysRef.current.clear();
     }
+    function isTypingTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.isContentEditable) return true;
+      const tag = target.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    }
     function onKeyDown(e: KeyboardEvent) {
       // OS / browser shortcuts (e.g. Cmd-Shift-S to screenshot) intercept the
       // matching keyup, leaving us with phantom-held movement keys. Treat any
@@ -231,13 +237,6 @@ export function useMovement(opts: Options) {
         return;
       }
       if (pausedRef.current) return;
-    function isTypingTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) return false;
-      if (target.isContentEditable) return true;
-      const tag = target.tagName;
-      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    }
-    function onKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       const key = e.key.toLowerCase();
       if (KEY_TO_DIR[key]) {
