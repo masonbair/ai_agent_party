@@ -76,6 +76,7 @@ def send(
     frame = {
         "type": "dm",
         "thread_key": tk,
+        "sender_color": sender.color,
         "message": {
             "id": mid,
             "sender_kind": sender.kind,

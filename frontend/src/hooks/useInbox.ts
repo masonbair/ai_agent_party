@@ -16,6 +16,14 @@ type Options = {
   onEvicted?: () => void;
 };
 
+export type IncomingToast = {
+  key: number;
+  thread_key: string;
+  sender_name: string;
+  sender_color?: string;
+  text: string;
+};
+
 function lastReadKey(thread_key: string): string {
   return `openparty.dm.lastRead.${thread_key}`;
 }
@@ -57,10 +65,25 @@ export function useInbox({ principal, onEvicted }: Options) {
   const [messagesByThread, setMessagesByThread] = useState<
     Record<string, DmMessage[]>
   >({});
-  const [unreadVersion, setUnreadVersion] = useState(0);
+  const [unreadByThread, setUnreadByThread] = useState<Record<string, number>>(
+    {},
+  );
+  const [latestIncoming, setLatestIncoming] = useState<IncomingToast | null>(
+    null,
+  );
   const [sendErrors, setSendErrors] = useState<Record<string, string | null>>({});
   const wsRef = useRef<WebSocket | null>(null);
   const evictedRef = useRef(false);
+  const openedKeyRef = useRef<string | null>(null);
+  const toastKeyRef = useRef(0);
+  const seenIdsRef = useRef<Record<string, Set<number>>>({});
+  const selfKey = principal ? principalKey(principal) : '';
+  const selfKeyRef = useRef(selfKey);
+  selfKeyRef.current = selfKey;
+
+  useEffect(() => {
+    openedKeyRef.current = openedKey;
+  }, [openedKey]);
 
   useEffect(() => {
     if (!principal) return;
@@ -94,9 +117,10 @@ export function useInbox({ principal, onEvicted }: Options) {
         if (f.type === 'dm') {
           const dm = frame as {
             thread_key: string;
+            sender_color?: string;
             message: DmMessage;
           };
-          ingestMessage(dm.thread_key, dm.message);
+          ingestMessage(dm.thread_key, dm.message, dm.sender_color);
         }
       };
       ws.onclose = () => {
@@ -107,10 +131,20 @@ export function useInbox({ principal, onEvicted }: Options) {
       ws.onerror = () => {};
     }
 
-    // Initial HTTP fetch of threads
+    // Initial HTTP fetch of threads; seed unread counts from persisted lastRead.
     listThreads(principal)
       .then((r) => {
-        if (!cancelled) setThreads(r.threads);
+        if (cancelled) return;
+        setThreads(r.threads);
+        const seed: Record<string, number> = {};
+        for (const t of r.threads) {
+          const sender = `${t.last_sender_kind}:${t.last_sender_id}`;
+          if (sender === selfKeyRef.current) continue;
+          if (t.last_message_id > readLastRead(t.thread_key)) {
+            seed[t.thread_key] = 1;
+          }
+        }
+        setUnreadByThread((prev) => ({ ...seed, ...prev }));
       })
       .catch(() => {});
     connect();
@@ -123,15 +157,20 @@ export function useInbox({ principal, onEvicted }: Options) {
   }, [principal?.id, principal?.kind]);
 
   const ingestMessage = useCallback(
-    (thread_key: string, message: DmMessage) => {
+    (thread_key: string, message: DmMessage, sender_color?: string) => {
+      const isMine =
+        `${message.sender_kind}:${message.sender_id}` === selfKeyRef.current;
+      const seen = seenIdsRef.current[thread_key] ?? new Set<number>();
+      if (seen.has(message.id)) return;
+      seen.add(message.id);
+      seenIdsRef.current[thread_key] = seen;
       setMessagesByThread((prev) => {
         const existing = prev[thread_key] ?? [];
-        if (existing.some((m) => m.id === message.id)) return prev;
         return { ...prev, [thread_key]: [...existing, message] };
       });
       setThreads((prev) => {
         const idx = prev.findIndex((t) => t.thread_key === thread_key);
-        const meKey = principal ? principalKey(principal) : '';
+        const meKey = selfKeyRef.current;
         const otherKey = thread_key
           .split('|')
           .find((k) => k !== meKey) ?? thread_key;
@@ -161,27 +200,41 @@ export function useInbox({ principal, onEvicted }: Options) {
         next.sort((a, b) => b.last_at - a.last_at);
         return next;
       });
+      if (isMine) return;
+      const isOpen = openedKeyRef.current === thread_key;
+      if (isOpen) {
+        // Auto-mark-read while looking at the thread.
+        writeLastRead(thread_key, message.id);
+        setUnreadByThread((prev) =>
+          prev[thread_key] ? { ...prev, [thread_key]: 0 } : prev,
+        );
+        return;
+      }
+      setUnreadByThread((prev) => ({
+        ...prev,
+        [thread_key]: (prev[thread_key] ?? 0) + 1,
+      }));
+      toastKeyRef.current += 1;
+      setLatestIncoming({
+        key: toastKeyRef.current,
+        thread_key,
+        sender_name: message.sender_name,
+        sender_color,
+        text: message.text,
+      });
     },
-    [principal],
+    [],
   );
 
   const unreadCount = useCallback(
-    (thread_key: string): number => {
-      void unreadVersion; // re-read localStorage on bumps
-      const lastRead = readLastRead(thread_key);
-      const msgs = messagesByThread[thread_key] ?? [];
-      const fromMsgs = msgs.filter((m) => m.id > lastRead).length;
-      if (fromMsgs > 0) return fromMsgs;
-      const summary = threads.find((t) => t.thread_key === thread_key);
-      if (summary && summary.last_message_id > lastRead) return 1;
-      return 0;
-    },
-    [messagesByThread, threads, unreadVersion],
+    (thread_key: string): number => unreadByThread[thread_key] ?? 0,
+    [unreadByThread],
   );
 
-  const totalUnread = useMemo(() => {
-    return threads.reduce((sum, t) => sum + unreadCount(t.thread_key), 0);
-  }, [threads, unreadCount]);
+  const totalUnread = useMemo(
+    () => Object.values(unreadByThread).reduce((a, b) => a + b, 0),
+    [unreadByThread],
+  );
 
   const markRead = useCallback(
     (thread_key: string) => {
@@ -191,10 +244,14 @@ export function useInbox({ principal, onEvicted }: Options) {
       const maxIdMsgs = msgs.reduce((m, x) => Math.max(m, x.id), 0);
       const top = Math.max(maxIdSummary, maxIdMsgs);
       if (top > 0) writeLastRead(thread_key, top);
-      setUnreadVersion((v) => v + 1);
+      setUnreadByThread((prev) =>
+        prev[thread_key] ? { ...prev, [thread_key]: 0 } : prev,
+      );
     },
     [threads, messagesByThread],
   );
+
+  const clearLatestIncoming = useCallback(() => setLatestIncoming(null), []);
 
   const loadOlder = useCallback(
     async (thread_key: string) => {
@@ -297,5 +354,7 @@ export function useInbox({ principal, onEvicted }: Options) {
     openedKey,
     openedThread,
     sendToPrincipal,
+    latestIncoming,
+    clearLatestIncoming,
   };
 }
