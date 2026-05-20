@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.errors import NOT_IN_PARTY, envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
-from app.validation import NoteValidationError
+from app.validation import NoteValidationError, STICKY_COLOR_ALLOWLIST
 from app.world import ParticipantNotInPartyError, PartyWorld
 
 router = APIRouter(prefix="/api/parties")
@@ -67,6 +67,15 @@ def _map_world_errors(exc: Exception) -> HTTPException:
         return HTTPException(status_code=403, detail=envelope("not_author"))
     if isinstance(exc, KeyError):
         return HTTPException(status_code=404, detail=envelope("not_found"))
+    if isinstance(exc, NoteValidationError):
+        return HTTPException(
+            status_code=422,
+            detail=envelope(
+                "invalid_note",
+                message=str(exc),
+                allowed_colors=list(STICKY_COLOR_ALLOWLIST),
+            ),
+        )
     return HTTPException(
         status_code=422, detail=envelope("invalid_note", message=str(exc))
     )
