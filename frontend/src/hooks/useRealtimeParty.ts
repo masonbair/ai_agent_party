@@ -59,8 +59,11 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        // Don't reset backoff on the raw handshake — the server may still
+        // reject the auth frame (e.g. stale principal after backend restart),
+        // and resetting here would cause a 1s reconnect storm. Reset only on
+        // the first confirmed-good server frame (snapshot, below).
         ws.send(JSON.stringify({ type: 'auth', principal }));
-        backoffRef.current = 1000;
         setStatus('open');
       };
 
@@ -73,13 +76,14 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
         }
         if (!frame || typeof frame !== 'object') return;
         const f = frame as { type?: string };
-        if (f.type === 'evicted') {
+        if (f.type === 'error' || f.type === 'evicted') {
           evictedRef.current = true;
           onEvicted?.();
           ws.close();
           return;
         }
         if (f.type === 'snapshot') {
+          backoffRef.current = 1000;
           const s = frame as { participants: Participant[] };
           setParticipants(s.participants);
         } else if (f.type === 'event') {
