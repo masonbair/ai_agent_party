@@ -116,7 +116,7 @@ export default function PartySpace({
             variant={p.id === user.session_id ? 'self' : 'other'}
             onSelect={
               p.id !== user.session_id && dm
-                ? () => dm.openDmWith({ kind: p.kind, id: p.id })
+                ? () => dm.openDmWith({ kind: p.kind, id: p.id }, p.username)
                 : undefined
             }
           />

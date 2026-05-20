@@ -1,7 +1,10 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 type DmContextValue = {
-  openDmWith: (recipient: { kind: 'human' | 'agent'; id: string }) => void;
+  openDmWith: (
+    recipient: { kind: 'human' | 'agent'; id: string },
+    displayName?: string,
+  ) => void;
 };
 
 const DmContext = createContext<DmContextValue | null>(null);

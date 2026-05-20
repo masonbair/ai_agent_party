@@ -11,6 +11,7 @@ type Props = {
   onSend: (text: string) => Promise<void>;
   sendError: string | null;
   selfPrincipalKey: string;
+  displayNameOverride?: string;
 };
 
 export default function DmThreadView({
@@ -22,13 +23,26 @@ export default function DmThreadView({
   onSend,
   sendError,
   selfPrincipalKey,
+  displayNameOverride,
 }: Props) {
   useEffect(() => {
     onMarkRead();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const otherName = thread?.last_sender_name ?? 'Direct message';
+  const otherFromMessages = messages.find(
+    (m) => `${m.sender_kind}:${m.sender_id}` !== selfPrincipalKey,
+  )?.sender_name;
+  const otherFromSummary =
+    thread &&
+    `${thread.last_sender_kind}:${thread.last_sender_id}` !== selfPrincipalKey
+      ? thread.last_sender_name
+      : undefined;
+  const otherName =
+    displayNameOverride ??
+    otherFromMessages ??
+    otherFromSummary ??
+    'Direct message';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

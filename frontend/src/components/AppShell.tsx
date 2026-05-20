@@ -14,6 +14,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [displayNames, setDisplayNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!sessionId) {
@@ -43,12 +44,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const inbox = useInbox({ principal, onEvicted });
 
   const openDmWith = useCallback(
-    async (recipient: { kind: 'human' | 'agent'; id: string }) => {
+    async (
+      recipient: { kind: 'human' | 'agent'; id: string },
+      displayName?: string,
+    ) => {
       if (!principal) return;
       const me = principalKey(principal);
       const other = principalKey(recipient);
       if (me === other) return;
       const tk = threadKey(me, other);
+      if (displayName) {
+        setDisplayNames((prev) =>
+          prev[tk] === displayName ? prev : { ...prev, [tk]: displayName },
+        );
+      }
       setDrawerOpen(true);
       await inbox.openThread(tk);
     },
@@ -84,6 +93,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         onOpenThread={inbox.openThread}
         onCloseThread={inbox.closeThread}
         onMarkRead={inbox.markRead}
+        displayNames={displayNames}
       />
     </DmProvider>
   );

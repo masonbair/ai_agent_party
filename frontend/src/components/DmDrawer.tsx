@@ -16,6 +16,7 @@ type Props = {
   onOpenThread: (thread_key: string) => Promise<void>;
   onCloseThread: () => void;
   onMarkRead: (thread_key: string) => void;
+  displayNames?: Record<string, string>;
 };
 
 export default function DmDrawer({
@@ -29,6 +30,7 @@ export default function DmDrawer({
   onOpenThread,
   onCloseThread,
   onMarkRead,
+  displayNames,
 }: Props) {
   if (!open) return null;
   const selfKey = principal ? principalKey(principal) : '';
@@ -87,6 +89,7 @@ export default function DmDrawer({
             onSend={openedThread.send}
             sendError={openedThread.sendError}
             selfPrincipalKey={selfKey}
+            displayNameOverride={displayNames?.[openedKey]}
           />
         ) : (
           <DmThreadList

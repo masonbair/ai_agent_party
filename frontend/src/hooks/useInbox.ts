@@ -275,7 +275,11 @@ export function useInbox({ principal, onEvicted }: Options) {
         canSend: (sendErrors[openedKey] ?? null) === null,
         send: async (text: string) => {
           const summary = threads.find((t) => t.thread_key === openedKey);
-          const otherKey = summary?.other_principal_key;
+          const meKey = principal ? principalKey(principal) : '';
+          const otherKey =
+            summary?.other_principal_key ??
+            openedKey.split('|').find((k) => k !== meKey) ??
+            null;
           if (!otherKey) return;
           await sendInThread(openedKey, otherKey, text);
         },
