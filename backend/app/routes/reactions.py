@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.errors import NOT_IN_PARTY, envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
-from app.validation import ReactionValidationError
+from app.validation import REACTION_EMOJI_ALLOWLIST, ReactionValidationError
 from app.world import ParticipantNotInPartyError, PartyWorld
 
 router = APIRouter(prefix="/api/parties")
@@ -44,6 +44,10 @@ def react(
     except ReactionValidationError as exc:
         raise HTTPException(
             status_code=422,
-            detail=envelope("invalid_emoji", message=str(exc)),
+            detail=envelope(
+                "invalid_emoji",
+                message=str(exc),
+                allowed_emojis=list(REACTION_EMOJI_ALLOWLIST),
+            ),
         )
     return {"emoji": ev.emoji, "expires_at": ev.expires_at, "cursor": world.cursor}
