@@ -1,12 +1,14 @@
-from typing import Literal
-
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel
 
 from app.errors import NOT_IN_PARTY, envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
-from app.validation import StrokeValidationError
+from app.validation import (
+    STROKE_COLOR_ALLOWLIST,
+    STROKE_WIDTH_ALLOWLIST,
+    StrokeValidationError,
+)
 from app.world import ParticipantNotInPartyError, PartyWorld
 
 router = APIRouter(prefix="/api/parties")
@@ -30,7 +32,7 @@ _MODULE_PATTERN = r"^[a-z0-9-]+$"
 class StrokeRequest(BaseModel):
     principal: Principal
     color: str
-    width: Literal["thin", "med", "thick"]
+    width: str
     points: list[dict]
 
 
@@ -53,7 +55,13 @@ def _map_errors(exc: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail=envelope("not_in_range"))
     if isinstance(exc, StrokeValidationError):
         return HTTPException(
-            status_code=422, detail=envelope("invalid_stroke", message=str(exc))
+            status_code=422,
+            detail=envelope(
+                "invalid_stroke",
+                message=str(exc),
+                allowed_colors=list(STROKE_COLOR_ALLOWLIST),
+                allowed_widths=list(STROKE_WIDTH_ALLOWLIST),
+            ),
         )
     return HTTPException(status_code=404, detail=envelope("not_found"))
 
