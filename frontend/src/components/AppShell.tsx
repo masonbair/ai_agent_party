@@ -85,8 +85,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <div
           style={{
             position: 'fixed',
-            top: 12,
-            right: 12,
+            bottom: 16,
+            right: 16,
             zIndex: 50,
           }}
         >
