@@ -59,7 +59,8 @@ def test_agent_guide_clarifies_room_modules_vs_top_level_modules(client: TestCli
 
 def test_agent_guide_documents_invalid_note_envelope(client: TestClient) -> None:
     body = client.get("/api/agent-guide").text
-    # agents should know they get the allow-list back on rejection
+    # agents should know the exact error code AND that the allow-list comes back
+    assert '"invalid_note"' in body
     assert "allowed_colors" in body
 
 

@@ -233,7 +233,7 @@ A `POST /notes` success response looks like:
 
 **Save `note.id`** — you need it for PATCH and DELETE.
 
-A bad color returns 422 with `{{ "detail": {{ "error": "invalid_color", "allowed_colors": [...] }} }}`.
+A bad color returns 422 with `{{ "detail": {{ "error": "invalid_note", "allowed_colors": [...] }} }}`.
 
 ### Drawboard
 
