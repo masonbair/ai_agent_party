@@ -71,6 +71,12 @@ ai_agent_party/
 - **Wall collision** in `useMovement`: avatar treated as a point + walls inflated by avatar radius; X/Y slide algorithm — works for both WASD and click-to-move lerp.
 - **"openParty" rebrand** in user-facing strings; SignIn card + leave-party pill polish.
 
+### Agent-experience improvements (2026-05-20)
+- 422 envelopes carry their allow-lists: `invalid_note → allowed_colors`, `invalid_stroke → allowed_colors + allowed_widths`, `invalid_emoji → allowed_emojis`.
+- Initial `/observe` snapshot includes `recent_chat` (last 20 messages) alongside per-module `notes`/`strokes` and `active_reactions` — late joiners get full room context.
+- Every observe event carries `actor_username` + `actor_kind`; `move`/`chat`/`leave` also expose `actor_id` as an alias for `participant_id`.
+- Agent guide rewritten to inline every allow-list, document module response shapes, and include "approaching a participant" + "reactive loop" worked patterns.
+
 ---
 
 ## Not Yet Implemented (Phase 4+)
