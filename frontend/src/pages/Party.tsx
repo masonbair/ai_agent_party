@@ -48,6 +48,7 @@ export default function Party() {
     lighting,
     modules,
     applyObserveInitial,
+    bubbles,
   } = useRealtimeParty(
     ready && principal
       ? { slug: party!.slug, principal, onEvicted: handleTakeover }
@@ -122,6 +123,9 @@ export default function Party() {
         reactions={reactions}
         applyObserveInitial={applyObserveInitial}
         realtimeStatus={realtimeStatus}
+        bubbles={bubbles}
+        slug={party.slug}
+        status={status}
       />
     </main>
   );

@@ -21,10 +21,19 @@ const participants: Participant[] = [
   { id: 'sid-2', kind: 'human', username: 'bob', color: '#4dd0e1', x: 400, y: 300 },
 ];
 
+const selfPrincipal = { kind: 'human' as const, id: 'sid-1' };
+
 describe('PartySpace with multiple participants', () => {
   it('renders one avatar per participant and marks the local user', () => {
     const { container } = render(
-      <PartySpace party={party} user={selfUser} participants={participants} />,
+      <PartySpace
+        party={party}
+        user={selfUser}
+        participants={participants}
+        slug={party.slug}
+        principal={selfPrincipal}
+        status="open"
+      />,
     );
     expect(screen.getByText('alice')).toBeInTheDocument();
     expect(screen.getByText('bob')).toBeInTheDocument();
@@ -33,10 +42,81 @@ describe('PartySpace with multiple participants', () => {
   });
 
   it('falls back to local-only render when participants is undefined', () => {
-    const { container } = render(<PartySpace party={party} user={selfUser} />);
+    const { container } = render(
+      <PartySpace
+        party={party}
+        user={selfUser}
+        slug={party.slug}
+        principal={selfPrincipal}
+        status="open"
+      />,
+    );
     expect(screen.getByText('alice')).toBeInTheDocument();
     expect(screen.queryByText('bob')).not.toBeInTheDocument();
     const selves = container.querySelectorAll('[data-self="true"]');
     expect(selves.length).toBe(1);
+  });
+});
+
+describe('PartySpace — chat bubbles & input', () => {
+  it('renders a bubble for each entry in bubbles, anchored to participant position', () => {
+    render(
+      <PartySpace
+        party={party}
+        user={selfUser}
+        participants={participants}
+        bubbles={{ 'sid-2': { text: 'hello', expiresAt: Date.now() + 5000 } }}
+        slug={party.slug}
+        principal={{ kind: 'human', id: 'sid-1' }}
+        status="open"
+      />,
+    );
+    expect(screen.getByText('hello')).toBeInTheDocument();
+  });
+
+  it('does not render a bubble for a participant no longer in the list', () => {
+    render(
+      <PartySpace
+        party={party}
+        user={selfUser}
+        participants={[]}
+        bubbles={{ ghost: { text: 'lost', expiresAt: Date.now() + 5000 } }}
+        slug={party.slug}
+        principal={{ kind: 'human', id: 'sid-1' }}
+        status="open"
+      />,
+    );
+    expect(screen.queryByText('lost')).not.toBeInTheDocument();
+  });
+
+  it('mounts a chat input', () => {
+    render(
+      <PartySpace
+        party={party}
+        user={selfUser}
+        participants={[]}
+        bubbles={{}}
+        slug={party.slug}
+        principal={{ kind: 'human', id: 'sid-1' }}
+        status="open"
+      />,
+    );
+    expect(screen.getByPlaceholderText(/say something/i)).toBeInTheDocument();
+  });
+
+  it('disables the input when status is not open', () => {
+    render(
+      <PartySpace
+        party={party}
+        user={selfUser}
+        participants={[]}
+        bubbles={{}}
+        slug={party.slug}
+        principal={{ kind: 'human', id: 'sid-1' }}
+        status="connecting"
+      />,
+    );
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    expect(input.disabled).toBe(true);
   });
 });

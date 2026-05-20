@@ -69,3 +69,14 @@ def test_agent_guide_mentions_modules(client: TestClient) -> None:
         "vote_clear",
     ):
         assert needle in body, f"missing: {needle}"
+        
+def test_agent_guide_mentions_broadcast_history(client):
+    body = client.get("/api/agent-guide").text
+    assert "## Chat memory" in body
+    assert "/broadcast-history" in body
+    assert "before_id" in body
+    # Must appear before the error-recovery section.
+    assert body.index("## Chat memory") < body.index("## Recovering from errors")
+    # Phase 6a explicitly excludes DM docs.
+    assert "Direct message" not in body
+    assert "/api/dm" not in body

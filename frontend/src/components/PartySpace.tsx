@@ -12,6 +12,8 @@ import { useMovement } from '../hooks/useMovement';
 import { apiGet } from '../api/client';
 import { react } from '../api/modules';
 import Avatar from './Avatar';
+import ChatBubble from './ChatBubble';
+import ChatInput from './ChatInput';
 import MusicPill from './MusicPill';
 import Wall from './Wall';
 import Zone from './Zone';
@@ -47,6 +49,9 @@ type Props = {
   reactions?: Map<string, { emoji: string; expiresAt: number }>;
   applyObserveInitial?: ApplyObserveInitial;
   realtimeStatus?: 'connecting' | 'open' | 'closed';
+  bubbles?: Record<string, { text: string; expiresAt: number }>;
+  slug: string;
+  status: 'connecting' | 'open' | 'closed';
 };
 
 type PlacedModule = Extract<ModuleSnapshot, { kind: 'stickynotes' | 'drawboard' }>;
@@ -62,6 +67,9 @@ export default function PartySpace({
   reactions,
   applyObserveInitial,
   realtimeStatus,
+  bubbles,
+  slug,
+  status,
 }: Props) {
   const { width, height } = party.worldSize;
   const [openModuleId, setOpenModuleId] = useState<string | null>(null);
@@ -248,6 +256,22 @@ export default function PartySpace({
             onClose={() => setPickerOpen(false)}
           />
         ) : null}
+        {Object.entries(bubbles ?? {}).map(([participantId, bubble]) => {
+          const speaker = renderList.find((p) => p.id === participantId);
+          if (!speaker) return null;
+          return (
+            <ChatBubble
+              key={participantId}
+              text={bubble.text}
+              x={speaker.x}
+              y={speaker.y}
+              worldWidth={width}
+              worldHeight={height}
+              expiresAt={bubble.expiresAt}
+            />
+          );
+        })}
+        <ChatInput slug={slug} principal={principal} disabled={status !== 'open'} />
       </div>
       {principal ? (
         <div

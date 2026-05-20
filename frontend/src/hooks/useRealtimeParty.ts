@@ -6,6 +6,7 @@ import type {
   StickyNote,
   Stroke,
 } from '../api/types';
+// frontend/src/hooks/useRealtimeParty.ts
 import type { Principal } from '../api/party';
 
 type Options = {
@@ -23,6 +24,11 @@ type ObservePayload = {
   lighting: LightingPreset;
   active_reactions: { actor_id: string; emoji: string; expires_at: number }[];
 };
+export type Bubble = { text: string; expiresAt: number };
+export type Bubbles = Record<string, Bubble>;
+
+export const BUBBLE_LIFETIME_MS = 5000;
+const BUBBLE_TICK_MS = 250;
 
 function wsUrlFor(slug: string): string {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -31,6 +37,7 @@ function wsUrlFor(slug: string): string {
 
 export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [bubbles, setBubbles] = useState<Bubbles>({});
   const [status, setStatus] = useState<Status>('connecting');
   const [reactions, setReactions] = useState<Map<string, ReactionState>>(
     new Map(),
@@ -49,6 +56,21 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
       m.set(r.actor_id, { emoji: r.emoji, expiresAt: r.expires_at * 1000 });
     }
     setReactions(m);
+  // Expiry tick: prunes bubbles whose expiresAt has passed.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBubbles((prev) => {
+        const now = Date.now();
+        let changed = false;
+        const next: Bubbles = {};
+        for (const [k, b] of Object.entries(prev)) {
+          if (b.expiresAt > now) next[k] = b;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, BUBBLE_TICK_MS);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -63,8 +85,11 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        // Don't reset backoff on the raw handshake — the server may still
+        // reject the auth frame (e.g. stale principal after backend restart),
+        // and resetting here would cause a 1s reconnect storm. Reset only on
+        // the first confirmed-good server frame (snapshot, below).
         ws.send(JSON.stringify({ type: 'auth', principal }));
-        backoffRef.current = 1000;
         setStatus('open');
       };
 
@@ -77,13 +102,14 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
         }
         if (!frame || typeof frame !== 'object') return;
         const f = frame as { type?: string };
-        if (f.type === 'evicted') {
+        if (f.type === 'error' || f.type === 'evicted') {
           evictedRef.current = true;
           onEvicted?.();
           ws.close();
           return;
         }
         if (f.type === 'snapshot') {
+          backoffRef.current = 1000;
           const s = frame as { participants: Participant[] };
           setParticipants(s.participants);
         } else if (f.type === 'event') {
@@ -96,6 +122,12 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
           } else if (ev.type === 'leave') {
             const id = (ev as unknown as { participant_id: string }).participant_id;
             setParticipants((prev) => prev.filter((q) => q.id !== id));
+            setBubbles((prev) => {
+              if (!(id in prev)) return prev;
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
           } else if (ev.type === 'move') {
             const m = ev as unknown as {
               participant_id: string;
@@ -219,6 +251,15 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
                   : m,
               ),
             );
+          } else if (ev.type === 'chat') {
+            const c = ev as unknown as { participant_id: string; text: string };
+            setBubbles((prev) => ({
+              ...prev,
+              [c.participant_id]: {
+                text: c.text,
+                expiresAt: Date.now() + BUBBLE_LIFETIME_MS,
+              },
+            }));
           }
         }
       };
@@ -231,9 +272,7 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
         reconnectTimer = setTimeout(connect, delay);
       };
 
-      ws.onerror = () => {
-        // onclose handler will run next; no extra cleanup here.
-      };
+      ws.onerror = () => {};
     }
 
     connect();
@@ -251,5 +290,6 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
     lighting,
     modules,
     applyObserveInitial,
+    bubbles,
   };
 }

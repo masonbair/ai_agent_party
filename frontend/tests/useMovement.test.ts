@@ -210,4 +210,26 @@ describe('useMovement', () => {
     // ended up near the target on the far side.
     expect(result.current.position.x).toBeGreaterThan(600);
   });
+
+  it('ignores movement keys when the user is typing in an input', () => {
+    const raf = setupRaf();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    const { result } = renderHook(() =>
+      useMovement({ worldWidth: 800, worldHeight: 500, speed: 200 }),
+    );
+
+    const startX = result.current.position.x;
+    act(() => {
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'd', bubbles: true }),
+      );
+      raf.tick(3);
+    });
+    expect(result.current.position.x).toBe(startX);
+
+    document.body.removeChild(input);
+  });
 });
