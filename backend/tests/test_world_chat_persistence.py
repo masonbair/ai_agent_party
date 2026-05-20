@@ -67,3 +67,21 @@ def test_chat_db_failure_aborts_emit(party, conn):
         world.chat("sess-1", "boom")
     # No ChatEvent should have been emitted because persistence failed.
     assert all(getattr(e, "text", None) != "boom" for e in received)
+
+
+def test_chat_route_persists_through_store(client, store):
+    # Register an agent and join the seeded party, then send chat.
+    party_slug = next(iter(__import__("app.parties_data", fromlist=["PARTY_REGISTRY"]).PARTY_REGISTRY))
+    a = client.post("/api/agents", json={"username": "Bot1", "color": "#ff6b9d"}).json()
+    principal = {"kind": "agent", "id": a["agent_id"]}
+    client.post(f"/api/parties/{party_slug}/join", json={"principal": principal})
+    r = client.post(
+        f"/api/parties/{party_slug}/chat",
+        json={"principal": principal, "text": "hi room"},
+    )
+    assert r.status_code == 200
+    from app import db as db_module
+    rows = db_module.query_broadcast_history(store.db, party_slug)
+    assert [row["text"] for row in rows] == ["hi room"]
+    assert rows[0]["sender_kind"] == "agent"
+    assert rows[0]["sender_name"] == "Bot1"

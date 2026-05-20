@@ -62,7 +62,7 @@ class Store:
         if party is None:
             return None
         if slug not in self._worlds:
-            self._worlds[slug] = PartyWorld(party)
+            self._worlds[slug] = PartyWorld(party, db_conn=self.db, party_slug=slug)
         return self._worlds[slug]
 
     def get_or_create_hub(self, slug: str) -> PartyWorldHub | None:
