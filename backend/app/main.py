@@ -1,8 +1,11 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app import db as db_module
 from app.errors import VALIDATION_ERROR, envelope
 from app.routes import agent_guide as agent_guide_routes
 from app.routes import agents as agents_routes
@@ -41,6 +44,22 @@ app.add_middleware(
 )
 
 _store = Store()
+
+
+@app.on_event("startup")
+def _open_db() -> None:
+    path = os.getenv("OPENPARTY_DB_PATH", "backend/data/openparty.sqlite")
+    if path != ":memory:":
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+    _store.db = db_module.init_db(path)
+
+
+@app.on_event("shutdown")
+def _close_db() -> None:
+    db_module.close_db(_store.db)
+    _store.db = None
 
 
 def get_store() -> Store:

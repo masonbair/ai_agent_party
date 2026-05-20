@@ -78,6 +78,20 @@ def test_broadcast_history_400_bad_before_id(client):
     assert r.status_code == 400
 
 
+def test_app_startup_opens_db(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENPARTY_DB_PATH", str(tmp_path / "x.sqlite"))
+    from fastapi.testclient import TestClient
+    from app.main import app, _store
+    # Clear dep overrides so the real _store is used.
+    app.dependency_overrides.clear()
+    with TestClient(app) as c:
+        assert _store.db is not None
+        r = c.get("/api/health")
+        assert r.status_code == 200
+    # After context exit, shutdown hook ran.
+    assert _store.db is None
+
+
 def test_broadcast_history_is_party_scoped(client, store):
     # Insert into two different party slugs via DB directly.
     db_module.insert_broadcast(
