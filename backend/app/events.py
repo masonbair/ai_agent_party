@@ -31,6 +31,9 @@ class LeaveEvent(BaseModel):
     type: Literal["leave"] = "leave"
     participant_id: str
     at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
 
 
 class MoveEvent(BaseModel):
@@ -40,6 +43,9 @@ class MoveEvent(BaseModel):
     x: float
     y: float
     at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
 
 
 class ChatEvent(BaseModel):
@@ -48,6 +54,9 @@ class ChatEvent(BaseModel):
     participant_id: str
     text: str
     at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
 
 
 class StickyNote(BaseModel):
@@ -86,6 +95,8 @@ class ReactionEvent(BaseModel):
     emoji: str
     expires_at: float
     at: float
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
 
 
 class LightingChangedEvent(BaseModel):

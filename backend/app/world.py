@@ -125,6 +125,16 @@ class PartyWorld:
     def _next_seq(self) -> int:
         return len(self._events) + 1
 
+    def _actor_fields(self, participant_id: str) -> dict:
+        p = self.participants.get(participant_id)
+        if p is None:
+            return {}
+        return {
+            "actor_id": p.id,
+            "actor_username": p.username,
+            "actor_kind": p.kind,
+        }
+
     def join(self, participant: Participant) -> JoinEvent:
         self.participants[participant.id] = participant
         ev = JoinEvent(seq=self._next_seq(), participant=participant, at=time.time())
@@ -136,8 +146,16 @@ class PartyWorld:
     def leave(self, participant_id: str) -> LeaveEvent:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
+        p = self.participants[participant_id]
         del self.participants[participant_id]
-        ev = LeaveEvent(seq=self._next_seq(), participant_id=participant_id, at=time.time())
+        ev = LeaveEvent(
+            seq=self._next_seq(),
+            participant_id=participant_id,
+            at=time.time(),
+            actor_id=p.id,
+            actor_username=p.username,
+            actor_kind=p.kind,
+        )
         self._events.append(ev)
         self._emit(ev)
         self._recompute_all_drawboard_votes(time.time())
@@ -162,6 +180,7 @@ class PartyWorld:
             x=new_x,
             y=new_y,
             at=time.time(),
+            **self._actor_fields(participant_id),
         )
         self._events.append(ev)
         self._emit(ev)
@@ -177,6 +196,7 @@ class PartyWorld:
             participant_id=participant_id,
             text=cleaned,
             at=time.time(),
+            **self._actor_fields(participant_id),
         )
         self._events.append(ev)
         self._emit(ev)
@@ -185,6 +205,7 @@ class PartyWorld:
     def react(self, participant_id: str, emoji: str) -> ReactionEvent:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
+        participant = self.participants[participant_id]
         cleaned = validate_reaction_emoji(emoji)
         now = time.time()
         expires_at = now + REACTION_LIFETIME_SECONDS
@@ -197,6 +218,8 @@ class PartyWorld:
             emoji=cleaned,
             expires_at=expires_at,
             at=now,
+            actor_username=participant.username,
+            actor_kind=participant.kind,
         )
         self._events.append(ev)
         self._emit(ev)

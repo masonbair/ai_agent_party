@@ -111,6 +111,53 @@ export type Stroke = {
 
 export type ApproachSlot = { x: number; y: number; occupied: boolean };
 
+// Observe event types
+
+export type MoveEvent = {
+  type: 'move';
+  seq: number;
+  participant_id: string;
+  x: number;
+  y: number;
+  at: number;
+  zone?: string | null;
+  actor_id?: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+};
+
+export type ChatEvent = {
+  type: 'chat';
+  seq: number;
+  participant_id: string;
+  text: string;
+  at: number;
+  actor_id?: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+};
+
+export type LeaveEvent = {
+  type: 'leave';
+  seq: number;
+  participant_id: string;
+  at: number;
+  actor_id?: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+};
+
+export type ReactionEvent = {
+  type: 'reaction';
+  seq: number;
+  actor_id: string;
+  emoji: string;
+  expires_at: number;
+  at: number;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+};
+
 export type ModuleSnapshot =
   | {
       id: string;
