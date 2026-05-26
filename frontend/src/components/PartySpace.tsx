@@ -1,3 +1,4 @@
+import { useDm } from '../contexts/DmContext';
 import { useEffect, useRef, useState } from 'react';
 import type {
   ChatEvent,
@@ -85,6 +86,7 @@ export default function PartySpace({
     paused: inputBlocked,
   });
   const floorRef = useRef<HTMLDivElement>(null);
+  const dm = useDm();
 
   useEffect(() => {
     if (!applyObserveInitial) return;
@@ -234,6 +236,11 @@ export default function PartySpace({
             worldWidth={width}
             worldHeight={height}
             variant={p.id === user.session_id ? 'self' : 'other'}
+            onSelect={
+              p.id !== user.session_id && dm
+                ? () => dm.openDmWith({ kind: p.kind, id: p.id }, p.username)
+                : undefined
+            }
           />
         ))}
         {reactions ? (

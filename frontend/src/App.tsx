@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import AppShell from './components/AppShell';
 import SessionPresenceManager from './components/SessionPresenceManager';
 import { SessionIdProvider } from './contexts/SessionIdContext';
 import Lobby from './pages/Lobby';
@@ -9,11 +10,13 @@ export default function App() {
   return (
     <SessionIdProvider>
       <SessionPresenceManager />
-      <Routes>
-        <Route path="/" element={<SignIn />} />
-        <Route path="/lobby" element={<Lobby />} />
-        <Route path="/party/:slug" element={<Party />} />
-      </Routes>
+      <AppShell>
+        <Routes>
+          <Route path="/" element={<SignIn />} />
+          <Route path="/lobby" element={<Lobby />} />
+          <Route path="/party/:slug" element={<Party />} />
+        </Routes>
+      </AppShell>
     </SessionIdProvider>
   );
 }
