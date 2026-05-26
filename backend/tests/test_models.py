@@ -3,12 +3,30 @@ from pydantic import ValidationError
 
 from app.models import (
     CreateSessionRequest,
+    DrawBoardModule,
+    LightingModule,
     PartyConfig,
+    PlacedModule,
     Room,
+    StickyNoteModule,
     User,
     Wall,
     Zone,
 )
+
+
+def _terrazzo(modules: list) -> dict:
+    return {
+        "slug": "test-party",
+        "name": "Test",
+        "description": "",
+        "theme": {"floor": "#fff", "accent": "#000"},
+        "zones": [],
+        "music": {"url": None, "label": "x"},
+        "worldSize": {"width": 800, "height": 500},
+        "room": {"border": "1px solid", "walls": []},
+        "modules": modules,
+    }
 
 
 def test_create_session_request_accepts_valid() -> None:
@@ -90,3 +108,39 @@ def test_room_accepts_clip_path_string() -> None:
 def test_wall_validates_dimensions() -> None:
     w = Wall(x=10.0, y=20.0, width=5.0, height=0.75, color="#000000")
     assert w.x == 10.0
+
+
+def test_partyconfig_accepts_typed_modules() -> None:
+    cfg = PartyConfig.model_validate(_terrazzo([
+        {"id": "lighting", "kind": "lighting", "preset": "dusk"},
+        {"id": "sticky-1", "kind": "stickynotes", "x": 80, "y": 60, "w": 240, "h": 160},
+        {"id": "draw-1", "kind": "drawboard", "x": 480, "y": 60, "w": 320, "h": 200},
+    ]))
+    kinds = [m.kind for m in cfg.modules]
+    assert kinds == ["lighting", "stickynotes", "drawboard"]
+
+
+def test_partyconfig_rejects_unknown_module_kind() -> None:
+    with pytest.raises(ValidationError):
+        PartyConfig.model_validate(_terrazzo([{"id": "x", "kind": "nope"}]))
+
+
+def test_lighting_preset_constrained() -> None:
+    with pytest.raises(ValidationError):
+        PartyConfig.model_validate(_terrazzo([
+            {"id": "lighting", "kind": "lighting", "preset": "rainbow"},
+        ]))
+
+
+def test_placed_module_dimensions_must_be_positive() -> None:
+    with pytest.raises(ValidationError):
+        PartyConfig.model_validate(_terrazzo([
+            {"id": "sticky-1", "kind": "stickynotes", "x": 0, "y": 0, "w": 0, "h": 50},
+        ]))
+
+
+def test_partyconfig_defaults_modules_to_empty_list() -> None:
+    data = _terrazzo([])
+    del data["modules"]
+    cfg = PartyConfig.model_validate(data)
+    assert cfg.modules == []

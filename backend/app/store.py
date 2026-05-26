@@ -1,3 +1,4 @@
+import sqlite3
 import uuid
 
 from app.events import Agent
@@ -20,6 +21,7 @@ class Store:
         self._session_presence: SessionPresenceHub | None = None
         self.dm_store: DmStore = DmStore()
         self.inbox_hub: InboxHub = InboxHub()
+        self.db: sqlite3.Connection | None = None
 
     def create_session(self, username: str, color: str) -> User:
         session_id = uuid.uuid4().hex
@@ -93,7 +95,7 @@ class Store:
         if party is None:
             return None
         if slug not in self._worlds:
-            self._worlds[slug] = PartyWorld(party)
+            self._worlds[slug] = PartyWorld(party, db_conn=self.db, party_slug=slug)
         return self._worlds[slug]
 
     def get_or_create_hub(self, slug: str) -> PartyWorldHub | None:

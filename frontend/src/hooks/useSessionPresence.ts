@@ -11,13 +11,13 @@ function wsUrl(): string {
 }
 
 export function useSessionPresence({ sessionId, onEvicted }: Options): void {
-  const evictedRef = useRef(false);
+  const rejectedRef = useRef(false);
   const onEvictedRef = useRef(onEvicted);
   onEvictedRef.current = onEvicted;
 
   useEffect(() => {
     if (!sessionId) return;
-    evictedRef.current = false;
+    rejectedRef.current = false;
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let backoff = 1000;
@@ -28,8 +28,10 @@ export function useSessionPresence({ sessionId, onEvicted }: Options): void {
       ws = new WebSocket(wsUrl());
 
       ws.onopen = () => {
+        // Don't reset backoff on the raw handshake — the server may still
+        // reject the auth frame (stale session_id after a backend restart),
+        // and resetting here would cause a 1s reconnect storm.
         ws?.send(JSON.stringify({ type: 'auth', session_id: sessionId }));
-        backoff = 1000;
       };
 
       ws.onmessage = (e: MessageEvent) => {
@@ -41,16 +43,17 @@ export function useSessionPresence({ sessionId, onEvicted }: Options): void {
         }
         if (!frame || typeof frame !== 'object') return;
         const f = frame as { type?: string };
-        if (f.type === 'evicted') {
-          evictedRef.current = true;
+        if (f.type === 'error' || f.type === 'evicted') {
+          rejectedRef.current = true;
           onEvictedRef.current?.();
           ws?.close();
           return;
         }
+        backoff = 1000;
       };
 
       ws.onclose = () => {
-        if (cancelled || evictedRef.current) return;
+        if (cancelled || rejectedRef.current) return;
         const delay = Math.min(backoff, 8000);
         backoff = Math.min(backoff * 2, 8000);
         reconnectTimer = setTimeout(connect, delay);
