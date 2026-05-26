@@ -148,7 +148,7 @@ def test_observe_since_collapses_consecutive_moves_per_participant() -> None:
     assert len(move_events) == 1
     assert move_events[0]["x"] == 100.0
     assert move_events[0]["y"] == 50.0
-    assert move_events[0]["participant_id"] == "s-alice"
+    assert move_events[0]["actor_id"] == "s-alice"
 
 
 def test_observe_since_does_not_collapse_chat_or_join_or_leave() -> None:
@@ -170,12 +170,15 @@ def test_observe_since_adds_zone_to_move_events() -> None:
     assert move["zone"] == "dance"
 
 
-def test_observe_since_adds_zone_to_join_participant() -> None:
+def test_observe_since_adds_zone_to_join_event() -> None:
     w = PartyWorld(CREAM_TERRAZZO)
     w.join(_alice().model_copy(update={"x": 200.0, "y": 100.0}))
     result = w.observe_since(0)
     join = next(e for e in result["events"] if e["type"] == "join")
-    assert join["participant"]["zone"] == "dance"
+    # Flat shape: zone at top level, not nested under participant
+    assert join["zone"] == "dance"
+    assert join["actor_id"] == "s-alice"
+    assert join["actor_username"] == "Alice"
 
 
 def test_observe_since_collapses_per_participant_not_globally() -> None:
@@ -188,10 +191,10 @@ def test_observe_since_collapses_per_participant_not_globally() -> None:
     w.move("s-alice", 70, 70)
     result = w.observe_since(2)
     moves = [e for e in result["events"] if e["type"] == "move"]
-    by_pid = {m["participant_id"]: m for m in moves}
-    assert set(by_pid.keys()) == {"s-alice", "s-bob"}
-    assert by_pid["s-alice"]["x"] == 70.0
-    assert by_pid["s-bob"]["x"] == 60.0
+    by_actor = {m["actor_id"]: m for m in moves}
+    assert set(by_actor.keys()) == {"s-alice", "s-bob"}
+    assert by_actor["s-alice"]["x"] == 70.0
+    assert by_actor["s-bob"]["x"] == 60.0
 
 
 def test_on_event_callback_is_invoked_on_append() -> None:

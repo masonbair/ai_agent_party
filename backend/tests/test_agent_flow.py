@@ -59,4 +59,4 @@ def test_full_agent_flow(client: TestClient) -> None:
     ).json()
     leave_events = [e for e in final["events"] if e["type"] == "leave"]
     assert len(leave_events) == 1
-    assert leave_events[0]["participant_id"] == agent["agent_id"]
+    assert leave_events[0]["actor_id"] == agent["agent_id"]

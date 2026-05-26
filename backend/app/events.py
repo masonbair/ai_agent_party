@@ -22,41 +22,43 @@ class Agent(BaseModel):
 class JoinEvent(BaseModel):
     seq: int
     type: Literal["join"] = "join"
-    participant: Participant
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    x: float
+    y: float
+    zone: str | None = None
     at: float
 
 
 class LeaveEvent(BaseModel):
     seq: int
     type: Literal["leave"] = "leave"
-    participant_id: str
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
     at: float
-    actor_id: str | None = None
-    actor_username: str | None = None
-    actor_kind: Literal["human", "agent"] | None = None
 
 
 class MoveEvent(BaseModel):
     seq: int
     type: Literal["move"] = "move"
-    participant_id: str
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
     x: float
     y: float
     at: float
-    actor_id: str | None = None
-    actor_username: str | None = None
-    actor_kind: Literal["human", "agent"] | None = None
 
 
 class ChatEvent(BaseModel):
     seq: int
     type: Literal["chat"] = "chat"
-    participant_id: str
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
     text: str
     at: float
-    actor_id: str | None = None
-    actor_username: str | None = None
-    actor_kind: Literal["human", "agent"] | None = None
 
 
 class StickyNote(BaseModel):
@@ -92,11 +94,11 @@ class ReactionEvent(BaseModel):
     seq: int
     type: Literal["reaction"] = "reaction"
     actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
     emoji: str
     expires_at: float
     at: float
-    actor_username: str | None = None
-    actor_kind: Literal["human", "agent"] | None = None
 
 
 class LightingChangedEvent(BaseModel):

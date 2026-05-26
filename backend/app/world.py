@@ -148,7 +148,16 @@ class PartyWorld:
 
     def join(self, participant: Participant) -> JoinEvent:
         self.participants[participant.id] = participant
-        ev = JoinEvent(seq=self._next_seq(), participant=participant, at=time.time())
+        ev = JoinEvent(
+            seq=self._next_seq(),
+            actor_id=participant.id,
+            actor_username=participant.username,
+            actor_kind=participant.kind,
+            x=participant.x,
+            y=participant.y,
+            zone=self.derive_zone(participant.x, participant.y),
+            at=time.time(),
+        )
         self._events.append(ev)
         self._emit(ev)
         self._recompute_all_drawboard_votes(time.time())
@@ -159,12 +168,7 @@ class PartyWorld:
             raise ParticipantNotInPartyError(participant_id)
         actor = self._actor_fields(participant_id)
         del self.participants[participant_id]
-        ev = LeaveEvent(
-            seq=self._next_seq(),
-            participant_id=participant_id,
-            at=time.time(),
-            **actor,
-        )
+        ev = LeaveEvent(seq=self._next_seq(), at=time.time(), **actor)
         self._events.append(ev)
         self._emit(ev)
         self._recompute_all_drawboard_votes(time.time())
@@ -185,7 +189,6 @@ class PartyWorld:
         )
         ev = MoveEvent(
             seq=self._next_seq(),
-            participant_id=participant_id,
             x=new_x,
             y=new_y,
             at=time.time(),
@@ -215,7 +218,6 @@ class PartyWorld:
             )
         ev = ChatEvent(
             seq=self._next_seq(),
-            participant_id=participant_id,
             text=cleaned,
             at=time.time(),
             **self._actor_fields(participant_id),
@@ -667,28 +669,18 @@ class PartyWorld:
         if since < 0:
             since = 0
         tail = self._events[since:]
-        latest_move_by_pid: dict[str, MoveEvent] = {}
+        latest_move_by_actor: dict[str, MoveEvent] = {}
         latest_vote_by_module: dict[str, VoteChangedEvent] = {}
         out: list[dict] = []
         for ev in tail:
             if isinstance(ev, MoveEvent):
-                latest_move_by_pid[ev.participant_id] = ev
+                latest_move_by_actor[ev.actor_id] = ev
                 continue
             if isinstance(ev, VoteChangedEvent):
                 latest_vote_by_module[ev.module_id] = ev
                 continue
-            if isinstance(ev, JoinEvent):
-                out.append(
-                    {
-                        "type": "join",
-                        "seq": ev.seq,
-                        "participant": self._participant_dict(ev.participant),
-                        "at": ev.at,
-                    }
-                )
-            else:
-                out.append(ev.model_dump())
-        for mv in latest_move_by_pid.values():
+            out.append(ev.model_dump())
+        for mv in latest_move_by_actor.values():
             d = mv.model_dump()
             d["zone"] = self.derive_zone(mv.x, mv.y)
             out.append(d)

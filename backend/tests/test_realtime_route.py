@@ -62,7 +62,7 @@ def test_ws_pushes_event_when_another_principal_joins(client: TestClient) -> Non
         frame = ws.receive_json()
         assert frame["type"] == "event"
         assert frame["event"]["type"] == "join"
-        assert frame["event"]["participant"]["username"] == "Bob"
+        assert frame["event"]["actor_username"] == "Bob"
 
 
 def test_ws_first_frame_non_auth_is_rejected(client: TestClient) -> None:

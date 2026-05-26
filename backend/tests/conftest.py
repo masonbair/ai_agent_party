@@ -17,6 +17,38 @@ from app.routes import session as session_routes
 from app.store import Store
 
 
+def register_human(client, *, username: str = "Alice", color: str = "#ff6b9d") -> dict:
+    """Register a human session and return a dict with session info + principal."""
+    user = client.post(
+        "/api/session", json={"username": username, "color": color}
+    ).json()
+    return {
+        **user,
+        "principal": {"kind": "human", "id": user["session_id"]},
+    }
+
+
+def register_agent(client, *, username: str = "Bot", color: str = "#4ecdc4") -> dict:
+    """Register an agent and return a dict with agent info + principal."""
+    agent = client.post(
+        "/api/agents", json={"username": username, "color": color}
+    ).json()
+    return {
+        **agent,
+        "principal": {"kind": "agent", "id": agent["agent_id"]},
+    }
+
+
+def join_party(client, principal_dict: dict, slug: str) -> dict:
+    """Join a party and return the response body."""
+    resp = client.post(
+        f"/api/parties/{slug}/join",
+        json={"principal": principal_dict["principal"]},
+    )
+    assert resp.status_code == 200, resp.json()
+    return resp.json()
+
+
 @pytest.fixture
 def store() -> Store:
     s = Store()

@@ -36,26 +36,57 @@ def test_participant_requires_human_or_agent_kind() -> None:
         )
 
 
-def test_join_event_carries_participant_and_seq() -> None:
-    ev = JoinEvent(seq=1, participant=_participant(), at=1715533200.0)
+def test_join_event_carries_actor_fields_and_seq() -> None:
+    p = _participant()
+    ev = JoinEvent(
+        seq=1,
+        actor_id=p.id,
+        actor_username=p.username,
+        actor_kind=p.kind,
+        x=p.x,
+        y=p.y,
+        at=1715533200.0,
+    )
     assert ev.type == "join"
     assert ev.seq == 1
-    assert ev.participant.username == "Alice"
+    assert ev.actor_username == "Alice"
+    assert ev.actor_id == "abc123"
 
 
-def test_leave_event_carries_participant_id() -> None:
-    ev = LeaveEvent(seq=2, participant_id="abc123", at=1715533200.0)
+def test_leave_event_carries_actor_id() -> None:
+    ev = LeaveEvent(
+        seq=2,
+        actor_id="abc123",
+        actor_username="Alice",
+        actor_kind="human",
+        at=1715533200.0,
+    )
     assert ev.type == "leave"
 
 
 def test_move_event_carries_coords() -> None:
-    ev = MoveEvent(seq=3, participant_id="abc123", x=10.0, y=20.0, at=1715533200.0)
+    ev = MoveEvent(
+        seq=3,
+        actor_id="abc123",
+        actor_username="Alice",
+        actor_kind="human",
+        x=10.0,
+        y=20.0,
+        at=1715533200.0,
+    )
     assert ev.type == "move"
     assert ev.x == 10.0
 
 
 def test_chat_event_carries_text_and_at() -> None:
-    ev = ChatEvent(seq=4, participant_id="abc123", text="hi", at=1715533200.0)
+    ev = ChatEvent(
+        seq=4,
+        actor_id="abc123",
+        actor_username="Alice",
+        actor_kind="human",
+        text="hi",
+        at=1715533200.0,
+    )
     assert ev.type == "chat"
     assert ev.text == "hi"
 
@@ -87,7 +118,15 @@ def test_event_union_includes_new_types() -> None:
 def test_reaction_event_round_trip() -> None:
     from app.events import ReactionEvent
 
-    ev = ReactionEvent(seq=1, actor_id="a", emoji="❤️", expires_at=2.0, at=1.0)
+    ev = ReactionEvent(
+        seq=1,
+        actor_id="a",
+        actor_username="Alice",
+        actor_kind="human",
+        emoji="❤️",
+        expires_at=2.0,
+        at=1.0,
+    )
     dumped = ev.model_dump()
     assert dumped["type"] == "reaction"
     assert dumped["emoji"] == "❤️"
