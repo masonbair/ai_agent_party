@@ -1,4 +1,15 @@
-from app.models import Music, PartyConfig, Room, Theme, Wall, WorldSize, Zone
+from app.models import (
+    DrawBoardModule,
+    LightingModule,
+    Music,
+    PartyConfig,
+    Room,
+    StickyNoteModule,
+    Theme,
+    Wall,
+    WorldSize,
+    Zone,
+)
 
 CREAM_TERRAZZO = PartyConfig(
     slug="cream-terrazzo",
@@ -62,6 +73,14 @@ CREAM_TERRAZZO = PartyConfig(
             Wall(x=75.0, y=40.0, width=25.0, height=1.2, color="#8b6f47"),
         ],
     ),
+    # Modules are mounted flush against the room walls in the bottom corners,
+    # outside every zone (snacks spans x=224..576 / y=290..460). They render
+    # as wall-mounted furniture and proxy through to a modal on interaction.
+    modules=[
+        LightingModule(preset="dusk"),
+        StickyNoteModule(id="sticky-1", x=0, y=420, w=180, h=80),
+        DrawBoardModule(id="draw-1", x=620, y=420, w=180, h=80),
+    ],
 )
 
 SPEAKEASY = PartyConfig(

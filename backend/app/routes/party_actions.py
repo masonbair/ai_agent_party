@@ -163,6 +163,19 @@ def _room_view(party) -> dict:
             for wl in party.room.walls
         ],
         "music": party.music.label,
+        "modules": [
+            {
+                "id": m.id,
+                "kind": m.kind,
+                **(
+                    {"x": m.x, "y": m.y, "w": m.w, "h": m.h}
+                    if m.kind in ("stickynotes", "drawboard")
+                    else {}
+                ),
+                **({"preset": m.preset} if m.kind == "lighting" else {}),
+            }
+            for m in party.modules
+        ],
     }
 
 
@@ -181,5 +194,9 @@ def observe(
             "room": _room_view(party),
             "participants": snap["participants"],
             "cursor": snap["cursor"],
+            "modules": snap["modules"],
+            "lighting": snap["lighting"],
+            "active_reactions": snap["active_reactions"],
+            "recent_chat": world.recent_chat(),
         }
     return world.observe_since(since)

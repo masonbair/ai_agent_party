@@ -1,3 +1,5 @@
+from typing import Annotated, Literal, Union
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.validation import ALLOWED_COLORS, USERNAME_REGEX
@@ -70,6 +72,40 @@ class Room(BaseModel):
     walls: list[Wall]
 
 
+LightingPreset = Literal["day", "dusk", "night", "party"]
+
+
+class StickyNoteModule(BaseModel):
+    id: str = Field(pattern=r"^[a-z0-9-]+$")
+    kind: Literal["stickynotes"] = "stickynotes"
+    x: float
+    y: float
+    w: float = Field(gt=0)
+    h: float = Field(gt=0)
+
+
+class DrawBoardModule(BaseModel):
+    id: str = Field(pattern=r"^[a-z0-9-]+$")
+    kind: Literal["drawboard"] = "drawboard"
+    x: float
+    y: float
+    w: float = Field(gt=0)
+    h: float = Field(gt=0)
+
+
+class LightingModule(BaseModel):
+    id: Literal["lighting"] = "lighting"
+    kind: Literal["lighting"] = "lighting"
+    preset: LightingPreset = "day"
+
+
+PlacedModule = Union[StickyNoteModule, DrawBoardModule]
+Module = Annotated[
+    Union[StickyNoteModule, DrawBoardModule, LightingModule],
+    Field(discriminator="kind"),
+]
+
+
 class PartyConfig(BaseModel):
     slug: str = Field(pattern=r"^[a-z0-9-]+$")
     name: str
@@ -79,6 +115,7 @@ class PartyConfig(BaseModel):
     music: Music
     worldSize: WorldSize
     room: Room
+    modules: list[Module] = Field(default_factory=list)
 
 
 class PartiesListResponse(BaseModel):

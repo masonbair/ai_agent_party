@@ -57,6 +57,19 @@ def test_agent_guide_documents_error_codes(client: TestClient) -> None:
     assert NOT_IN_PARTY in body
 
 
+def test_agent_guide_mentions_modules(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    for needle in (
+        "## Modules",
+        "approachSlots",
+        "POST /api/parties/{slug}/react",
+        "POST /api/parties/{slug}/lighting",
+        "POST /api/parties/{slug}/modules/{module_id}/notes",
+        "POST /api/parties/{slug}/modules/{module_id}/strokes",
+        "vote_clear",
+    ):
+        assert needle in body, f"missing: {needle}"
+        
 def test_agent_guide_mentions_broadcast_history(client):
     body = client.get("/api/agent-guide").text
     assert "## Chat memory" in body
