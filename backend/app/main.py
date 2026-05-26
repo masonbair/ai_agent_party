@@ -4,9 +4,10 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import db as db_module
-from app.errors import VALIDATION_ERROR, envelope
+from app.errors import NOT_FOUND, VALIDATION_ERROR, envelope
 from app.routes import agent_guide as agent_guide_routes
 from app.routes import agents as agents_routes
 from app.routes import dm as dm_routes
@@ -22,6 +23,34 @@ from app.routes import session as session_routes
 from app.store import Store
 
 app = FastAPI(title="ai_agent_party")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    """Wrap any HTTPException whose detail is still a bare string into
+    the standard envelope. HTTPExceptions raised via ``http_envelope``
+    already carry a dict detail; we pass those through untouched.
+    """
+    detail = exc.detail
+    if isinstance(detail, dict) and "error" in detail:
+        # Already enveloped.
+        return JSONResponse(status_code=exc.status_code, content={"detail": detail})
+
+    # Map known framework messages onto stable codes.
+    code_map = {
+        404: ("not_found", "The requested resource was not found."),
+        405: ("method_not_allowed", "HTTP method not allowed for this route."),
+        401: ("unauthorized", "Authentication required."),
+        403: ("forbidden", "Access denied."),
+    }
+    code, default_msg = code_map.get(exc.status_code, ("http_error", str(detail) or "HTTP error."))
+    message = default_msg if not isinstance(detail, str) or detail.lower() in ("not found", "method not allowed") else detail
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": envelope(code, message=message)},
+    )
 
 
 @app.exception_handler(RequestValidationError)
