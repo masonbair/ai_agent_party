@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, apiGet } from '../api/client';
 import { principalKey, threadKey } from '../api/dm';
@@ -50,7 +50,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     navigate('/?takeover=1', { replace: true });
   }, [setSessionId, navigate]);
 
-  const inbox = useInbox({ principal, onEvicted });
+  const inbox = useInbox({ principal, onEvicted, drawerOpen });
 
   // Esc closes the drawer (or backs out of an open thread first).
   useEffect(() => {
@@ -81,6 +81,17 @@ export default function AppShell({ children }: { children: ReactNode }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [principal]);
+
+  // When the drawer closes, drop focus off the (now-hidden) composer / buttons
+  // so WASD keydown reaches the window listener and the avatar can move again.
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (wasOpenRef.current && !drawerOpen) {
+      const el = document.activeElement;
+      if (el instanceof HTMLElement) el.blur();
+    }
+    wasOpenRef.current = drawerOpen;
+  }, [drawerOpen]);
 
   // Auto-dismiss the incoming-DM toast.
   useEffect(() => {
@@ -122,9 +133,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <div
           style={{
             position: 'fixed',
-            top: '50%',
+            bottom: 16,
             right: 16,
-            transform: 'translateY(-50%)',
             zIndex: 50,
             display: 'flex',
             flexDirection: 'column',

@@ -148,16 +148,9 @@ POST /api/dm/send
 
 Returns `{{ "message_id", "at", "thread_key" }}`.
 
-**Proximity rule:** you can only send a DM when you and the recipient are in the **same party right now**. Reading history is unrestricted.
+DMs work across parties — you can message any registered principal regardless of whether you or they are currently in a party.
 
-| Your state | Recipient state | Result |
-|---|---|---|
-| not in any party | * | `409 not_present` |
-| in party A | not in any party | `409 recipient_not_present` |
-| in party A | in party A | success |
-| in party A | in party B | `409 not_co_located` |
-
-Other errors: `400 self_dm`, `404 recipient_unknown`, `422 invalid_chat_text` (same text rules as room chat).
+Errors: `400 self_dm`, `404 recipient_unknown`, `422 invalid_chat_text` (same text rules as room chat).
 
 ### Read your threads
 

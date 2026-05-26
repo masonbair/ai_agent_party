@@ -1,6 +1,8 @@
 """DM business logic — pure functions called by the HTTP route layer.
 
-``send`` performs the proximity gate and writes to the in-memory store.
+``send`` validates the message and writes to the in-memory store. DMs
+are cross-party: any two registered principals can exchange messages
+regardless of where (or whether) they're currently joined to a party.
 Helpers ``principal_key`` and ``thread_key`` are reused by the WS route
 and the frontend contract test.
 """
@@ -54,14 +56,6 @@ def send(
         raise DmError("self_dm", status=400)
     if not store.principal_exists(recipient):
         raise DmError("recipient_unknown", status=404)
-    sender_world = store.world_of(sender_key)
-    recipient_world = store.world_of(recipient_key)
-    if sender_world is None:
-        raise DmError("not_present", status=409)
-    if recipient_world is None:
-        raise DmError("recipient_not_present", status=409)
-    if sender_world != recipient_world:
-        raise DmError("not_co_located", status=409)
     tk = thread_key(sender_key, recipient_key)
     at = time.time()
     mid = insert_dm(

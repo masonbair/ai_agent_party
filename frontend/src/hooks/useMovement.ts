@@ -196,7 +196,30 @@ export function useMovement(opts: Options) {
   const throttleMsRef = useRef(opts.moveThrottleMs ?? 100);
   throttleMsRef.current = opts.moveThrottleMs ?? 100;
   const pausedRef = useRef(opts.paused ?? false);
+  const wasPausedRef = useRef(opts.paused ?? false);
   pausedRef.current = opts.paused ?? false;
+
+  // When movement pauses (e.g. user opens a module modal), flush the latest
+  // position to the backend. Move events are throttled to ~100ms; without
+  // this flush, the server may still hold a position from before the user
+  // walked into a module's interaction zone, causing a 409 not_in_range on
+  // the next module action (stroke, note, vote).
+  useEffect(() => {
+    const nowPaused = opts.paused ?? false;
+    if (nowPaused && !wasPausedRef.current) {
+      const { x, y } = posRef.current;
+      if (
+        onMoveRef.current &&
+        (x !== lastEmitRef.current.x || y !== lastEmitRef.current.y)
+      ) {
+        const nowMs =
+          typeof performance !== 'undefined' ? performance.now() : Date.now();
+        lastEmitRef.current = { time: nowMs, x, y };
+        onMoveRef.current(x, y);
+      }
+    }
+    wasPausedRef.current = nowPaused;
+  }, [opts.paused]);
 
   posRef.current = position;
   targetRef.current = target;

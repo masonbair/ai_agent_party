@@ -122,10 +122,9 @@ export default function Party() {
         lighting={lighting}
         reactions={reactions}
         applyObserveInitial={applyObserveInitial}
-        realtimeStatus={realtimeStatus}
         bubbles={bubbles}
         slug={party.slug}
-        status={status}
+        status={realtimeStatus}
       />
     </main>
   );

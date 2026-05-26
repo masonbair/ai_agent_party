@@ -14,6 +14,7 @@ type Status = 'connecting' | 'open' | 'closed';
 type Options = {
   principal: Principal | null;
   onEvicted?: () => void;
+  drawerOpen?: boolean;
 };
 
 export type IncomingToast = {
@@ -58,7 +59,7 @@ export type OpenedThread = {
   canSend: boolean;
 };
 
-export function useInbox({ principal, onEvicted }: Options) {
+export function useInbox({ principal, onEvicted, drawerOpen = false }: Options) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [status, setStatus] = useState<Status>('connecting');
   const [openedKey, setOpenedKey] = useState<string | null>(null);
@@ -84,6 +85,11 @@ export function useInbox({ principal, onEvicted }: Options) {
   useEffect(() => {
     openedKeyRef.current = openedKey;
   }, [openedKey]);
+
+  const drawerOpenRef = useRef(drawerOpen);
+  useEffect(() => {
+    drawerOpenRef.current = drawerOpen;
+  }, [drawerOpen]);
 
   useEffect(() => {
     if (!principal) return;
@@ -132,18 +138,43 @@ export function useInbox({ principal, onEvicted }: Options) {
     }
 
     // Initial HTTP fetch of threads; seed unread counts from persisted lastRead.
+    // DM message IDs are globally monotonic (not per-thread), so we can't infer
+    // the unread count from `last_message_id - lastRead`. Instead, for any
+    // thread whose latest message is newer than our persisted lastRead, we fetch
+    // the recent history and count messages with id > lastRead authored by
+    // someone other than us.
     listThreads(principal)
-      .then((r) => {
+      .then(async (r) => {
         if (cancelled) return;
         setThreads(r.threads);
-        const seed: Record<string, number> = {};
-        for (const t of r.threads) {
+        const me = selfKeyRef.current;
+        const candidates = r.threads.filter((t) => {
           const sender = `${t.last_sender_kind}:${t.last_sender_id}`;
-          if (sender === selfKeyRef.current) continue;
-          if (t.last_message_id > readLastRead(t.thread_key)) {
-            seed[t.thread_key] = 1;
-          }
-        }
+          if (sender === me) return false;
+          return t.last_message_id > readLastRead(t.thread_key);
+        });
+        const seed: Record<string, number> = {};
+        await Promise.all(
+          candidates.map(async (t) => {
+            const lastRead = readLastRead(t.thread_key);
+            try {
+              const h = await getThreadHistory(t.thread_key, principal, {
+                limit: 200,
+              });
+              let count = 0;
+              for (const m of h.messages) {
+                if (m.id <= lastRead) continue;
+                if (`${m.sender_kind}:${m.sender_id}` === me) continue;
+                count += 1;
+              }
+              if (count > 0) seed[t.thread_key] = count;
+            } catch {
+              // Fall back to a count of 1 so the badge isn't silently wrong.
+              seed[t.thread_key] = 1;
+            }
+          }),
+        );
+        if (cancelled) return;
         setUnreadByThread((prev) => ({ ...seed, ...prev }));
       })
       .catch(() => {});
@@ -201,7 +232,12 @@ export function useInbox({ principal, onEvicted }: Options) {
         return next;
       });
       if (isMine) return;
-      const isOpen = openedKeyRef.current === thread_key;
+      // Only suppress the toast / auto-mark-read when the user is *actively viewing*
+      // this thread — i.e. the drawer is open AND it's the opened thread. A sticky
+      // openedKey from a previous session shouldn't silence notifications while the
+      // drawer is closed.
+      const isOpen =
+        drawerOpenRef.current && openedKeyRef.current === thread_key;
       if (isOpen) {
         // Auto-mark-read while looking at the thread.
         writeLastRead(thread_key, message.id);
@@ -214,6 +250,10 @@ export function useInbox({ principal, onEvicted }: Options) {
         ...prev,
         [thread_key]: (prev[thread_key] ?? 0) + 1,
       }));
+      // Toasts fire for EVERY incoming non-mine, non-open message regardless of
+      // whether the thread is new. `toastKeyRef` increments per message so the
+      // <button key={toast.key}> in AppShell remounts and re-runs its entry
+      // animation for back-to-back DMs in the same thread.
       toastKeyRef.current += 1;
       setLatestIncoming({
         key: toastKeyRef.current,

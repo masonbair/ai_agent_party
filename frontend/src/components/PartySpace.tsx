@@ -49,7 +49,6 @@ type Props = {
   lighting?: LightingPreset;
   reactions?: Map<string, { emoji: string; expiresAt: number }>;
   applyObserveInitial?: ApplyObserveInitial;
-  realtimeStatus?: 'connecting' | 'open' | 'closed';
   bubbles?: Record<string, { text: string; expiresAt: number }>;
   slug: string;
   status: 'connecting' | 'open' | 'closed';
@@ -67,7 +66,6 @@ export default function PartySpace({
   lighting,
   reactions,
   applyObserveInitial,
-  realtimeStatus,
   bubbles,
   slug,
   status,
@@ -189,11 +187,30 @@ export default function PartySpace({
     <div
       style={{
         width: 'min(95vw, 1000px)',
-        aspectRatio: `${width} / ${height}`,
         margin: '24px auto',
-        position: 'relative',
       }}
     >
+      {principal ? (
+        <div
+          aria-live="polite"
+          style={{
+            margin: '0 auto 12px',
+            textAlign: 'center',
+            fontSize: 'clamp(14px, 1.6vw, 18px)',
+            color: '#333',
+            letterSpacing: 0.4,
+          }}
+        >
+          press <kbd>R</kbd> to react · walk near a board and press <kbd>E</kbd> to interact
+        </div>
+      ) : null}
+      <div
+        style={{
+          width: '100%',
+          aspectRatio: `${width} / ${height}`,
+          position: 'relative',
+        }}
+      >
       <div
         ref={floorRef}
         onClick={onClick}
@@ -255,7 +272,7 @@ export default function PartySpace({
         <MusicPill label={party.music.label} />
         {principal ? (
           <RadialReactionPicker
-            open={pickerOpen && realtimeStatus !== 'closed'}
+            open={pickerOpen && status !== 'closed'}
             anchorPercent={anchorPercent}
             onPick={(emoji) => {
               void react(party.slug, principal, emoji);
@@ -278,21 +295,10 @@ export default function PartySpace({
             />
           );
         })}
-        <ChatInput slug={slug} principal={principal} disabled={status !== 'open'} />
+      </div>
       </div>
       {principal ? (
-        <div
-          aria-live="polite"
-          style={{
-            margin: '8px auto 0',
-            textAlign: 'center',
-            fontSize: 12,
-            color: '#555',
-            letterSpacing: 0.4,
-          }}
-        >
-          press <kbd>R</kbd> to react · walk near a board and press <kbd>E</kbd> to interact
-        </div>
+        <ChatInput slug={slug} principal={principal} disabled={status !== 'open'} />
       ) : null}
       {openModule && principal ? (
         <ModuleModal

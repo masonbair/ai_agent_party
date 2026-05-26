@@ -116,50 +116,35 @@ def test_send_unknown_recipient_rejected() -> None:
     assert exc.value.status == 404
 
 
-def test_send_not_present_when_sender_not_in_any_party() -> None:
+def test_send_succeeds_when_neither_participant_in_any_party() -> None:
+    """DMs are cross-party: registered principals can message regardless of presence."""
     store = Store()
     sender, recipient = _seed(store)
-    _join(store, "cream-terrazzo", recipient.id, "human", "Bob")
-    with pytest.raises(DmError) as exc:
-        send(
-            store=store,
-            dm_store=store.dm_store,
-            inbox_hub=store.inbox_hub,
-            sender=sender,
-            recipient=recipient,
-            text="hi",
-        )
-    assert exc.value.code == "not_present"
+    hub = store.inbox_hub
+    published: list[tuple[str, dict]] = []
+    hub.publish = lambda key, frame: published.append((key, frame))  # type: ignore[assignment]
+
+    result = send(
+        store=store,
+        dm_store=store.dm_store,
+        inbox_hub=hub,
+        sender=sender,
+        recipient=recipient,
+        text="hi",
+    )
+    assert result["thread_key"] == thread_key(
+        principal_key(sender), principal_key(recipient)
+    )
+    keys_notified = {p[0] for p in published}
+    assert keys_notified == {principal_key(sender), principal_key(recipient)}
 
 
-def test_send_recipient_not_present() -> None:
-    store = Store()
-    sender, recipient = _seed(store)
-    _join(store, "cream-terrazzo", sender.id, "human", "Alice")
-    with pytest.raises(DmError) as exc:
-        send(
-            store=store,
-            dm_store=store.dm_store,
-            inbox_hub=store.inbox_hub,
-            sender=sender,
-            recipient=recipient,
-            text="hi",
-        )
-    assert exc.value.code == "recipient_not_present"
-
-
-def test_send_not_co_located() -> None:
-    """Spec: parties are keyed by slug; only one party exists in seed.
-
-    Force the cross-party case by joining the recipient into a synthetic
-    second world directly.
-    """
+def test_send_across_parties_succeeds() -> None:
+    """Sender and recipient in different parties — DM still delivers."""
     store = Store()
     sender, recipient = _seed(store)
     _join(store, "cream-terrazzo", sender.id, "human", "Alice")
-    # Build a second world out of band — we need the recipient in a
-    # different slug. Re-use the same party config but under a fresh
-    # in-memory slug to simulate two parties.
+    # Put the recipient in a separate world to exercise the old cross-party gate.
     from app.parties_data import CREAM_TERRAZZO
     from app.world import PartyWorld
 
@@ -176,16 +161,23 @@ def test_send_not_co_located() -> None:
             joined_at=0.0,
         )
     )
-    with pytest.raises(DmError) as exc:
-        send(
-            store=store,
-            dm_store=store.dm_store,
-            inbox_hub=store.inbox_hub,
-            sender=sender,
-            recipient=recipient,
-            text="hi",
-        )
-    assert exc.value.code == "not_co_located"
+    hub = store.inbox_hub
+    published: list[tuple[str, dict]] = []
+    hub.publish = lambda key, frame: published.append((key, frame))  # type: ignore[assignment]
+
+    result = send(
+        store=store,
+        dm_store=store.dm_store,
+        inbox_hub=hub,
+        sender=sender,
+        recipient=recipient,
+        text="hi from another party",
+    )
+    rows = query_thread_history(store.dm_store, thread_key=result["thread_key"])
+    assert len(rows) == 1
+    assert rows[0]["text"] == "hi from another party"
+    keys_notified = {p[0] for p in published}
+    assert keys_notified == {principal_key(sender), principal_key(recipient)}
 
 
 def test_send_invalid_text_raises_chat_validation_error() -> None:

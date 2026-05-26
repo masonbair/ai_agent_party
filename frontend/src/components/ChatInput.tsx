@@ -77,14 +77,11 @@ export default function ChatInput({ slug, principal, disabled }: Props) {
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       style={{
-        position: 'absolute',
-        left: 12,
-        right: 12,
-        bottom: 12,
         display: 'flex',
         flexDirection: 'column',
         gap: 4,
-        zIndex: 10,
+        margin: '12px auto 0',
+        width: '100%',
       }}
     >
       <input

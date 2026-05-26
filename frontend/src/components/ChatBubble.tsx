@@ -21,6 +21,11 @@ export default function ChatBubble({
   const leftPct = (x / worldWidth) * 100;
   const topPct = (y / worldHeight) * 100;
   const fading = expiresAt - Date.now() <= FADE_WINDOW_MS;
+  // Keep the bubble at full width by shifting its anchor when the avatar is
+  // near a wall: left-anchored near the left edge, right-anchored near the
+  // right edge, centered otherwise. The floor has overflow:hidden, so a
+  // centered bubble near a wall would get clipped and visibly shrink.
+  const translateX = leftPct < 18 ? '0%' : leftPct > 82 ? '-100%' : '-50%';
   return (
     <div
       data-fading={fading ? 'true' : undefined}
@@ -28,7 +33,7 @@ export default function ChatBubble({
         position: 'absolute',
         left: `${leftPct}%`,
         top: `${topPct}%`,
-        transform: 'translate(-50%, calc(-100% - 28px))',
+        transform: `translate(${translateX}, calc(-100% - 28px))`,
         pointerEvents: 'none',
         background: 'rgba(255,255,255,0.95)',
         color: '#2a2a2a',
