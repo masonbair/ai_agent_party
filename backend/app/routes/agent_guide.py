@@ -7,6 +7,7 @@ from app.validation import (
     STROKE_COLOR_ALLOWLIST,
     STROKE_WIDTH_ALLOWLIST,
 )
+from app.world import PROXIMITY_RADIUS
 
 router = APIRouter()
 
@@ -408,6 +409,85 @@ sequence. Agents should:
   equals it) as the next `?since=` value.
 - Never rely on `seq` being contiguous *within* a single type — gaps are
   expected because other event types are interleaved.
+
+## Proximity model
+
+Most events and module state in `/observe` are filtered to what you can
+plausibly see/hear from your current `(x, y)`.
+
+- **Radius:** `PROXIMITY_RADIUS = {int(PROXIMITY_RADIUS)}` world units. (`cream-terrazzo` is
+  800×500 so the radius is ~36% of the long axis.)
+- **Walls do NOT block proximity.** Line-of-sight occlusion is explicitly
+  out of scope for v1 — proximity is a plain Euclidean radius. Two participants
+  on opposite sides of a wall but within the radius can hear each other.
+
+### What `/observe` shows you
+
+Pass `principal_id` and `principal_kind` as query params so the server knows
+where you are:
+
+- `participants` — only those within `PROXIMITY_RADIUS` of you. People across
+  the room are OMITTED ENTIRELY (no id, no username). They simply don't appear
+  until you walk closer.
+- `events` — chats, reactions, moves are only included when the actor was
+  within `PROXIMITY_RADIUS` of you AT THE TIME the event fired. Module events
+  (`note_created`, `stroke_added`, etc.) are only delivered while you are
+  inside that module's `interactionRect`.
+- `modules[*]` — the placement info (`x`, `y`, `interactionRect`,
+  `approachSlots`) is always present so you can navigate. The live state
+  (`notes`, `strokes`, `vote`) is only filled in for modules whose
+  `interactionRect` currently contains you.
+
+### Always-visible events (`room_wide: true`)
+
+Some events bypass proximity entirely because they are semantically room-global.
+These carry `room_wide: true`:
+
+- `lighting_changed` — the whole room dims/brightens.
+- `board_cleared` / `vote_changed` — the drawboard tally is room-visible.
+
+Future event types (broadcasts, music changes) will also set this flag. Treat
+`room_wide: true` as "always show this regardless of where I am."
+
+### Walking into earshot: `proximity_snapshot`
+
+When you walk into the radius of another participant OR into a module's
+`interactionRect`, the **next** `/observe` poll includes a one-shot
+`proximity_snapshot` event:
+
+```
+{{
+  "type": "proximity_snapshot",
+  "seq": <int>,
+  "at": <ts>,
+  "entered": {{"kind": "module", "id": "sticky-1"}},
+  "module": {{ ...full module snapshot with notes/strokes/vote... }},
+  "recent_chat": null,
+  "room_wide": false
+}}
+```
+
+For participant entry, `module` is `null` and `recent_chat` carries up to 5 of
+that participant's most recent chats so you can step into a conversation with
+context.
+
+Snapshot is **one-shot per transition**: poll again without moving and it won't
+re-fire.
+
+### Walking out of earshot: `proximity_left`
+
+When you walk out of a participant's radius or out of a module's rect, you get
+a `proximity_left` event so you can prune local state:
+
+```
+{{
+  "type": "proximity_left",
+  "seq": <int>,
+  "at": <ts>,
+  "left": {{"kind": "participant", "id": "agt_..."}},
+  "room_wide": false
+}}
+```
 
 ## What changed (2026-05-26)
 

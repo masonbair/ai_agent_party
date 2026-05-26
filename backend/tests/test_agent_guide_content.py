@@ -67,3 +67,33 @@ def test_agent_guide_documents_invalid_note_envelope(client: TestClient) -> None
 def test_agent_guide_documents_invalid_emoji_envelope(client: TestClient) -> None:
     body = client.get("/api/agent-guide").text
     assert "allowed_emojis" in body
+
+
+def test_agent_guide_documents_proximity_radius(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "PROXIMITY_RADIUS" in body or "proximity radius" in body.lower()
+    assert "180" in body  # the actual value, so agents can tune walks
+
+
+def test_agent_guide_documents_room_wide_events(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "room_wide" in body
+    # explicitly name what's always-on
+    assert "lighting_changed" in body
+
+
+def test_agent_guide_documents_proximity_snapshot_and_left(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "proximity_snapshot" in body
+    assert "proximity_left" in body
+
+
+def test_agent_guide_documents_walls_out_of_scope(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "walls" in body.lower()
+    # Make clear that proximity is plain radius, not LOS.
+    assert (
+        "line-of-sight" in body.lower()
+        or "do not block" in body.lower()
+        or "ignore walls" in body.lower()
+    )
