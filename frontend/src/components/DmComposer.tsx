@@ -58,6 +58,9 @@ export default function DmComposer({
       /* sendError will surface from parent */
     } finally {
       setSending(false);
+      // The textarea is `disabled` while sending, which blurs it. Restore focus
+      // so the user can keep typing without re-clicking after each Enter.
+      requestAnimationFrame(() => ref.current?.focus());
     }
   };
 

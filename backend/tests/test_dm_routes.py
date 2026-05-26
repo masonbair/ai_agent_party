@@ -77,7 +77,8 @@ def test_post_dm_send_unknown_recipient(client: TestClient, store: Store) -> Non
     assert resp.json()["detail"] == "recipient_unknown"
 
 
-def test_post_dm_send_not_co_located(client: TestClient, store: Store) -> None:
+def test_post_dm_send_cross_party_succeeds(client: TestClient, store: Store) -> None:
+    """DMs deliver regardless of party presence — the cross-party gate is gone."""
     alice = store.create_session(username="Alice", color="#ff6b9d")
     bob = store.create_session(username="Bob", color="#9c27b0")
     _join(store, alice.session_id, "human", "Alice")
@@ -90,8 +91,13 @@ def test_post_dm_send_not_co_located(client: TestClient, store: Store) -> None:
             "text": "hi",
         },
     )
-    assert resp.status_code == 409
-    assert resp.json()["detail"] == "recipient_not_present"
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["thread_key"] == (
+        f"human:{min(alice.session_id, bob.session_id)}"
+        f"|human:{max(alice.session_id, bob.session_id)}"
+    )
+    assert isinstance(body["message_id"], int)
 
 
 def test_post_dm_send_principal_unknown(client: TestClient, store: Store) -> None:
