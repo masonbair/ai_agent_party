@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import db as db_module
-from app.errors import NOT_FOUND, VALIDATION_ERROR, envelope
+from app.errors import FORBIDDEN, HTTP_ERROR, METHOD_NOT_ALLOWED, NOT_FOUND, UNAUTHORIZED, VALIDATION_ERROR, envelope
 from app.routes import agent_guide as agent_guide_routes
 from app.routes import agents as agents_routes
 from app.routes import dm as dm_routes
@@ -38,18 +38,18 @@ async def _http_exception_handler(
         # Already enveloped.
         return JSONResponse(status_code=exc.status_code, content={"detail": detail})
 
-    # Map known framework messages onto stable codes.
+    # Map known framework status codes onto stable codes + safe default messages.
+    # Never leak raw Starlette internal strings as the public message.
     code_map = {
-        404: ("not_found", "The requested resource was not found."),
-        405: ("method_not_allowed", "HTTP method not allowed for this route."),
-        401: ("unauthorized", "Authentication required."),
-        403: ("forbidden", "Access denied."),
+        404: NOT_FOUND,
+        405: METHOD_NOT_ALLOWED,
+        401: UNAUTHORIZED,
+        403: FORBIDDEN,
     }
-    code, default_msg = code_map.get(exc.status_code, ("http_error", str(detail) or "HTTP error."))
-    message = default_msg if not isinstance(detail, str) or detail.lower() in ("not found", "method not allowed") else detail
+    code = code_map.get(exc.status_code, HTTP_ERROR)
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": envelope(code, message=message)},
+        content={"detail": envelope(code)},
     )
 
 

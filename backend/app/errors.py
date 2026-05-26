@@ -25,6 +25,16 @@ AGENT_NOT_FOUND = "agent_not_found"
 INVALID_LIMIT = "invalid_limit"
 INVALID_BEFORE_ID = "invalid_before_id"
 NOT_FOUND = "not_found"  # generic fall-back
+METHOD_NOT_ALLOWED = "method_not_allowed"
+UNAUTHORIZED = "unauthorized"
+FORBIDDEN = "forbidden"
+HTTP_ERROR = "http_error"
+NOT_IN_RANGE = "not_in_range"
+LIMIT_REACHED = "limit_reached"
+NOT_AUTHOR = "not_author"
+INVALID_PRESET = "invalid_preset"
+INVALID_STROKE = "invalid_stroke"
+INVALID_NOTE = "invalid_note"
 
 
 # Default human-readable messages keyed by code. Routes may override.
@@ -43,6 +53,16 @@ _DEFAULT_MESSAGES: dict[str, str] = {
     INVALID_LIMIT: "The `limit` query parameter is out of range.",
     INVALID_BEFORE_ID: "The `before_id` query parameter is invalid.",
     NOT_FOUND: "The requested resource was not found.",
+    METHOD_NOT_ALLOWED: "HTTP method not allowed for this route.",
+    UNAUTHORIZED: "Authentication required.",
+    FORBIDDEN: "Access denied.",
+    HTTP_ERROR: "HTTP error.",
+    NOT_IN_RANGE: "You are not within the module's interaction zone.",
+    LIMIT_REACHED: "You have reached the per-user note limit.",
+    NOT_AUTHOR: "Only the note's author can modify it.",
+    INVALID_PRESET: "The lighting preset is not valid.",
+    INVALID_STROKE: "The stroke failed validation.",
+    INVALID_NOTE: "The note failed validation.",
 }
 
 

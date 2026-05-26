@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, Response, status
 from pydantic import BaseModel
 
-from app.errors import NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
+from app.errors import INVALID_NOTE, LIMIT_REACHED, NOT_AUTHOR, NOT_FOUND, NOT_IN_PARTY, NOT_IN_RANGE, PARTY_NOT_FOUND, http_envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
 from app.validation import NoteValidationError, STICKY_COLOR_ALLOWLIST
@@ -60,24 +60,24 @@ def _map_world_errors(exc: Exception) -> Exception:
     if isinstance(exc, ParticipantNotInPartyError):
         return http_envelope(409, NOT_IN_PARTY)
     if isinstance(exc, PartyWorld.NotInRangeError):
-        return http_envelope(409, "not_in_range",
+        return http_envelope(409, NOT_IN_RANGE,
                              message="You are not within the module's interaction zone.")
     if isinstance(exc, PartyWorld.LimitReachedError):
-        return http_envelope(409, "limit_reached",
+        return http_envelope(409, LIMIT_REACHED,
                              message="You have reached the per-user note limit.")
     if isinstance(exc, PartyWorld.NotAuthorError):
-        return http_envelope(403, "not_author",
+        return http_envelope(403, NOT_AUTHOR,
                              message="Only the note's author can modify it.")
     if isinstance(exc, KeyError):
-        return http_envelope(404, "not_found")
+        return http_envelope(404, NOT_FOUND)
     if isinstance(exc, NoteValidationError):
         return http_envelope(
             422,
-            "invalid_note",
+            INVALID_NOTE,
             message=str(exc),
             allowed_colors=list(STICKY_COLOR_ALLOWLIST),
         )
-    return http_envelope(422, "invalid_note", message=str(exc))
+    return http_envelope(422, INVALID_NOTE, message=str(exc))
 
 
 @router.post("/{slug}/modules/{module_id}/notes")

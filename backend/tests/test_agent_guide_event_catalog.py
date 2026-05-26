@@ -40,5 +40,12 @@ def test_agent_guide_uses_flat_join_shape(client):
 
 def test_agent_guide_calls_out_participant_id_removal(client):
     body = client.get("/api/agent-guide").text
-    assert "participant_id" in body  # mentioned in "what changed" so agents notice
-    assert "actor_id" in body
+    # The guide must document the removal of participant_id in a "what changed"
+    # context so agents know to migrate to actor_id.
+    assert "participant_id" in body, "guide must mention participant_id so agents know it was removed"
+    # The guide must name actor_id as the replacement.
+    assert "actor_id" in body, "guide must reference actor_id as the replacement"
+    # The actual removal/deprecation context must be present — not just a bare mention.
+    assert "no longer" in body or "removed" in body or "replaced" in body, (
+        "guide must state that participant_id was removed/replaced, not just mention it"
+    )

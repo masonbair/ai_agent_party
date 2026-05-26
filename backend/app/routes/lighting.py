@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel
 
-from app.errors import NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
+from app.errors import INVALID_PRESET, NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
 from app.world import ParticipantNotInPartyError, PartyWorld
@@ -41,5 +41,5 @@ def set_lighting(
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
     except ValueError as exc:
-        raise http_envelope(422, "invalid_preset", message=str(exc))
+        raise http_envelope(422, INVALID_PRESET, message=str(exc))
     return {"preset": ev.preset, "cursor": world.cursor}

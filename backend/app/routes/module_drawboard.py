@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel
 
-from app.errors import NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
+from app.errors import INVALID_STROKE, NOT_FOUND, NOT_IN_PARTY, NOT_IN_RANGE, PARTY_NOT_FOUND, http_envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
 from app.validation import (
@@ -52,17 +52,17 @@ def _map_errors(exc: Exception) -> Exception:
     if isinstance(exc, ParticipantNotInPartyError):
         return http_envelope(409, NOT_IN_PARTY)
     if isinstance(exc, PartyWorld.NotInRangeError):
-        return http_envelope(409, "not_in_range",
+        return http_envelope(409, NOT_IN_RANGE,
                              message="You are not within the module's interaction zone.")
     if isinstance(exc, StrokeValidationError):
         return http_envelope(
             422,
-            "invalid_stroke",
+            INVALID_STROKE,
             message=str(exc),
             allowed_colors=list(STROKE_COLOR_ALLOWLIST),
             allowed_widths=list(STROKE_WIDTH_ALLOWLIST),
         )
-    return http_envelope(404, "not_found")
+    return http_envelope(404, NOT_FOUND)
 
 
 @router.post("/{slug}/modules/{module_id}/strokes")

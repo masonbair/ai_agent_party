@@ -129,8 +129,7 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
             // late arrivals we use a placeholder until the next snapshot.
             setParticipants((prev) => {
               if (prev.some((q) => q.id === j.actor_id)) return prev;
-              const existing = prev.find((q) => q.id === j.actor_id);
-              const color = existing?.color ?? '#aaaaaa';
+              const color = '#aaaaaa';
               return [...prev, {
                 id: j.actor_id,
                 kind: j.actor_kind,
