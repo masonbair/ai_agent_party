@@ -1,19 +1,23 @@
 from tests.conftest import join_party, register_human
 
 
-def test_tracker_cleared_on_leave(client):
+def test_tracker_cleared_on_leave(client, store):
     a = register_human(client, username="Alice")
     b = register_human(client, username="Bob")
     join_party(client, a, "cream-terrazzo")
     join_party(client, b, "cream-terrazzo")
 
-    # Alice polls — establishes a tracker entry.
-    client.get("/api/parties/cream-terrazzo/observe", params={"principal_id": a["principal"]["id"]})
+    # Alice polls with ?since=0 — establishes a tracker entry via observe_since_scoped.
+    client.get(
+        "/api/parties/cream-terrazzo/observe",
+        params={
+            "principal_id": a["principal"]["id"],
+            "principal_kind": a["principal"]["kind"],
+            "since": 0,
+        },
+    )
 
-    # Internal check via the store.
-    from app.main import app  # noqa: WPS433 - test introspection
-    from app.store import Store
-    store: Store = app.state.store
+    # Internal check via the injected store fixture.
     world = store.get_or_create_world("cream-terrazzo")
     assert a["principal"]["id"] in world._proximity_trackers
 

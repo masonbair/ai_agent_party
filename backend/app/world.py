@@ -296,6 +296,7 @@ class PartyWorld:
             **self._actor_fields(participant_id),
         )
         self._events.append(ev)
+        self._actor_pos_at_seq[ev.seq] = (sender.x, sender.y)
         self._emit(ev)
         return ev
 
@@ -308,6 +309,7 @@ class PartyWorld:
         self.active_reactions[participant_id] = Reaction(
             actor_id=participant_id, emoji=cleaned, expires_at=expires_at,
         )
+        p = self.participants[participant_id]
         ev = ReactionEvent(
             seq=self._next_seq(),
             emoji=cleaned,
@@ -316,6 +318,7 @@ class PartyWorld:
             **self._actor_fields(participant_id),
         )
         self._events.append(ev)
+        self._actor_pos_at_seq[ev.seq] = (p.x, p.y)
         self._emit(ev)
         return ev
 
@@ -761,14 +764,197 @@ class PartyWorld:
         ]
         return base
 
-    def observe_since_scoped(self, since: int, requester_id: str) -> dict:
-        """``observe_since`` filtered to what the requester can see.
+    def _participant_recent_chat(
+        self, participant_id: str, after_seq: int, limit: int
+    ) -> list[dict]:
+        """Return up to ``limit`` most-recent chats from ``participant_id``
+        with ``seq > after_seq``, oldest-first."""
+        out: list[dict] = []
+        for ev in reversed(self._events):
+            if (
+                isinstance(ev, ChatEvent)
+                and ev.actor_id == participant_id
+                and ev.seq > after_seq
+            ):
+                out.append(ev.model_dump())
+                if len(out) >= limit:
+                    break
+        out.reverse()
+        return out
 
-        Filled out fully in Task 4. Delegates to observe_since for now
-        so the participant-scoping tests pass.
-        """
-        # Task 4 replaces this with full event scoping.
-        return self.observe_since(since)
+    def observe_since_scoped(self, since: int, requester_id: str) -> dict:
+        """``observe_since`` filtered to what the requester can see."""
+        if since < 0:
+            since = 0
+        req = self.participants.get(requester_id)
+        if req is None:
+            # Requester left mid-poll — return unscoped tail.
+            return self.observe_since(since)
+
+        tracker = self._proximity_trackers.setdefault(
+            requester_id, ProximityTracker()
+        )
+
+        tail = self._events[since:]
+        latest_move_by_pid: dict[str, MoveEvent] = {}
+        latest_vote_by_module: dict[str, VoteChangedEvent] = {}
+        out: list[dict] = []
+
+        req_pos = (req.x, req.y)
+
+        for ev in tail:
+            # room_wide events always pass.
+            room_wide = getattr(ev, "room_wide", False)
+
+            if isinstance(ev, MoveEvent):
+                # Coalesce to latest, scope by actor's final move position.
+                if room_wide or within_proximity(req_pos, (ev.x, ev.y)):
+                    latest_move_by_pid[ev.actor_id] = ev
+                continue
+
+            if isinstance(ev, VoteChangedEvent):
+                # room_wide by default — still coalesce.
+                latest_vote_by_module[ev.module_id] = ev
+                continue
+
+            if isinstance(ev, ChatEvent):
+                if not room_wide:
+                    pos = self._actor_pos_at_seq.get(ev.seq)
+                    if pos is None or not within_proximity(req_pos, pos):
+                        continue
+                out.append(ev.model_dump())
+                continue
+
+            if isinstance(ev, ReactionEvent):
+                if not room_wide:
+                    pos = self._actor_pos_at_seq.get(ev.seq)
+                    if pos is None or not within_proximity(req_pos, pos):
+                        continue
+                out.append(ev.model_dump())
+                continue
+
+            if isinstance(
+                ev,
+                (NoteCreatedEvent, NoteUpdatedEvent, NoteDeletedEvent,
+                 StrokeAddedEvent, StrokeDroppedEvent),
+            ):
+                # Module-scoped events: only delivered if requester is inside
+                # the module's interactionRect right now.
+                if self.in_zone(ev.module_id, req.x, req.y):
+                    out.append(ev.model_dump())
+                continue
+
+            if isinstance(ev, JoinEvent):
+                if within_proximity(req_pos, (ev.x, ev.y)):
+                    out.append(
+                        {
+                            "type": "join",
+                            "seq": ev.seq,
+                            "actor_id": ev.actor_id,
+                            "actor_username": ev.actor_username,
+                            "actor_kind": ev.actor_kind,
+                            "x": ev.x,
+                            "y": ev.y,
+                            "zone": ev.zone,
+                            "at": ev.at,
+                            "room_wide": False,
+                        }
+                    )
+                continue
+
+            if isinstance(ev, LeaveEvent):
+                # Always deliver leave so requester can clean up local state —
+                # clients can ignore unknown ids.
+                out.append(ev.model_dump())
+                continue
+
+            # Default: room_wide or unrecognized → pass through.
+            if room_wide:
+                out.append(ev.model_dump())
+
+        for mv in latest_move_by_pid.values():
+            d = mv.model_dump()
+            d["zone"] = self.derive_zone(mv.x, mv.y)
+            out.append(d)
+        for v in latest_vote_by_module.values():
+            out.append(v.model_dump())
+
+        # --- Proximity entry: emit one-shot snapshots ---
+        now_participants = self._participants_in_range_for(requester_id)
+        now_modules = self._modules_in_rect_for(requester_id)
+        entered_p, left_p, entered_m, left_m = tracker.diff(
+            now_participants, now_modules
+        )
+        synthetic_seq = self.cursor
+        now_ts = time.time()
+        for module_id in sorted(entered_m):
+            m = self._placed_module(module_id)
+            if m is None:
+                continue
+            synthetic_seq += 1
+            out.append(
+                {
+                    "type": "proximity_snapshot",
+                    "seq": synthetic_seq,
+                    "at": now_ts,
+                    "entered": {"kind": "module", "id": module_id},
+                    "module": self._module_snapshot(m),
+                    "recent_chat": None,
+                    "room_wide": False,
+                }
+            )
+        for other_id in sorted(entered_p):
+            synthetic_seq += 1
+            out.append(
+                {
+                    "type": "proximity_snapshot",
+                    "seq": synthetic_seq,
+                    "at": now_ts,
+                    "entered": {"kind": "participant", "id": other_id},
+                    "module": None,
+                    "recent_chat": self._participant_recent_chat(
+                        other_id,
+                        after_seq=tracker.last_observed_cursor,
+                        limit=PROXIMITY_SNAPSHOT_CHAT_LIMIT,
+                    ),
+                    "room_wide": False,
+                }
+            )
+
+        # --- Proximity exit: emit proximity_left events ---
+        for module_id in sorted(left_m):
+            synthetic_seq += 1
+            out.append(
+                {
+                    "type": "proximity_left",
+                    "seq": synthetic_seq,
+                    "at": now_ts,
+                    "left": {"kind": "module", "id": module_id},
+                    "room_wide": False,
+                }
+            )
+        for other_id in sorted(left_p):
+            synthetic_seq += 1
+            out.append(
+                {
+                    "type": "proximity_left",
+                    "seq": synthetic_seq,
+                    "at": now_ts,
+                    "left": {"kind": "participant", "id": other_id},
+                    "room_wide": False,
+                }
+            )
+
+        out.sort(key=lambda e: e["seq"])
+
+        # Update tracker AFTER diff so subsequent polls start from new state.
+        tracker.commit(
+            participants_in_range=now_participants,
+            modules_in_rect=now_modules,
+            cursor=self.cursor,
+        )
+
+        return {"events": out, "cursor": self.cursor}
 
     def snapshot(self) -> dict:
         now = time.time()
