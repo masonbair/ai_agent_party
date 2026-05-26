@@ -29,6 +29,7 @@ class JoinEvent(BaseModel):
     y: float
     zone: str | None = None
     at: float
+    room_wide: bool = False
 
 
 class LeaveEvent(BaseModel):
@@ -38,6 +39,7 @@ class LeaveEvent(BaseModel):
     actor_username: str
     actor_kind: Literal["human", "agent"]
     at: float
+    room_wide: bool = False
 
 
 class MoveEvent(BaseModel):
@@ -49,6 +51,7 @@ class MoveEvent(BaseModel):
     x: float
     y: float
     at: float
+    room_wide: bool = False
 
 
 class ChatEvent(BaseModel):
@@ -59,6 +62,7 @@ class ChatEvent(BaseModel):
     actor_kind: Literal["human", "agent"]
     text: str
     at: float
+    room_wide: bool = False
 
 
 class StickyNote(BaseModel):
@@ -99,6 +103,7 @@ class ReactionEvent(BaseModel):
     emoji: str
     expires_at: float
     at: float
+    room_wide: bool = False
 
 
 class LightingChangedEvent(BaseModel):
@@ -107,6 +112,7 @@ class LightingChangedEvent(BaseModel):
     preset: Literal["day", "dusk", "night", "party"]
     changed_by: str
     at: float
+    room_wide: bool = True  # lighting is a whole-room change
 
 
 class NoteCreatedEvent(BaseModel):
@@ -115,6 +121,7 @@ class NoteCreatedEvent(BaseModel):
     module_id: str
     note: StickyNote
     at: float
+    room_wide: bool = False
 
 
 class NoteUpdatedEvent(BaseModel):
@@ -123,6 +130,7 @@ class NoteUpdatedEvent(BaseModel):
     module_id: str
     note: StickyNote
     at: float
+    room_wide: bool = False
 
 
 class NoteDeletedEvent(BaseModel):
@@ -131,6 +139,7 @@ class NoteDeletedEvent(BaseModel):
     module_id: str
     note_id: str
     at: float
+    room_wide: bool = False
 
 
 class StrokeAddedEvent(BaseModel):
@@ -139,6 +148,7 @@ class StrokeAddedEvent(BaseModel):
     module_id: str
     stroke: Stroke
     at: float
+    room_wide: bool = False
 
 
 class StrokeDroppedEvent(BaseModel):
@@ -147,6 +157,7 @@ class StrokeDroppedEvent(BaseModel):
     module_id: str
     stroke_id: str
     at: float
+    room_wide: bool = False
 
 
 class BoardClearedEvent(BaseModel):
@@ -155,6 +166,7 @@ class BoardClearedEvent(BaseModel):
     module_id: str
     cleared_by: str
     at: float
+    room_wide: bool = True  # visible to everyone — the board snaps clean
 
 
 class VoteChangedEvent(BaseModel):
@@ -164,6 +176,38 @@ class VoteChangedEvent(BaseModel):
     votes: int
     needed: int
     at: float
+    room_wide: bool = True  # tally visible to everyone watching the board
+
+
+class ProximitySnapshotEvent(BaseModel):
+    """One-shot snapshot emitted to a specific requester when they enter
+    proximity of a module's interactionRect or another participant.
+
+    Server-side only: NEVER appended to ``PartyWorld._events`` because it is
+    per-requester. Constructed on the fly inside ``observe_since_scoped`` and
+    injected into that requester's event list.
+    """
+
+    seq: int  # mirrors the cursor at emit time so clients can sort/dedupe
+    type: Literal["proximity_snapshot"] = "proximity_snapshot"
+    at: float
+    entered: dict  # {"kind": "module"|"participant", "id": "..."}
+    # Populated when entered.kind == "module":
+    module: dict | None = None  # full module snapshot (notes/strokes/vote)
+    # Populated when entered.kind == "participant":
+    recent_chat: list[dict] | None = None  # last N visible chats from them
+    room_wide: bool = False
+
+
+class ProximityLeftEvent(BaseModel):
+    """One-shot leave event when the requester walks out of range of a
+    participant or out of a module's interactionRect."""
+
+    seq: int
+    type: Literal["proximity_left"] = "proximity_left"
+    at: float
+    left: dict  # {"kind": "module"|"participant", "id": "..."}
+    room_wide: bool = False
 
 
 Event = (
@@ -180,4 +224,6 @@ Event = (
     | StrokeDroppedEvent
     | BoardClearedEvent
     | VoteChangedEvent
+    | ProximitySnapshotEvent
+    | ProximityLeftEvent
 )

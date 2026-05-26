@@ -1,3 +1,4 @@
+import math
 import sqlite3
 import time
 import uuid
@@ -46,6 +47,28 @@ from app.validation import (
     validate_reaction_emoji,
     validate_stroke,
 )
+
+# Proximity radius in world units. See plan #02 for justification.
+# Other specs MUST import this constant rather than redefining it.
+PROXIMITY_RADIUS = 180.0
+
+# Max recent chats bundled into a participant-entry proximity_snapshot.
+PROXIMITY_SNAPSHOT_CHAT_LIMIT = 5
+
+
+def within_proximity(
+    a: tuple[float, float], b: tuple[float, float]
+) -> bool:
+    """Return True if points ``a`` and ``b`` are within PROXIMITY_RADIUS.
+
+    Plain Euclidean radius. Walls do NOT block — line-of-sight is explicitly
+    out of scope for v1 (see ``docs/features/feature-backlog.md`` §6 Owner
+    Additions, Open question).
+    """
+    dx = a[0] - b[0]
+    dy = a[1] - b[1]
+    return math.hypot(dx, dy) <= PROXIMITY_RADIUS
+
 
 _LIGHTING_PRESETS = ("day", "dusk", "night", "party")
 
