@@ -1,12 +1,16 @@
 """Canonical error codes returned to API clients.
 
-Every 422/401/409 response uses the envelope shape
-`{"detail": {"error": "<code>", ...}}` (for codes with extra context)
-or `{"detail": "<code>"}` for plain string codes. Keep this file as the
-single source of truth so agent guides, tests, and route handlers stay
-in lockstep.
-"""
+Every error response uses the envelope shape:
 
+    {"detail": {"error": "<code>", "message": "<human>", ...extras}}
+
+Use `http_envelope` to build the FastAPI HTTPException — never construct
+HTTPException with a string `detail` directly.
+"""
+from fastapi import HTTPException
+
+
+# Codes — one constant per error.
 PRINCIPAL_UNKNOWN = "principal_unknown"
 NOT_IN_PARTY = "not_in_party"
 INVALID_COLOR = "invalid_color"
@@ -15,8 +19,51 @@ VALIDATION_ERROR = "validation_error"
 SELF_DM = "self_dm"
 RECIPIENT_UNKNOWN = "recipient_unknown"
 DM_FORBIDDEN = "dm_forbidden"
+PARTY_NOT_FOUND = "party_not_found"
+SESSION_NOT_FOUND = "session_not_found"
+AGENT_NOT_FOUND = "agent_not_found"
+INVALID_LIMIT = "invalid_limit"
+INVALID_BEFORE_ID = "invalid_before_id"
+NOT_FOUND = "not_found"  # generic fall-back
 
 
-def envelope(error: str, **extras: object) -> dict[str, object]:
-    """Build a structured 422-style detail body: `{"error": code, ...extras}`."""
-    return {"error": error, **extras}
+# Default human-readable messages keyed by code. Routes may override.
+_DEFAULT_MESSAGES: dict[str, str] = {
+    PRINCIPAL_UNKNOWN: "The provided principal could not be resolved.",
+    NOT_IN_PARTY: "You must join the party before performing this action.",
+    INVALID_COLOR: "The provided color is not in the allow-list.",
+    INVALID_CHAT_TEXT: "Chat text failed validation.",
+    VALIDATION_ERROR: "Request body failed validation.",
+    SELF_DM: "You cannot send a direct message to yourself.",
+    RECIPIENT_UNKNOWN: "The DM recipient could not be resolved.",
+    DM_FORBIDDEN: "You are not a participant in this thread.",
+    PARTY_NOT_FOUND: "No party exists with that slug.",
+    SESSION_NOT_FOUND: "No session exists with that id.",
+    AGENT_NOT_FOUND: "No agent exists with that id.",
+    INVALID_LIMIT: "The `limit` query parameter is out of range.",
+    INVALID_BEFORE_ID: "The `before_id` query parameter is invalid.",
+    NOT_FOUND: "The requested resource was not found.",
+}
+
+
+def envelope(error: str, *, message: str | None = None, **extras: object) -> dict[str, object]:
+    """Build a structured detail body: ``{"error": code, "message": ..., ...extras}``.
+
+    `message` falls back to a sensible default when omitted.
+    """
+    msg = message if message is not None else _DEFAULT_MESSAGES.get(error, error)
+    return {"error": error, "message": msg, **extras}
+
+
+def http_envelope(
+    status_code: int,
+    error: str,
+    *,
+    message: str | None = None,
+    **extras: object,
+) -> HTTPException:
+    """Build a FastAPI ``HTTPException`` whose ``detail`` is the standard envelope."""
+    return HTTPException(
+        status_code=status_code,
+        detail=envelope(error, message=message, **extras),
+    )

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Response, status
 from pydantic import BaseModel
 
-from app.errors import NOT_IN_PARTY, envelope
+from app.errors import NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
 from app.validation import NoteValidationError, STICKY_COLOR_ALLOWLIST
@@ -17,7 +17,7 @@ def _store_dep() -> Store:  # pragma: no cover
 def _world(store: Store, slug: str) -> PartyWorld:
     world = store.get_or_create_world(slug)
     if world is None:
-        raise HTTPException(status_code=404, detail="party not found")
+        raise http_envelope(404, PARTY_NOT_FOUND)
     return world
 
 
@@ -56,29 +56,28 @@ _NoteErrors = (
 )
 
 
-def _map_world_errors(exc: Exception) -> HTTPException:
+def _map_world_errors(exc: Exception) -> Exception:
     if isinstance(exc, ParticipantNotInPartyError):
-        return HTTPException(status_code=409, detail=NOT_IN_PARTY)
+        return http_envelope(409, NOT_IN_PARTY)
     if isinstance(exc, PartyWorld.NotInRangeError):
-        return HTTPException(status_code=409, detail=envelope("not_in_range"))
+        return http_envelope(409, "not_in_range",
+                             message="You are not within the module's interaction zone.")
     if isinstance(exc, PartyWorld.LimitReachedError):
-        return HTTPException(status_code=409, detail=envelope("limit_reached"))
+        return http_envelope(409, "limit_reached",
+                             message="You have reached the per-user note limit.")
     if isinstance(exc, PartyWorld.NotAuthorError):
-        return HTTPException(status_code=403, detail=envelope("not_author"))
+        return http_envelope(403, "not_author",
+                             message="Only the note's author can modify it.")
     if isinstance(exc, KeyError):
-        return HTTPException(status_code=404, detail=envelope("not_found"))
+        return http_envelope(404, "not_found")
     if isinstance(exc, NoteValidationError):
-        return HTTPException(
-            status_code=422,
-            detail=envelope(
-                "invalid_note",
-                message=str(exc),
-                allowed_colors=list(STICKY_COLOR_ALLOWLIST),
-            ),
+        return http_envelope(
+            422,
+            "invalid_note",
+            message=str(exc),
+            allowed_colors=list(STICKY_COLOR_ALLOWLIST),
         )
-    return HTTPException(
-        status_code=422, detail=envelope("invalid_note", message=str(exc))
-    )
+    return http_envelope(422, "invalid_note", message=str(exc))
 
 
 @router.post("/{slug}/modules/{module_id}/notes")

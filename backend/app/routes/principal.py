@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from fastapi import HTTPException
 from pydantic import BaseModel
 
-from app.errors import PRINCIPAL_UNKNOWN
+from app.errors import PRINCIPAL_UNKNOWN, http_envelope
 from app.store import Store
 
 
@@ -25,7 +24,7 @@ def resolve_principal(store: Store, principal: Principal) -> ResolvedPrincipal:
     if principal.kind == "human":
         user = store.get_session(principal.id)
         if user is None:
-            raise HTTPException(status_code=401, detail=PRINCIPAL_UNKNOWN)
+            raise http_envelope(401, PRINCIPAL_UNKNOWN)
         return ResolvedPrincipal(
             id=user.session_id,
             kind="human",
@@ -34,7 +33,7 @@ def resolve_principal(store: Store, principal: Principal) -> ResolvedPrincipal:
         )
     agent = store.get_agent(principal.id)
     if agent is None:
-        raise HTTPException(status_code=401, detail=PRINCIPAL_UNKNOWN)
+        raise http_envelope(401, PRINCIPAL_UNKNOWN)
     return ResolvedPrincipal(
         id=agent.agent_id,
         kind="agent",

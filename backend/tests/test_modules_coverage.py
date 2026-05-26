@@ -40,7 +40,7 @@ def test_react_unknown_principal_401(client: TestClient) -> None:
         json={"principal": GHOST, "emoji": "❤️"},
     )
     assert r.status_code == 401
-    assert r.json() == {"detail": PRINCIPAL_UNKNOWN}
+    assert r.json()["detail"]["error"] == PRINCIPAL_UNKNOWN
 
 
 def test_lighting_unknown_principal_401(client: TestClient) -> None:

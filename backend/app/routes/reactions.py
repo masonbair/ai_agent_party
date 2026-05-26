@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel
 
-from app.errors import NOT_IN_PARTY, envelope
+from app.errors import NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
 from app.validation import REACTION_EMOJI_ALLOWLIST, ReactionValidationError
@@ -17,7 +17,7 @@ def _store_dep() -> Store:  # pragma: no cover - overridden by main
 def _world(store: Store, slug: str) -> PartyWorld:
     world = store.get_or_create_world(slug)
     if world is None:
-        raise HTTPException(status_code=404, detail="party not found")
+        raise http_envelope(404, PARTY_NOT_FOUND)
     return world
 
 
@@ -40,14 +40,12 @@ def react(
     try:
         ev = world.react(resolved.id, body.emoji)
     except ParticipantNotInPartyError:
-        raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
+        raise http_envelope(409, NOT_IN_PARTY)
     except ReactionValidationError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=envelope(
-                "invalid_emoji",
-                message=str(exc),
-                allowed_emojis=list(REACTION_EMOJI_ALLOWLIST),
-            ),
+        raise http_envelope(
+            422,
+            "invalid_emoji",
+            message=str(exc),
+            allowed_emojis=list(REACTION_EMOJI_ALLOWLIST),
         )
     return {"emoji": ev.emoji, "expires_at": ev.expires_at, "cursor": world.cursor}

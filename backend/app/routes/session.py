@@ -8,6 +8,7 @@ from fastapi import (
     status,
 )
 
+from app.errors import SESSION_NOT_FOUND, http_envelope
 from app.models import CreateSessionRequest, User
 from app.store import Store
 
@@ -29,14 +30,14 @@ def create_session(
 def get_session(session_id: str, store: Store = Depends(_store_dep)) -> User:
     user = store.get_session(session_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="session not found")
+        raise http_envelope(404, SESSION_NOT_FOUND)
     return user
 
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(session_id: str, store: Store = Depends(_store_dep)) -> Response:
     if not store.delete_session(session_id):
-        raise HTTPException(status_code=404, detail="session not found")
+        raise http_envelope(404, SESSION_NOT_FOUND)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

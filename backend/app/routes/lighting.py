@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel
 
-from app.errors import NOT_IN_PARTY, envelope
+from app.errors import NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
 from app.world import ParticipantNotInPartyError, PartyWorld
@@ -16,7 +16,7 @@ def _store_dep() -> Store:  # pragma: no cover
 def _world(store: Store, slug: str) -> PartyWorld:
     world = store.get_or_create_world(slug)
     if world is None:
-        raise HTTPException(status_code=404, detail="party not found")
+        raise http_envelope(404, PARTY_NOT_FOUND)
     return world
 
 
@@ -39,10 +39,7 @@ def set_lighting(
     try:
         ev = world.set_lighting(resolved.id, body.preset)
     except ParticipantNotInPartyError:
-        raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
+        raise http_envelope(409, NOT_IN_PARTY)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=envelope("invalid_preset", message=str(exc)),
-        )
+        raise http_envelope(422, "invalid_preset", message=str(exc))
     return {"preset": ev.preset, "cursor": world.cursor}

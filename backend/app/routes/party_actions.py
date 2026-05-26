@@ -1,9 +1,9 @@
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Response, status
 from pydantic import BaseModel
 
-from app.errors import INVALID_CHAT_TEXT, NOT_IN_PARTY, envelope
+from app.errors import INVALID_CHAT_TEXT, NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
 from app.events import Participant
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
@@ -20,7 +20,7 @@ def _store_dep() -> Store:  # pragma: no cover - overridden by main
 def _world(store: Store, slug: str) -> PartyWorld:
     world = store.get_or_create_world(slug)
     if world is None:
-        raise HTTPException(status_code=404, detail="party not found")
+        raise http_envelope(404, PARTY_NOT_FOUND)
     return world
 
 
@@ -95,7 +95,7 @@ def leave(
     try:
         world.leave(resolved.id)
     except ParticipantNotInPartyError:
-        raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
+        raise http_envelope(409, NOT_IN_PARTY)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -110,7 +110,7 @@ def move(
     try:
         ev = world.move(resolved.id, body.x, body.y)
     except ParticipantNotInPartyError:
-        raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
+        raise http_envelope(409, NOT_IN_PARTY)
     return {
         "x": ev.x,
         "y": ev.y,
@@ -130,12 +130,9 @@ def chat(
     try:
         world.chat(resolved.id, body.text)
     except ParticipantNotInPartyError:
-        raise HTTPException(status_code=409, detail=NOT_IN_PARTY)
+        raise http_envelope(409, NOT_IN_PARTY)
     except ChatValidationError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=envelope(INVALID_CHAT_TEXT, message=str(exc)),
-        )
+        raise http_envelope(422, INVALID_CHAT_TEXT, message=str(exc))
     return {"cursor": world.cursor}
 
 

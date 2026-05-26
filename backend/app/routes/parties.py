@@ -9,6 +9,7 @@ from fastapi import (
 )
 from pydantic import ValidationError
 
+from app.errors import PARTY_NOT_FOUND, http_envelope
 from app.models import PartiesListResponse, PartyConfig
 from app.routes.party_actions import _room_view
 from app.routes.principal import Principal, resolve_principal
@@ -33,7 +34,7 @@ def get_party(
 ) -> PartyConfig:
     party = store.get_party(slug)
     if party is None:
-        raise HTTPException(status_code=404, detail="party not found")
+        raise http_envelope(404, PARTY_NOT_FOUND)
     return party
 
 
