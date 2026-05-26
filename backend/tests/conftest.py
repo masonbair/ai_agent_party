@@ -39,11 +39,16 @@ def register_agent(client, *, username: str = "Bot", color: str = "#4ecdc4") -> 
     }
 
 
-def join_party(client, principal_dict: dict, slug: str) -> dict:
+def join_party(client, principal_dict: dict, slug: str, *, x=None, y=None) -> dict:
     """Join a party and return the response body."""
+    body: dict = {"principal": principal_dict["principal"]}
+    if x is not None:
+        body["x"] = x
+    if y is not None:
+        body["y"] = y
     resp = client.post(
         f"/api/parties/{slug}/join",
-        json={"principal": principal_dict["principal"]},
+        json=body,
     )
     assert resp.status_code == 200, resp.json()
     return resp.json()

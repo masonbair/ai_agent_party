@@ -180,13 +180,27 @@ def _room_view(party) -> dict:
 def observe(
     slug: str = Path(pattern=_SLUG_PATTERN),
     since: int | None = None,
+    principal_id: str | None = None,
+    principal_kind: str | None = None,
     store: Store = Depends(_store_dep),
 ) -> dict:
     world = _world(store, slug)
     party = store.get_party(slug)
     assert party is not None
+
+    requester_id: str | None = None
+    if principal_id is not None and principal_kind is not None:
+        # Only scope if the requester is actually in the party.
+        # If the principal is unknown/not joined, fall back to unscoped so
+        # the lobby UI still works.
+        if principal_id in world.participants:
+            requester_id = principal_id
+
     if since is None:
-        snap = world.snapshot()
+        if requester_id is None:
+            snap = world.snapshot()
+        else:
+            snap = world.scoped_snapshot(requester_id)
         return {
             "room": _room_view(party),
             "participants": snap["participants"],
@@ -196,4 +210,6 @@ def observe(
             "active_reactions": snap["active_reactions"],
             "recent_chat": world.recent_chat(),
         }
-    return world.observe_since(since)
+    if requester_id is None:
+        return world.observe_since(since)
+    return world.observe_since_scoped(since, requester_id)

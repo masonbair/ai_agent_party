@@ -702,6 +702,74 @@ class PartyWorld:
             base["vote"] = {"votes": active, "needed": needed}
         return base
 
+    def _participants_visible_to(self, requester_id: str) -> list[dict]:
+        """Project participants the requester can see (within radius)."""
+        req = self.participants.get(requester_id)
+        if req is None:
+            return []
+        out: list[dict] = []
+        for p in self.participants.values():
+            if p.id == requester_id or within_proximity(
+                (req.x, req.y), (p.x, p.y)
+            ):
+                out.append(self._participant_dict(p))
+        return out
+
+    def _modules_in_rect_for(self, requester_id: str) -> set[str]:
+        req = self.participants.get(requester_id)
+        if req is None:
+            return set()
+        out: set[str] = set()
+        for m in self._party.modules:
+            if isinstance(m, (StickyNoteModule, DrawBoardModule)):
+                if self.in_zone(m.id, req.x, req.y):
+                    out.add(m.id)
+        return out
+
+    def _participants_in_range_for(self, requester_id: str) -> set[str]:
+        req = self.participants.get(requester_id)
+        if req is None:
+            return set()
+        return {
+            p.id
+            for p in self.participants.values()
+            if p.id != requester_id and within_proximity(
+                (req.x, req.y), (p.x, p.y)
+            )
+        }
+
+    def _module_stub(self, full: dict) -> dict:
+        """Strip live state from a module the requester is not inside.
+
+        Keeps placement / approachSlots so agents can navigate toward it, but
+        omits ``notes``/``strokes``/``vote`` so distant module state stays
+        hidden (fixes the noteboard-at-distance bug).
+        """
+        return {
+            k: v for k, v in full.items()
+            if k not in ("notes", "strokes", "vote")
+        }
+
+    def scoped_snapshot(self, requester_id: str) -> dict:
+        """``snapshot()`` filtered to what the requester can see."""
+        base = self.snapshot()
+        base["participants"] = self._participants_visible_to(requester_id)
+        in_rect = self._modules_in_rect_for(requester_id)
+        base["modules"] = [
+            m if m["id"] in in_rect else self._module_stub(m)
+            for m in base["modules"]
+        ]
+        return base
+
+    def observe_since_scoped(self, since: int, requester_id: str) -> dict:
+        """``observe_since`` filtered to what the requester can see.
+
+        Filled out fully in Task 4. Delegates to observe_since for now
+        so the participant-scoping tests pass.
+        """
+        # Task 4 replaces this with full event scoping.
+        return self.observe_since(since)
+
     def snapshot(self) -> dict:
         now = time.time()
         active_reactions = [
