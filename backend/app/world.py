@@ -754,7 +754,12 @@ class PartyWorld:
         }
 
     def scoped_snapshot(self, requester_id: str) -> dict:
-        """``snapshot()`` filtered to what the requester can see."""
+        """``snapshot()`` filtered to what the requester can see.
+
+        Also seeds the proximity tracker so subsequent ``observe_since_scoped``
+        polls start from the correct baseline (rather than treating everything
+        as a fresh "entry").
+        """
         base = self.snapshot()
         base["participants"] = self._participants_visible_to(requester_id)
         in_rect = self._modules_in_rect_for(requester_id)
@@ -762,19 +767,34 @@ class PartyWorld:
             m if m["id"] in in_rect else self._module_stub(m)
             for m in base["modules"]
         ]
+        # Seed tracker so the next ?since= poll doesn't re-fire snapshot events
+        # for participants/modules already visible in this snapshot.
+        tracker = self._proximity_trackers.setdefault(
+            requester_id, ProximityTracker()
+        )
+        tracker.commit(
+            participants_in_range=self._participants_in_range_for(requester_id),
+            modules_in_rect=in_rect,
+            cursor=self.cursor,
+        )
         return base
 
     def _participant_recent_chat(
         self, participant_id: str, after_seq: int, limit: int
     ) -> list[dict]:
-        """Return up to ``limit`` most-recent chats from ``participant_id``
-        with ``seq > after_seq``, oldest-first."""
+        """Return up to ``limit`` most-recent chats from ``participant_id``,
+        oldest-first.
+
+        ``after_seq`` is retained as a parameter for future use (e.g. once
+        the event log is trimmed), but is not used to filter here: the
+        requester may never have seen these chats if they were out of range,
+        so we catch them up on all recent messages regardless of cursor.
+        """
         out: list[dict] = []
         for ev in reversed(self._events):
             if (
                 isinstance(ev, ChatEvent)
                 and ev.actor_id == participant_id
-                and ev.seq > after_seq
             ):
                 out.append(ev.model_dump())
                 if len(out) >= limit:
