@@ -86,6 +86,57 @@ describe('useSessionPresence', () => {
     expect(MockWebSocket.instances).toHaveLength(1);
   });
 
+  it('invokes onEvicted and suppresses reconnect on a server error frame', async () => {
+    const onEvicted = vi.fn();
+    renderHook(() => useSessionPresence({ sessionId: 'sid-1', onEvicted }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws = MockWebSocket.instances[0];
+
+    act(() => ws.receive({ type: 'error', detail: 'invalid session' }));
+
+    expect(onEvicted).toHaveBeenCalledTimes(1);
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1100));
+    });
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it('does not reset backoff on raw onopen (server may still reject auth)', async () => {
+    renderHook(() => useSessionPresence({ sessionId: 'sid-1' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws1 = MockWebSocket.instances[0];
+
+    // First close right after onopen — backoff should grow to 2s on the next cycle.
+    act(() => ws1.close());
+
+    // After ~1100ms one reconnect should have fired.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1100));
+    });
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const ws2 = MockWebSocket.instances[1];
+
+    // Close ws2 immediately after open (auth-reject pattern). Reconnect must
+    // wait ~2s now, not 1s. After 1.2s, no new socket yet.
+    act(() => ws2.close());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    // After total ~2.2s past the second close, a third socket appears.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1100));
+    });
+    expect(MockWebSocket.instances.length).toBeGreaterThanOrEqual(3);
+  });
+
   it('reconnects with backoff on an unexpected close', async () => {
     renderHook(() => useSessionPresence({ sessionId: 'sid-1' }));
     await act(async () => {

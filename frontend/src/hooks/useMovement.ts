@@ -17,6 +17,12 @@ type Options = {
   start?: Point;
   onMove?: (x: number, y: number) => void;
   moveThrottleMs?: number;
+  /**
+   * When true, all movement input (WASD/arrows + click-to-move) is ignored
+   * and any held keys are released. Used while modal pickers are open so
+   * the avatar doesn't wander while the user is choosing a reaction.
+   */
+  paused?: boolean;
 };
 
 const KEY_TO_DIR: Record<string, Point> = {
@@ -189,6 +195,8 @@ export function useMovement(opts: Options) {
   });
   const throttleMsRef = useRef(opts.moveThrottleMs ?? 100);
   throttleMsRef.current = opts.moveThrottleMs ?? 100;
+  const pausedRef = useRef(opts.paused ?? false);
+  pausedRef.current = opts.paused ?? false;
 
   posRef.current = position;
   targetRef.current = target;
@@ -210,6 +218,9 @@ export function useMovement(opts: Options) {
   }
 
   useEffect(() => {
+    function clearKeys() {
+      if (keysRef.current.size > 0) keysRef.current.clear();
+    }
     function isTypingTarget(target: EventTarget | null): boolean {
       if (!(target instanceof HTMLElement)) return false;
       if (target.isContentEditable) return true;
@@ -217,6 +228,15 @@ export function useMovement(opts: Options) {
       return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
     }
     function onKeyDown(e: KeyboardEvent) {
+      // OS / browser shortcuts (e.g. Cmd-Shift-S to screenshot) intercept the
+      // matching keyup, leaving us with phantom-held movement keys. Treat any
+      // modifier-bearing keydown as "not a movement input" and also flush any
+      // previously held movement keys so the avatar doesn't drift.
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        clearKeys();
+        return;
+      }
+      if (pausedRef.current) return;
       if (isTypingTarget(e.target)) return;
       const key = e.key.toLowerCase();
       if (KEY_TO_DIR[key]) {
@@ -232,11 +252,18 @@ export function useMovement(opts: Options) {
       if (isTypingTarget(e.target)) return;
       keysRef.current.delete(e.key.toLowerCase());
     }
+    function onVisibilityChange() {
+      if (document.visibilityState !== 'visible') clearKeys();
+    }
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', clearKeys);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', clearKeys);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 
@@ -250,6 +277,12 @@ export function useMovement(opts: Options) {
       const { x, y } = posRef.current;
       let dx = 0;
       let dy = 0;
+
+      if (pausedRef.current) {
+        if (keysRef.current.size > 0) keysRef.current.clear();
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
 
       if (keysRef.current.size > 0) {
         for (const k of keysRef.current) {

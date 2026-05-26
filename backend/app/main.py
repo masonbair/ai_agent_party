@@ -1,13 +1,23 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app import db as db_module
 from app.errors import VALIDATION_ERROR, envelope
 from app.routes import agent_guide as agent_guide_routes
 from app.routes import agents as agents_routes
+from app.routes import dm as dm_routes
+from app.routes import inbox_ws as inbox_ws_routes
+from app.routes import lighting as lighting_routes
+from app.routes import module_drawboard as module_drawboard_routes
+from app.routes import module_notes as module_notes_routes
+from app.routes import history as history_routes
 from app.routes import parties as parties_routes
 from app.routes import party_actions as party_actions_routes
+from app.routes import reactions as reactions_routes
 from app.routes import session as session_routes
 from app.store import Store
 
@@ -42,6 +52,22 @@ app.add_middleware(
 _store = Store()
 
 
+@app.on_event("startup")
+def _open_db() -> None:
+    path = os.getenv("OPENPARTY_DB_PATH", "backend/data/openparty.sqlite")
+    if path != ":memory:":
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+    _store.db = db_module.init_db(path)
+
+
+@app.on_event("shutdown")
+def _close_db() -> None:
+    db_module.close_db(_store.db)
+    _store.db = None
+
+
 def get_store() -> Store:
     return _store
 
@@ -50,11 +76,25 @@ app.dependency_overrides[session_routes._store_dep] = get_store
 app.dependency_overrides[parties_routes._store_dep] = get_store
 app.dependency_overrides[agents_routes._store_dep] = get_store
 app.dependency_overrides[party_actions_routes._store_dep] = get_store
+app.dependency_overrides[dm_routes._store_dep] = get_store
+app.dependency_overrides[inbox_ws_routes._store_dep] = get_store
+app.dependency_overrides[reactions_routes._store_dep] = get_store
+app.dependency_overrides[lighting_routes._store_dep] = get_store
+app.dependency_overrides[module_notes_routes._store_dep] = get_store
+app.dependency_overrides[module_drawboard_routes._store_dep] = get_store
+app.dependency_overrides[history_routes._store_dep] = get_store
 app.include_router(session_routes.router)
 app.include_router(parties_routes.router)
 app.include_router(agents_routes.router)
 app.include_router(party_actions_routes.router)
 app.include_router(agent_guide_routes.router)
+app.include_router(dm_routes.router)
+app.include_router(inbox_ws_routes.router)
+app.include_router(reactions_routes.router)
+app.include_router(lighting_routes.router)
+app.include_router(module_notes_routes.router)
+app.include_router(module_drawboard_routes.router)
+app.include_router(history_routes.router)
 
 
 @app.get("/api/health")

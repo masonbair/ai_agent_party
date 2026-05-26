@@ -41,7 +41,15 @@ export default function Party() {
     navigate('/?takeover=1', { replace: true });
   }, [navigate, setSessionId]);
 
-  const { participants, bubbles, status } = useRealtimeParty(
+  const {
+    participants,
+    status: realtimeStatus,
+    reactions,
+    lighting,
+    modules,
+    applyObserveInitial,
+    bubbles,
+  } = useRealtimeParty(
     ready && principal
       ? { slug: party!.slug, principal, onEvicted: handleTakeover }
       : { slug: '', principal: { kind: 'human', id: '' } },
@@ -109,9 +117,14 @@ export default function Party() {
         user={session.user}
         participants={participants}
         onMove={onMove}
+        principal={principal ?? undefined}
+        modules={modules}
+        lighting={lighting}
+        reactions={reactions}
+        applyObserveInitial={applyObserveInitial}
+        realtimeStatus={realtimeStatus}
         bubbles={bubbles}
         slug={party.slug}
-        principal={principal!}
         status={status}
       />
     </main>

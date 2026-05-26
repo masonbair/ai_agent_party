@@ -232,6 +232,63 @@ describe('useRealtimeParty', () => {
     });
     expect(MockWebSocket.instances).toHaveLength(1);
   });
+
+  it('invokes onEvicted and suppresses reconnect on a server error frame', async () => {
+    const onEvicted = vi.fn();
+    renderHook(() =>
+      useRealtimeParty({
+        slug: 'cream-terrazzo',
+        principal: selfPrincipal,
+        onEvicted,
+      }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws = MockWebSocket.instances[0];
+
+    act(() => ws.receive({ type: 'error', detail: 'invalid principal' }));
+
+    expect(onEvicted).toHaveBeenCalledTimes(1);
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1100));
+    });
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it('does not reset backoff until a confirmed-good frame (snapshot)', async () => {
+    renderHook(() =>
+      useRealtimeParty({ slug: 'cream-terrazzo', principal: selfPrincipal }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws1 = MockWebSocket.instances[0];
+
+    // ws1: onopen fired (so backoff would have reset under old code). Close
+    // without sending snapshot — backoff must grow on the next cycle.
+    act(() => ws1.close());
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1100));
+    });
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const ws2 = MockWebSocket.instances[1];
+    act(() => ws2.close());
+
+    // Backoff should now be ~2s; no third socket yet at 1.2s.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1100));
+    });
+    expect(MockWebSocket.instances.length).toBeGreaterThanOrEqual(3);
+  });
 });
 
 function chatFrame(participant_id: string, text: string, seq: number) {
