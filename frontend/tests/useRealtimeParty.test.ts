@@ -104,14 +104,13 @@ describe('useRealtimeParty', () => {
         event: {
           seq: 1,
           type: 'join',
-          participant: {
-            id: 'sid-2',
-            kind: 'human',
-            username: 'bob',
-            color: '#4dd0e1',
-            x: 200,
-            y: 200,
-          },
+          actor_id: 'sid-2',
+          actor_username: 'bob',
+          actor_kind: 'human',
+          x: 200,
+          y: 200,
+          zone: null,
+          at: 1700000001,
         },
         cursor: 1,
       }),
@@ -141,7 +140,7 @@ describe('useRealtimeParty', () => {
     act(() =>
       ws.receive({
         type: 'event',
-        event: { seq: 1, type: 'move', participant_id: 'sid-2', x: 300, y: 250 },
+        event: { seq: 1, type: 'move', actor_id: 'sid-2', actor_username: 'bob', actor_kind: 'human', x: 300, y: 250 },
         cursor: 1,
       }),
     );
@@ -171,7 +170,7 @@ describe('useRealtimeParty', () => {
     act(() =>
       ws.receive({
         type: 'event',
-        event: { seq: 1, type: 'move', participant_id: 'sid-1', x: 999, y: 999 },
+        event: { seq: 1, type: 'move', actor_id: 'sid-1', actor_username: 'alice', actor_kind: 'human', x: 999, y: 999 },
         cursor: 1,
       }),
     );
@@ -200,7 +199,7 @@ describe('useRealtimeParty', () => {
     act(() =>
       ws.receive({
         type: 'event',
-        event: { seq: 1, type: 'leave', participant_id: 'sid-2' },
+        event: { seq: 1, type: 'leave', actor_id: 'sid-2', actor_username: 'bob', actor_kind: 'human', at: 1700000001 },
         cursor: 1,
       }),
     );
@@ -291,14 +290,16 @@ describe('useRealtimeParty', () => {
   });
 });
 
-function chatFrame(participant_id: string, text: string, seq: number) {
+function chatFrame(actor_id: string, text: string, seq: number) {
   return {
     type: 'event',
     cursor: seq,
     event: {
       type: 'chat',
       seq,
-      participant_id,
+      actor_id,
+      actor_username: actor_id,
+      actor_kind: 'human',
       text,
       at: 1700000000 + seq,
     },
@@ -357,7 +358,7 @@ describe('useRealtimeParty — chat bubbles', () => {
       ws.receive({
         type: 'event',
         cursor: 2,
-        event: { type: 'leave', seq: 2, participant_id: 'them', at: 1700000001 },
+        event: { type: 'leave', seq: 2, actor_id: 'them', actor_username: 'them', actor_kind: 'human', at: 1700000001 },
       });
     });
     expect(result.current.bubbles['them']).toBeUndefined();

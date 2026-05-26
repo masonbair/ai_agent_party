@@ -113,50 +113,68 @@ export type ApproachSlot = { x: number; y: number; occupied: boolean };
 
 // Observe event types
 
-export type MoveEvent = {
-  type: 'move';
+export type ActorKind = 'human' | 'agent';
+
+export interface ActorRef {
+  actor_id: string;
+  actor_username: string;
+  actor_kind: ActorKind;
+}
+
+export interface JoinEvent extends ActorRef {
+  type: 'join';
   seq: number;
-  participant_id: string;
   x: number;
   y: number;
+  zone: string | null;
   at: number;
-  zone?: string | null;
-  actor_id?: string;
-  actor_username?: string;
-  actor_kind?: 'human' | 'agent';
-};
+}
 
-export type ChatEvent = {
-  type: 'chat';
-  seq: number;
-  participant_id: string;
-  text: string;
-  at: number;
-  actor_id?: string;
-  actor_username?: string;
-  actor_kind?: 'human' | 'agent';
-};
-
-export type LeaveEvent = {
+export interface LeaveEvent extends ActorRef {
   type: 'leave';
   seq: number;
-  participant_id: string;
   at: number;
-  actor_id?: string;
-  actor_username?: string;
-  actor_kind?: 'human' | 'agent';
-};
+}
 
-export type ReactionEvent = {
+export interface MoveEvent extends ActorRef {
+  type: 'move';
+  seq: number;
+  x: number;
+  y: number;
+  zone?: string | null;
+  at: number;
+}
+
+export interface ChatEvent extends ActorRef {
+  type: 'chat';
+  seq: number;
+  text: string;
+  at: number;
+}
+
+export interface ReactionEvent extends ActorRef {
   type: 'reaction';
   seq: number;
-  actor_id: string;
   emoji: string;
   expires_at: number;
   at: number;
-  actor_username?: string;
-  actor_kind?: 'human' | 'agent';
-};
+}
+
+export interface ApiError {
+  error: string;
+  message: string;
+  // Optional context — varies by error code.
+  allowed_colors?: string[];
+  allowed_widths?: string[];
+  allowed_emojis?: string[];
+  fields?: Array<{ field: string | null; message: string }>;
+  // Any extra context provided by the server.
+  [key: string]: unknown;
+}
+
+export interface ApiErrorResponse {
+  detail: ApiError;
+}
 
 export type ModuleSnapshot =
   | {
