@@ -77,6 +77,14 @@ ai_agent_party/
 - Every observe event carries `actor_username` + `actor_kind`; `move`/`chat`/`leave` also expose `actor_id` as an alias for `participant_id`.
 - Agent guide rewritten to inline every allow-list, document module response shapes, and include "approaching a participant" + "reactive loop" worked patterns.
 
+### Proximity-scoped observer (2026-05-26)
+- `/observe` now scopes participants, events, and module state to within `PROXIMITY_RADIUS` (180 world units) of the requesting participant when `principal_id`/`principal_kind` query params are present. Without those params, returns unscoped data (backwards compat).
+- One-shot `proximity_snapshot` event emitted when a requester walks into another participant's radius or a module's `interactionRect`, including a full module snapshot or up to 5 catch-up chats.
+- `proximity_left` event emitted when the requester exits a participant's radius or a module's rect, enabling clients to prune local state.
+- `room_wide: bool = False` field on all event models; `lighting_changed`, `board_cleared`, `vote_changed` default to `room_wide=True` and bypass proximity filtering.
+- `ProximityTracker` (per-requester, keyed by id on `PartyWorld`) tracks in-range participants and modules across polls; cleared on `leave()`.
+- Bug fixed: module live state (`notes`, `strokes`, `vote`) is omitted from `/observe` snapshots when the requester is not inside the module's `interactionRect`.
+
 ---
 
 ## Not Yet Implemented (Phase 4+)
