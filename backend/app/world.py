@@ -77,6 +77,50 @@ class ParticipantNotInPartyError(LookupError):
     pass
 
 
+class ProximityTracker:
+    """Per-requester memory of which participants and modules they were in
+    range of on their last ``observe_since_scoped`` call.
+
+    Used to detect proximity entry (emit ``proximity_snapshot``) and
+    proximity exit (emit ``proximity_left``). Owned by ``PartyWorld``,
+    keyed by requester participant id, cleared on ``leave``.
+    """
+
+    def __init__(self) -> None:
+        self.participants_in_range: set[str] = set()
+        self.modules_in_rect: set[str] = set()
+        # The cursor at the time of the last poll. Used to bound the
+        # ``recent_chat`` slice in a participant-entry snapshot to chats
+        # the requester hadn't yet seen.
+        self.last_observed_cursor: int = 0
+
+    def diff(
+        self,
+        participants_in_range: set[str],
+        modules_in_rect: set[str],
+    ) -> tuple[set[str], set[str], set[str], set[str]]:
+        """Compute entered/left sets relative to current state.
+
+        Does NOT auto-commit — call ``commit()`` when you want to persist the
+        new state so subsequent diffs start from the updated baseline.
+        """
+        entered_p = participants_in_range - self.participants_in_range
+        left_p = self.participants_in_range - participants_in_range
+        entered_m = modules_in_rect - self.modules_in_rect
+        left_m = self.modules_in_rect - modules_in_rect
+        return entered_p, left_p, entered_m, left_m
+
+    def commit(
+        self,
+        participants_in_range: set[str],
+        modules_in_rect: set[str],
+        cursor: int,
+    ) -> None:
+        self.participants_in_range = set(participants_in_range)
+        self.modules_in_rect = set(modules_in_rect)
+        self.last_observed_cursor = cursor
+
+
 class PartyWorld:
     class NotInRangeError(LookupError):
         pass
@@ -114,6 +158,11 @@ class PartyWorld:
         # walked into / out of a board with a vote in flight) so the displayed
         # 'needed' updates without requiring a new vote.
         self._last_vote_state: dict[str, tuple[int, int]] = {}
+        # Per-requester proximity tracking. Cleared on leave().
+        self._proximity_trackers: dict[str, ProximityTracker] = {}
+        # Position of the actor at the time each event was emitted, keyed by seq.
+        # Only populated for chat/reaction events; move events carry x/y already.
+        self._actor_pos_at_seq: dict[int, tuple[float, float]] = {}
         for m in party.modules:
             if isinstance(m, LightingModule):
                 self.lighting = m.preset
@@ -191,6 +240,7 @@ class PartyWorld:
             raise ParticipantNotInPartyError(participant_id)
         actor = self._actor_fields(participant_id)
         del self.participants[participant_id]
+        self._proximity_trackers.pop(participant_id, None)
         ev = LeaveEvent(seq=self._next_seq(), at=time.time(), **actor)
         self._events.append(ev)
         self._emit(ev)
