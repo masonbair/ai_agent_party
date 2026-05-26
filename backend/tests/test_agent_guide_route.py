@@ -77,6 +77,5 @@ def test_agent_guide_mentions_broadcast_history(client):
     assert "before_id" in body
     # Must appear before the error-recovery section.
     assert body.index("## Chat memory") < body.index("## Recovering from errors")
-    # Phase 6a explicitly excludes DM docs.
-    assert "Direct message" not in body
-    assert "/api/dm" not in body
+    # DM docs are present (added post Phase 6a).
+    assert "/api/dm" in body
