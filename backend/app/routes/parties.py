@@ -1,3 +1,5 @@
+import time
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -10,7 +12,16 @@ from fastapi import (
 from pydantic import ValidationError
 
 from app.errors import PARTY_NOT_FOUND, http_envelope
-from app.models import PartiesListResponse, PartyConfig
+from app.models import (
+    Occupancy,
+    PartiesListResponse,
+    PartyConfig,
+    PartyListEntry,
+    PartyPreviewChat,
+    PartyPreviewMusic,
+    PartyPreviewResponse,
+)
+from app.occupancy import compute_occupancy
 from app.routes.party_actions import _room_view
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
@@ -24,7 +35,18 @@ def _store_dep() -> Store:  # pragma: no cover - overridden by main
 
 @router.get("", response_model=PartiesListResponse)
 def list_parties(store: Store = Depends(_store_dep)) -> PartiesListResponse:
-    return PartiesListResponse(parties=store.list_parties())
+    now = time.time()
+    entries: list[PartyListEntry] = []
+    for party in store.list_parties():
+        world = store.get_world(party.slug)
+        if world is None:
+            occ = Occupancy(humans=0, agents=0, total=0, active_last_5min=0)
+        else:
+            occ = Occupancy(**compute_occupancy(world, now=now))
+        entries.append(
+            PartyListEntry(**party.model_dump(), occupancy=occ)
+        )
+    return PartiesListResponse(parties=entries)
 
 
 @router.get("/{slug}", response_model=PartyConfig)
