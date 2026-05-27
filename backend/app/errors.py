@@ -35,6 +35,8 @@ NOT_AUTHOR = "not_author"
 INVALID_PRESET = "invalid_preset"
 INVALID_STROKE = "invalid_stroke"
 INVALID_NOTE = "invalid_note"
+INVALID_REPLY_TO = "invalid_reply_to"
+RATE_LIMITED = "rate_limited"
 
 
 # Default human-readable messages keyed by code. Routes may override.
@@ -63,6 +65,8 @@ _DEFAULT_MESSAGES: dict[str, str] = {
     INVALID_PRESET: "The lighting preset is not valid.",
     INVALID_STROKE: "The stroke failed validation.",
     INVALID_NOTE: "The note failed validation.",
+    INVALID_REPLY_TO: "reply_to does not reference a known chat event.",
+    RATE_LIMITED: "Chat rate limit exceeded.",
 }
 
 

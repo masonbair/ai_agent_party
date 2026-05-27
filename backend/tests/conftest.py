@@ -55,6 +55,15 @@ def join_party(client, principal_dict: dict, slug: str, *, x=None, y=None) -> di
 
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Reset the chat rate limiter singleton before each test to prevent state bleed."""
+    from app.rate_limit import reset_chat_limiter_for_tests
+    reset_chat_limiter_for_tests()
+    yield
+    reset_chat_limiter_for_tests()
+
+
 @pytest.fixture
 def store() -> Store:
     s = Store()

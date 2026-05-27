@@ -170,6 +170,14 @@ class PartyWorld:
     def cursor(self) -> int:
         return len(self._events)
 
+    def has_chat_at_seq(self, seq: int) -> bool:
+        for ev in self._events:
+            if ev.seq == seq:
+                return isinstance(ev, ChatEvent)
+            if ev.seq > seq:
+                return False
+        return False
+
     @property
     def events(self) -> list[Event]:
         return list(self._events)
