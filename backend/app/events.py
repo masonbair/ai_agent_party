@@ -38,6 +38,7 @@ class LeaveEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     at: float
     room_wide: bool = False
 
@@ -48,6 +49,7 @@ class MoveEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     x: float
     y: float
     at: float
@@ -60,6 +62,7 @@ class ChatEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     text: str
     at: float
     room_wide: bool = False
@@ -100,6 +103,7 @@ class ReactionEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     emoji: str
     expires_at: float
     at: float
