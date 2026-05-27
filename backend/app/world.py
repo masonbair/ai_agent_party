@@ -403,16 +403,26 @@ class PartyWorld:
         y: float,
     ) -> NoteCreatedEvent:
         m = self._require_placed(module_id)
-        if not isinstance(m, StickyNoteModule):
-            raise KeyError(f"module {module_id} is not stickynotes")
-        self._require_in_zone(participant_id, module_id)
+        if not isinstance(m, (StickyNoteModule, FreeNotesModule)):
+            raise KeyError(f"module {module_id} is not a notes module")
+        if isinstance(m, StickyNoteModule):
+            self._require_in_zone(participant_id, module_id)
+        else:  # FreeNotesModule — require room membership only.
+            if participant_id not in self.participants:
+                raise ParticipantNotInPartyError(participant_id)
         cleaned_text = validate_note_text(text)
         cleaned_color = validate_note_color(color)
         notes = self.notes_by_module[module_id]
         own = sum(1 for n in notes if n.author_id == participant_id)
         if own >= NOTES_PER_USER_MAX:
             raise PartyWorld.LimitReachedError(module_id)
-        lx, ly = self._clamp_local(m, x, y)
+        if isinstance(m, FreeNotesModule):
+            wx = self._party.worldSize.width
+            wy = self._party.worldSize.height
+            lx = max(0.0, min(float(wx), float(x)))
+            ly = max(0.0, min(float(wy), float(y)))
+        else:
+            lx, ly = self._clamp_local(m, x, y)
         participant = self.participants[participant_id]
         note = StickyNote(
             id=uuid.uuid4().hex,
@@ -448,9 +458,13 @@ class PartyWorld:
         y: float | None = None,
     ) -> NoteUpdatedEvent:
         m = self._require_placed(module_id)
-        if not isinstance(m, StickyNoteModule):
+        if not isinstance(m, (StickyNoteModule, FreeNotesModule)):
             raise KeyError(module_id)
-        self._require_in_zone(participant_id, module_id)
+        if isinstance(m, StickyNoteModule):
+            self._require_in_zone(participant_id, module_id)
+        else:
+            if participant_id not in self.participants:
+                raise ParticipantNotInPartyError(participant_id)
         notes = self.notes_by_module[module_id]
         for i, n in enumerate(notes):
             if n.id == note_id:
@@ -464,7 +478,13 @@ class PartyWorld:
                 if x is not None or y is not None:
                     nx = n.x if x is None else x
                     ny = n.y if y is None else y
-                    lx, ly = self._clamp_local(m, nx, ny)
+                    if isinstance(m, FreeNotesModule):
+                        wx = self._party.worldSize.width
+                        wy = self._party.worldSize.height
+                        lx = max(0.0, min(float(wx), float(nx)))
+                        ly = max(0.0, min(float(wy), float(ny)))
+                    else:
+                        lx, ly = self._clamp_local(m, nx, ny)
                     fields["x"] = lx
                     fields["y"] = ly
                 updated = n.model_copy(update=fields)
@@ -483,8 +503,14 @@ class PartyWorld:
     def delete_note(
         self, participant_id: str, module_id: str, note_id: str
     ) -> NoteDeletedEvent:
-        self._require_placed(module_id)
-        self._require_in_zone(participant_id, module_id)
+        m = self._require_placed(module_id)
+        if not isinstance(m, (StickyNoteModule, FreeNotesModule)):
+            raise KeyError(module_id)
+        if isinstance(m, StickyNoteModule):
+            self._require_in_zone(participant_id, module_id)
+        else:
+            if participant_id not in self.participants:
+                raise ParticipantNotInPartyError(participant_id)
         notes = self.notes_by_module[module_id]
         for i, n in enumerate(notes):
             if n.id == note_id:
