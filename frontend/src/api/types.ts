@@ -55,6 +55,25 @@ export type PartiesListResponse = {
   parties: PartyListEntry[];
 };
 
+export type PartyPreviewChat = {
+  seq: number;
+  actor_id: string;
+  actor_username: string;
+  actor_kind: 'human' | 'agent';
+  text: string;
+  at: number;
+};
+
+export type PartyPreviewResponse = {
+  slug: string;
+  name: string;
+  description: string;
+  occupancy: Occupancy;
+  lighting: LightingPreset;
+  music: { url: string | null; label: string };
+  recent_chat: PartyPreviewChat[];
+};
+
 export type Participant = {
   id: string;
   kind: 'human' | 'agent';
