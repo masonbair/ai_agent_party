@@ -1,7 +1,8 @@
 {
   "permissions": {
-    "defaultMode": "acceptEdits",
+    "defaultMode": "bypassPermissions",
     "allow": [
+      "Bash(PYTHONPATH=* )",
       "Agent",
       "Task",
       "TaskCreate",
@@ -22,6 +23,8 @@
       "Bash(backend/.venv/bin/python *)",
       "Bash(backend/.venv/bin/pip *)",
       "Bash(backend/.venv/bin/pytest *)",
+      "Bash(/Users/masonbair/Desktop/programming/ai_agent_party/backend/.venv/bin/python *)",
+      "Bash(/Users/masonbair/Desktop/programming/ai_agent_party/backend/.venv/bin/pytest *)",
       "Bash(/Users/masonbair/Desktop/programming/ai_agent_party/.claude/worktrees/*/backend/.venv/bin/python *)",
       "Bash(/Users/masonbair/Desktop/programming/ai_agent_party/.claude/worktrees/*/backend/.venv/bin/pip *)",
       "Bash(/Users/masonbair/Desktop/programming/ai_agent_party/.claude/worktrees/*/backend/.venv/bin/pytest *)",
