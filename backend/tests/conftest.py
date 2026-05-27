@@ -54,22 +54,6 @@ def join_party(client, principal_dict: dict, slug: str, *, x=None, y=None) -> di
     return resp.json()
 
 
-_register_agent_fn = register_agent
-_register_human_fn = register_human
-_join_party_fn = join_party
-
-
-@pytest.fixture
-def register_agent():
-    """Fixture: returns the register_agent callable."""
-    return _register_agent_fn
-
-
-@pytest.fixture
-def join_party():
-    """Fixture: returns the join_party callable."""
-    return _join_party_fn
-
 
 @pytest.fixture
 def store() -> Store:

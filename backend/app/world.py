@@ -1,3 +1,4 @@
+import re as _re
 import sqlite3
 import time
 import uuid
@@ -59,6 +60,27 @@ from app.validation import (
 # PROXIMITY_RADIUS``) keep working unchanged.
 
 _LIGHTING_PRESETS = ("day", "dusk", "night", "party")
+
+_MENTION_RE = _re.compile(r"@([A-Za-z0-9]{2,20})")
+
+
+def parse_mentions(text: str, participants: dict) -> list[str]:
+    """Return ordered, de-duplicated actor_ids whose username matches an @handle.
+
+    Matching is case-insensitive. Unknown handles are silently ignored —
+    the literal "@foo" stays in the chat text.
+    """
+    by_lower: dict[str, str] = {
+        p.username.lower(): pid for pid, p in participants.items()
+    }
+    out: list[str] = []
+    seen: set[str] = set()
+    for handle in _MENTION_RE.findall(text):
+        pid = by_lower.get(handle.lower())
+        if pid is not None and pid not in seen:
+            out.append(pid)
+            seen.add(pid)
+    return out
 
 
 class ParticipantNotInPartyError(LookupError):
@@ -219,7 +241,15 @@ class PartyWorld:
         self._recompute_all_drawboard_votes(time.time())
         return ev
 
-    def chat(self, participant_id: str, text: str) -> ChatEvent:
+    def chat(
+        self,
+        participant_id: str,
+        text: str,
+        *,
+        to_id: str | None = None,
+        reply_to: int | None = None,
+        scope: str = "proximity",
+    ) -> ChatEvent:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
         cleaned = validate_chat_text(text)
@@ -236,10 +266,15 @@ class PartyWorld:
                 text=cleaned,
                 at=at,
             )
+        mentions = parse_mentions(cleaned, self.participants)
         ev = ChatEvent(
             seq=self._next_seq(),
             text=cleaned,
             at=time.time(),
+            mentions=mentions,
+            to_id=to_id,
+            reply_to=reply_to,
+            room_wide=(scope == "room"),
             **self._actor_fields(participant_id),
         )
         self._events.append(ev)
@@ -977,7 +1012,7 @@ class PartyWorld:
         out.reverse()
         return out
 
-    def observe_since(self, since: int) -> dict:
+    def observe_since(self, since: int, viewer_id: str | None = None) -> dict:
         if since < 0:
             since = 0
         tail = self._events[since:]
@@ -991,7 +1026,11 @@ class PartyWorld:
             if isinstance(ev, VoteChangedEvent):
                 latest_vote_by_module[ev.module_id] = ev
                 continue
-            out.append(ev.model_dump())
+            d = ev.model_dump()
+            if isinstance(ev, ChatEvent) and viewer_id is not None:
+                if viewer_id in ev.mentions and viewer_id != ev.actor_id:
+                    d["you_are_mentioned"] = True
+            out.append(d)
         for mv in latest_move_by_actor.values():
             d = mv.model_dump()
             d["zone"] = self.derive_zone(mv.x, mv.y)

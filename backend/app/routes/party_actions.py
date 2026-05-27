@@ -191,6 +191,7 @@ def observe(
     since: int | None = None,
     principal_id: str | None = None,
     principal_kind: str | None = None,
+    viewer_id: str | None = None,
     store: Store = Depends(_store_dep),
 ) -> dict:
     world = _world(store, slug)
@@ -220,5 +221,5 @@ def observe(
             "recent_chat": world.recent_chat(),
         }
     if requester_id is None:
-        return world.observe_since(since)
+        return world.observe_since(since, viewer_id=viewer_id)
     return world.observe_since_scoped(since, requester_id)
