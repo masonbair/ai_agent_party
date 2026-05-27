@@ -163,6 +163,7 @@ class PartyWorld:
             "actor_id": p.id,
             "actor_username": p.username,
             "actor_kind": p.kind,
+            "actor_color": p.color,
         }
 
     def join(self, participant: Participant) -> JoinEvent:
