@@ -285,6 +285,24 @@ class PartyWorld:
         self._emit(ev)
         return ev
 
+    def interaction_rect(self, module_id: str) -> dict[str, float] | None:
+        m = self._placed_module(module_id)
+        if m is None:
+            return None
+        margin = INTERACTION_MARGIN
+        return {
+            "x": m.x - margin,
+            "y": m.y - margin,
+            "w": m.w + 2 * margin,
+            "h": m.h + 2 * margin,
+        }
+
+    def actor_position(self, participant_id: str) -> dict[str, float] | None:
+        p = self.participants.get(participant_id)
+        if p is None:
+            return None
+        return {"x": p.x, "y": p.y}
+
     def _require_placed(self, module_id: str) -> PlacedModule:
         m = self._placed_module(module_id)
         if m is None:
