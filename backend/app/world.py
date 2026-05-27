@@ -711,6 +711,40 @@ class PartyWorld:
             base["vote"] = {"votes": active, "needed": needed}
         return base
 
+    def _note_event_visible_to(self, ev, req: Participant) -> bool:
+        """Return True if a note/stroke event should be delivered to `req`.
+
+        For placed sticky/drawboard modules: requester must be inside the rect.
+        For FreeNotesModule: requester must be within PROXIMITY_RADIUS of the
+        note's (x, y). This method is extended in Task 10.
+        """
+        try:
+            from app.models import FreeNotesModule  # type: ignore[attr-defined]
+        except ImportError:
+            FreeNotesModule = ()  # sentinel
+        m = self._placed_module(ev.module_id)
+        if isinstance(m, FreeNotesModule):
+            # Proximity-based scoping: note's x/y.
+            note_xy = None
+            if hasattr(ev, "note"):
+                note_xy = (ev.note.x, ev.note.y)
+            elif hasattr(ev, "note_id"):
+                nid = ev.note_id
+                for past in self._events:
+                    if (
+                        isinstance(past, NoteCreatedEvent)
+                        and past.note.id == nid
+                    ):
+                        note_xy = (past.note.x, past.note.y)
+                        break
+            if note_xy is None:
+                return False
+            dx = req.x - note_xy[0]
+            dy = req.y - note_xy[1]
+            return (dx * dx + dy * dy) <= (PROXIMITY_RADIUS ** 2)
+        # Sticky/drawboard: requester inside interactionRect.
+        return self.in_zone(ev.module_id, req.x, req.y)
+
     def _participants_visible_to(self, requester_id: str) -> list[dict]:
         """Project participants the requester can see (within radius).
 
@@ -888,6 +922,12 @@ class PartyWorld:
                 out.append(ev.model_dump())
                 continue
 
+            if isinstance(ev, ModuleChatEvent):
+                # Module chat: only visible to participants inside the rect.
+                if self.in_zone(ev.module_id, req.x, req.y):
+                    out.append(ev.model_dump())
+                continue
+
             if isinstance(
                 ev,
                 (NoteCreatedEvent, NoteUpdatedEvent, NoteDeletedEvent,
@@ -895,7 +935,7 @@ class PartyWorld:
             ):
                 # Module-scoped events: only delivered if requester is inside
                 # the module's interactionRect right now.
-                if self.in_zone(ev.module_id, req.x, req.y):
+                if self._note_event_visible_to(ev, req):
                     out.append(ev.model_dump())
                 continue
 
