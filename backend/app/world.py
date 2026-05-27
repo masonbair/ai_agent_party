@@ -308,6 +308,66 @@ class PartyWorld:
         self._emit(ev)
         return ev
 
+    def set_music(
+        self,
+        changed_by: str,
+        *,
+        action: str,
+        track_id: str,
+        volume: int | None = None,
+    ) -> MusicChangedEvent:
+        if changed_by not in self.participants:
+            raise ParticipantNotInPartyError(changed_by)
+        a = validate_music_action(action)
+        t = validate_music_track(track_id)
+        now = time.time()
+
+        if a == "play":
+            new_playing = True
+            new_track = t
+            new_volume = (
+                validate_music_volume(volume)
+                if volume is not None else self.music.volume
+            )
+        elif a == "pause":
+            new_playing = False
+            new_track = t
+            new_volume = self.music.volume
+        elif a == "skip":
+            new_playing = True
+            new_track = t
+            new_volume = self.music.volume
+        elif a == "set_volume":
+            if volume is None:
+                raise MusicValidationError(
+                    "volume is required for action 'set_volume'"
+                )
+            new_playing = self.music.playing
+            new_track = t
+            new_volume = validate_music_volume(volume)
+        else:
+            # validate_music_action already excluded this path.
+            raise MusicValidationError(f"unknown action {a!r}")
+
+        self.music = MusicState(
+            track_id=new_track,
+            playing=new_playing,
+            volume=new_volume,
+            since=now,
+        )
+        ev = MusicChangedEvent(
+            seq=self._next_seq(),
+            track_id=new_track,
+            playing=new_playing,
+            volume=new_volume,
+            at=now,
+            room_wide=True,
+            **self._actor_fields(changed_by),
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
+
     def _require_placed(self, module_id: str) -> PlacedModule:
         m = self._placed_module(module_id)
         if m is None:
