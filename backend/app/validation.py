@@ -63,6 +63,54 @@ SLOT_OCCUPIED_RADIUS = 32.0
 VOTE_TTL_SECONDS = 30.0
 REACTION_LIFETIME_SECONDS = 1.0
 
+# --- music module ---------------------------------------------------------
+
+MUSIC_TRACK_ALLOWLIST: tuple[str, ...] = (
+    "lofi-loop",
+    "jazz-club",
+    "synthwave",
+    "ambient-1",
+    "party-mix",
+)
+
+MUSIC_VOLUME_MIN = 0
+MUSIC_VOLUME_MAX = 100
+
+MUSIC_ACTIONS: tuple[str, ...] = ("play", "pause", "skip", "set_volume")
+
+
+class MusicValidationError(ValueError):
+    pass
+
+
+def validate_music_track(track_id: str) -> str:
+    if not isinstance(track_id, str) or not track_id:
+        raise MusicValidationError("track_id is required")
+    if track_id not in MUSIC_TRACK_ALLOWLIST:
+        raise MusicValidationError(
+            f"unknown track {track_id!r}; allowed={list(MUSIC_TRACK_ALLOWLIST)}"
+        )
+    return track_id
+
+
+def validate_music_volume(volume: int) -> int:
+    # bool is a subclass of int — reject explicitly so True/False can't slip in.
+    if isinstance(volume, bool) or not isinstance(volume, int):
+        raise MusicValidationError("volume must be an integer")
+    if volume < MUSIC_VOLUME_MIN or volume > MUSIC_VOLUME_MAX:
+        raise MusicValidationError(
+            f"volume must be {MUSIC_VOLUME_MIN}..{MUSIC_VOLUME_MAX}"
+        )
+    return volume
+
+
+def validate_music_action(action: str) -> str:
+    if action not in MUSIC_ACTIONS:
+        raise MusicValidationError(
+            f"unknown action {action!r}; allowed={list(MUSIC_ACTIONS)}"
+        )
+    return action
+
 
 class ReactionValidationError(ValueError):
     pass

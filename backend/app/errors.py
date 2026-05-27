@@ -35,6 +35,10 @@ NOT_AUTHOR = "not_author"
 INVALID_PRESET = "invalid_preset"
 INVALID_STROKE = "invalid_stroke"
 INVALID_NOTE = "invalid_note"
+INVALID_TRACK = "invalid_track"
+INVALID_VOLUME = "invalid_volume"
+INVALID_ACTION = "invalid_action"
+RATE_LIMITED_MUSIC = "rate_limited_music"
 
 
 # Default human-readable messages keyed by code. Routes may override.
