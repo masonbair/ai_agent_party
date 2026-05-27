@@ -1,8 +1,9 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions",
+    "defaultMode": "acceptEdits",
     "allow": [
-      "Bash(PYTHONPATH=* )",
+      "Bash(PYTHONPATH=*)",
+      "Bash(cd *)",
       "Agent",
       "Task",
       "TaskCreate",
