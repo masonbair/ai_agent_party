@@ -179,6 +179,19 @@ class VoteChangedEvent(BaseModel):
     room_wide: bool = True  # tally visible to everyone watching the board
 
 
+class MusicChangedEvent(BaseModel):
+    seq: int
+    type: Literal["music_changed"] = "music_changed"
+    track_id: str
+    playing: bool
+    volume: int
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    room_wide: bool = True
+
+
 class ProximitySnapshotEvent(BaseModel):
     """One-shot snapshot emitted to a specific requester when they enter
     proximity of a module's interactionRect or another participant.
@@ -224,6 +237,7 @@ Event = (
     | StrokeDroppedEvent
     | BoardClearedEvent
     | VoteChangedEvent
+    | MusicChangedEvent
     | ProximitySnapshotEvent
     | ProximityLeftEvent
 )
