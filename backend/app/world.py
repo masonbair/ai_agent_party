@@ -16,6 +16,7 @@ from app.events import (
     Event,
     JoinEvent,
     LeaveEvent,
+    ModuleChatEvent,
     MoveEvent,
     Participant,
     Reaction,
@@ -59,6 +60,7 @@ from app.validation import (
 # PROXIMITY_RADIUS``) keep working unchanged.
 
 _LIGHTING_PRESETS = ("day", "dusk", "night", "party")
+MODULE_CHAT_HISTORY_LIMIT = 50
 
 
 class ParticipantNotInPartyError(LookupError):
@@ -102,6 +104,8 @@ class PartyWorld:
         # walked into / out of a board with a vote in flight) so the displayed
         # 'needed' updates without requiring a new vote.
         self._last_vote_state: dict[str, tuple[int, int]] = {}
+        # Per-module chat history (capped at MODULE_CHAT_HISTORY_LIMIT).
+        self.module_chat_by_module: dict[str, list[ModuleChatEvent]] = {}
         # Per-requester proximity tracking. Cleared on leave().
         self._proximity_trackers: dict[str, ProximityTracker] = {}
         # Position of the actor at the time each event was emitted, keyed by seq.
@@ -268,6 +272,43 @@ class PartyWorld:
         self._actor_pos_at_seq[ev.seq] = (p.x, p.y)
         self._emit(ev)
         return ev
+
+    def module_chat(
+        self, participant_id: str, module_id: str, text: str
+    ) -> ModuleChatEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        self._require_placed(module_id)
+        # FreeNotesModule does not gate by interactionRect — room membership only.
+        # We use a local import to avoid a circular import cycle. Once FreeNotesModule
+        # is defined in models.py (Task 7), this import is always available.
+        try:
+            from app.models import FreeNotesModule  # type: ignore[attr-defined]
+        except ImportError:
+            FreeNotesModule = ()  # sentinel: isinstance(m, ()) is always False
+        m = self._placed_module(module_id)
+        if not isinstance(m, FreeNotesModule):
+            self._require_in_zone(participant_id, module_id)
+        cleaned = validate_chat_text(text)
+        at = time.time()
+        ev = ModuleChatEvent(
+            seq=self._next_seq(),
+            module_id=module_id,
+            text=cleaned,
+            at=at,
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        bucket = self.module_chat_by_module.setdefault(module_id, [])
+        bucket.append(ev)
+        if len(bucket) > MODULE_CHAT_HISTORY_LIMIT:
+            del bucket[: len(bucket) - MODULE_CHAT_HISTORY_LIMIT]
+        self._emit(ev)
+        return ev
+
+    def module_chat_history(self, module_id: str) -> list[dict]:
+        bucket = self.module_chat_by_module.get(module_id, [])
+        return [ev.model_dump() for ev in bucket]
 
     def set_lighting(self, changed_by: str, preset: str) -> LightingChangedEvent:
         if changed_by not in self.participants:

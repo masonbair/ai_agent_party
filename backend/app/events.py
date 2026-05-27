@@ -65,6 +65,18 @@ class ChatEvent(BaseModel):
     room_wide: bool = False
 
 
+class ModuleChatEvent(BaseModel):
+    seq: int
+    type: Literal["module_chat"] = "module_chat"
+    module_id: str
+    text: str
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    room_wide: bool = False
+
+
 class StickyNote(BaseModel):
     id: str
     module_id: str
@@ -215,6 +227,7 @@ Event = (
     | LeaveEvent
     | MoveEvent
     | ChatEvent
+    | ModuleChatEvent
     | ReactionEvent
     | LightingChangedEvent
     | NoteCreatedEvent
