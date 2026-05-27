@@ -24,6 +24,9 @@ from app.events import (
     NoteCreatedEvent,
     NoteDeletedEvent,
     NoteUpdatedEvent,
+    ProposalCreatedEvent,
+    ProposalResolvedEvent,
+    ProposalVoteEvent,
     ReactionEvent,
     VoteChangedEvent,
     StickyNote,
@@ -59,6 +62,8 @@ from app.validation import (
 # PROXIMITY_RADIUS``) keep working unchanged.
 
 _LIGHTING_PRESETS = ("day", "dusk", "night", "party")
+
+PROPOSAL_TEXT_MAX = 65  # mirrors chat cap (shared brief: do not raise)
 
 
 class ParticipantNotInPartyError(LookupError):
@@ -1060,9 +1065,108 @@ class PartyWorld:
             "active_reactions": active_reactions,
         }
 
+    def create_proposal(
+        self, participant_id: str, text: str, expires_in_sec: int
+    ) -> ProposalCreatedEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        if not (1 <= int(expires_in_sec) <= 60):
+            raise ValueError("invalid_expiry")
+        cleaned = validate_chat_text(text)
+        if len(cleaned) == 0 or len(cleaned) > PROPOSAL_TEXT_MAX:
+            raise ValueError("invalid_proposal_text")
+        now = time.time()
+        pid = uuid.uuid4().hex
+        expires_at = now + float(expires_in_sec)
+        self.proposals[pid] = {
+            "id": pid,
+            "text": cleaned,
+            "expires_at": expires_at,
+            "created_by": participant_id,
+            "votes": {},  # participant_id -> "yes"|"no"|"abstain"
+            "resolved": False,
+        }
+        ev = ProposalCreatedEvent(
+            seq=self._next_seq(),
+            proposal_id=pid,
+            text=cleaned,
+            expires_at=expires_at,
+            at=now,
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
+
+    def _tally(self, proposal_id: str) -> dict:
+        votes = self.proposals[proposal_id]["votes"]
+        out: dict = {"yes": 0, "no": 0, "abstain": 0}
+        for v in votes.values():
+            if v in out:
+                out[v] += 1
+        return out
+
+    def vote_proposal(
+        self, participant_id: str, proposal_id: str, vote: str
+    ) -> ProposalVoteEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        p = self.proposals.get(proposal_id)
+        if p is None or p["resolved"]:
+            raise KeyError(proposal_id)
+        now = time.time()
+        if now >= p["expires_at"]:
+            raise TimeoutError(proposal_id)
+        if vote not in ("yes", "no", "abstain"):
+            raise ValueError("invalid_vote")
+        p["votes"][participant_id] = vote
+        tallies = self._tally(proposal_id)
+        ev = ProposalVoteEvent(
+            seq=self._next_seq(),
+            proposal_id=proposal_id,
+            vote=vote,
+            tallies=tallies,
+            at=now,
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
+
+    def resolve_expired_proposals(self) -> list[ProposalResolvedEvent]:
+        now = time.time()
+        out: list[ProposalResolvedEvent] = []
+        for pid, p in list(self.proposals.items()):
+            if p["resolved"]:
+                continue
+            if now >= p["expires_at"]:
+                p["resolved"] = True
+                ev = ProposalResolvedEvent(
+                    seq=self._next_seq(),
+                    proposal_id=pid,
+                    text=p["text"],
+                    tallies=self._tally(pid),
+                    at=now,
+                )
+                self._events.append(ev)
+                self._emit(ev)
+                out.append(ev)
+        return out
+
     def active_proposals(self) -> list[dict]:
-        """Stub — filled in by Task 11 (proposals feature)."""
-        return []
+        # Lazy resolution: anything past expiry is resolved on next read.
+        self.resolve_expired_proposals()
+        return [
+            {
+                "id": p["id"],
+                "text": p["text"],
+                "expires_at": p["expires_at"],
+                "created_by": p["created_by"],
+                "tallies": self._tally(p["id"]),
+            }
+            for p in self.proposals.values()
+            if not p["resolved"]
+        ]
 
     def recent_chat(self, limit: int = RECENT_CHAT_LIMIT) -> list[dict]:
         out: list[dict] = []
@@ -1075,6 +1179,7 @@ class PartyWorld:
         return out
 
     def observe_since(self, since: int) -> dict:
+        self.resolve_expired_proposals()
         if since < 0:
             since = 0
         tail = self._events[since:]

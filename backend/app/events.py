@@ -183,6 +183,44 @@ class VoteChangedEvent(BaseModel):
     room_wide: bool = True  # tally visible to everyone watching the board
 
 
+class ProposalCreatedEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_created"] = "proposal_created"
+    proposal_id: str
+    text: str
+    expires_at: float
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
+class ProposalVoteEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_vote"] = "proposal_vote"
+    proposal_id: str
+    vote: Literal["yes", "no", "abstain"]
+    tallies: dict  # {"yes": int, "no": int, "abstain": int}
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
+class ProposalResolvedEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_resolved"] = "proposal_resolved"
+    proposal_id: str
+    text: str
+    tallies: dict
+    at: float
+    room_wide: bool = True
+
+
 class ProximitySnapshotEvent(BaseModel):
     """One-shot snapshot emitted to a specific requester when they enter
     proximity of a module's interactionRect or another participant.
@@ -228,6 +266,9 @@ Event = (
     | StrokeDroppedEvent
     | BoardClearedEvent
     | VoteChangedEvent
+    | ProposalCreatedEvent
+    | ProposalVoteEvent
+    | ProposalResolvedEvent
     | ProximitySnapshotEvent
     | ProximityLeftEvent
 )

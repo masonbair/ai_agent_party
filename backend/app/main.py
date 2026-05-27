@@ -12,6 +12,7 @@ from app.routes import agent_guide as agent_guide_routes
 from app.routes import agents as agents_routes
 from app.routes import dm as dm_routes
 from app.routes import follow as follow_routes
+from app.routes import proposals as proposals_routes
 from app.routes import inbox_ws as inbox_ws_routes
 from app.routes import lighting as lighting_routes
 from app.routes import module_drawboard as module_drawboard_routes
@@ -103,6 +104,7 @@ def get_store() -> Store:
 
 
 app.dependency_overrides[follow_routes._store_dep] = get_store
+app.dependency_overrides[proposals_routes._store_dep] = get_store
 app.dependency_overrides[session_routes._store_dep] = get_store
 app.dependency_overrides[parties_routes._store_dep] = get_store
 app.dependency_overrides[agents_routes._store_dep] = get_store
@@ -127,6 +129,7 @@ app.include_router(module_notes_routes.router)
 app.include_router(module_drawboard_routes.router)
 app.include_router(history_routes.router)
 app.include_router(follow_routes.router)
+app.include_router(proposals_routes.router)
 
 
 @app.get("/api/health")

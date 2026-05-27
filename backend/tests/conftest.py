@@ -6,6 +6,7 @@ from app.main import app, get_store
 from app.routes import agents as agents_routes
 from app.routes import dm as dm_routes
 from app.routes import follow as follow_routes
+from app.routes import proposals as proposals_routes
 from app.routes import inbox_ws as inbox_ws_routes
 from app.routes import lighting as lighting_routes
 from app.routes import module_drawboard as module_drawboard_routes
@@ -78,5 +79,6 @@ def client(store: Store) -> TestClient:
     app.dependency_overrides[module_drawboard_routes._store_dep] = lambda: store
     app.dependency_overrides[history_routes._store_dep] = lambda: store
     app.dependency_overrides[follow_routes._store_dep] = lambda: store
+    app.dependency_overrides[proposals_routes._store_dep] = lambda: store
     yield TestClient(app)
     app.dependency_overrides.clear()
