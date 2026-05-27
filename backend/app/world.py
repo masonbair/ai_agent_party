@@ -610,6 +610,7 @@ class PartyWorld:
             "kind": p.kind,
             "username": p.username,
             "color": p.color,
+            "style": p.style,
             "x": p.x,
             "y": p.y,
             "zone": self.derive_zone(p.x, p.y),

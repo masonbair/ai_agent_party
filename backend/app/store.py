@@ -50,8 +50,15 @@ class Store:
     def get_party(self, slug: str) -> PartyConfig | None:
         return self._parties.get(slug)
 
-    def register_agent(self, username: str, color: str) -> Agent:
-        agent = Agent(agent_id=uuid.uuid4().hex, username=username, color=color)
+    def register_agent(
+        self, username: str, color: str, style: str = "reactive"
+    ) -> Agent:
+        agent = Agent(
+            agent_id=uuid.uuid4().hex,
+            username=username,
+            color=color,
+            style=style,
+        )
         self._agents[agent.agent_id] = agent
         return agent
 

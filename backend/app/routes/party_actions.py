@@ -60,6 +60,10 @@ def join(
     assert party is not None
     x = body.x if body.x is not None else party.worldSize.width / 2
     y = body.y if body.y is not None else party.worldSize.height / 2
+    style: str | None = None
+    if resolved.kind == "agent":
+        agent = store.get_agent(resolved.id)
+        style = agent.style if agent is not None else "reactive"
     participant = Participant(
         id=resolved.id,
         kind=resolved.kind,
@@ -68,6 +72,7 @@ def join(
         x=float(x),
         y=float(y),
         joined_at=time.time(),
+        style=style,
     )
     world.join(participant)
     return {
@@ -76,6 +81,7 @@ def join(
             "kind": participant.kind,
             "username": participant.username,
             "color": participant.color,
+            "style": participant.style,
             "x": participant.x,
             "y": participant.y,
             "zone": world.derive_zone(participant.x, participant.y),
