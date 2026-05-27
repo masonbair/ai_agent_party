@@ -131,3 +131,55 @@ def test_music_bad_action_422(client: TestClient) -> None:
     )
     assert r.status_code == 422
     assert r.json()["detail"]["error"] == "invalid_action"
+
+
+def test_music_burst_two_then_429(client: TestClient) -> None:
+    user = _register_human(client)
+    _join(client, user)
+
+    # Reset rate-limit state for a clean window.
+    from app import rate_limit
+    rate_limit._buckets.clear()  # type: ignore[attr-defined]
+
+    payload = {
+        "principal": user["principal"],
+        "action": "play",
+        "track_id": "lofi-loop",
+    }
+    r1 = client.post("/api/parties/cream-terrazzo/music", json=payload)
+    r2 = client.post("/api/parties/cream-terrazzo/music", json=payload)
+    r3 = client.post("/api/parties/cream-terrazzo/music", json=payload)
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert r3.status_code == 429
+    assert r3.json()["detail"]["error"] == "rate_limited_music"
+
+
+def test_music_refill_after_five_seconds(client: TestClient, monkeypatch) -> None:
+    user = _register_human(client)
+    _join(client, user)
+
+    from app import rate_limit
+    rate_limit._buckets.clear()  # type: ignore[attr-defined]
+
+    fake_now = [1000.0]
+
+    def fake_time() -> float:
+        return fake_now[0]
+
+    monkeypatch.setattr(rate_limit, "_now", fake_time)
+
+    payload = {
+        "principal": user["principal"],
+        "action": "play",
+        "track_id": "lofi-loop",
+    }
+    client.post("/api/parties/cream-terrazzo/music", json=payload)
+    client.post("/api/parties/cream-terrazzo/music", json=payload)
+    r3 = client.post("/api/parties/cream-terrazzo/music", json=payload)
+    assert r3.status_code == 429
+
+    # 5 seconds later: bucket refills 1 unit.
+    fake_now[0] += 5.0
+    r4 = client.post("/api/parties/cream-terrazzo/music", json=payload)
+    assert r4.status_code == 200

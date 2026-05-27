@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel
 
+from app import rate_limit
 from app.errors import (
     INVALID_ACTION,
     INVALID_TRACK,
     INVALID_VOLUME,
     NOT_IN_PARTY,
     PARTY_NOT_FOUND,
+    RATE_LIMITED_MUSIC,
     envelope,
     http_envelope,
 )
@@ -63,6 +65,20 @@ def set_music(
 ) -> dict:
     world = _world(store, slug)
     resolved = resolve_principal(store, body.principal)
+    allowed = rate_limit.acquire(
+        scope="music",
+        principal_id=resolved.id,
+        burst=2,
+        refill_per_sec=0.2,  # 1 token per 5 seconds
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=envelope(
+                RATE_LIMITED_MUSIC,
+                message="music cooldown: burst 2, refill 1 per 5s",
+            ),
+        )
     try:
         ev = world.set_music(
             resolved.id,
