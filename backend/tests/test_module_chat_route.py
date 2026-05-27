@@ -55,6 +55,18 @@ def test_post_module_chat_over_65_chars_returns_invalid_chat_text(
     assert resp.json()["detail"]["error"] == "invalid_chat_text"
 
 
+def test_module_chat_on_freenotes_works_anywhere_in_room(
+    client: TestClient,
+) -> None:
+    sid = _join(client, "alex", x=400.0, y=250.0)  # nowhere near a wall
+    resp = client.post(
+        "/api/parties/cream-terrazzo/modules/freenotes-1/chat",
+        json={"principal": {"kind": "human", "id": sid}, "text": "wall talk"},
+    )
+    assert resp.status_code == 200, resp.json()
+    assert resp.json()["module_id"] == "freenotes-1"
+
+
 def test_module_chat_cooldown_returns_429_with_retry_after_ms(
     client: TestClient,
 ) -> None:
