@@ -35,6 +35,14 @@ NOT_AUTHOR = "not_author"
 INVALID_PRESET = "invalid_preset"
 INVALID_STROKE = "invalid_stroke"
 INVALID_NOTE = "invalid_note"
+CANNOT_FOLLOW_SELF = "cannot_follow_self"
+TARGET_NOT_IN_PARTY = "target_not_in_party"
+NOT_FOLLOWING = "not_following"
+PROPOSAL_NOT_FOUND = "proposal_not_found"
+PROPOSAL_EXPIRED = "proposal_expired"
+INVALID_VOTE = "invalid_vote"
+INVALID_PROPOSAL_TEXT = "invalid_proposal_text"
+INVALID_EXPIRY = "invalid_expiry"
 
 
 # Default human-readable messages keyed by code. Routes may override.
@@ -63,6 +71,14 @@ _DEFAULT_MESSAGES: dict[str, str] = {
     INVALID_PRESET: "The lighting preset is not valid.",
     INVALID_STROKE: "The stroke failed validation.",
     INVALID_NOTE: "The note failed validation.",
+    CANNOT_FOLLOW_SELF: "You cannot follow yourself.",
+    TARGET_NOT_IN_PARTY: "The follow target is not in this party.",
+    NOT_FOLLOWING: "You are not following anyone.",
+    PROPOSAL_NOT_FOUND: "No proposal exists with that id.",
+    PROPOSAL_EXPIRED: "This proposal has already expired.",
+    INVALID_VOTE: "Vote must be 'yes', 'no', or 'abstain'.",
+    INVALID_PROPOSAL_TEXT: "Proposal text failed validation.",
+    INVALID_EXPIRY: "expires_in_sec must be between 1 and 60 inclusive.",
 }
 
 
