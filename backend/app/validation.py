@@ -18,7 +18,12 @@ ALLOWED_COLORS: tuple[str, ...] = (
 )
 
 CHAT_MAX_LEN = 65
-CHAT_TEXT_REGEX = re.compile(r"^[A-Za-z0-9 .,!?'\-]+$")
+# Allowed characters in chat text:
+# letters, digits, spaces, the punctuation set .,!?'-, and @ for mentions.
+# Owner is conservative on character expansion — do not add more without
+# an explicit owner decision (see docs/features/feature-backlog.md §1).
+CHAT_ALLOWED_CHARS_REGEX = r"^[A-Za-z0-9 .,!?'\-@]+$"
+CHAT_TEXT_REGEX = re.compile(CHAT_ALLOWED_CHARS_REGEX)
 RECENT_CHAT_LIMIT = 20
 
 
