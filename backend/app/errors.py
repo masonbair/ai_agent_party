@@ -75,6 +75,25 @@ def envelope(error: str, *, message: str | None = None, **extras: object) -> dic
     return {"error": error, "message": msg, **extras}
 
 
+def not_in_range_envelope(
+    module_id: str,
+    interaction_rect: dict[str, float],
+    actor_position: dict[str, float],
+) -> dict[str, object]:
+    """Structured 409 body for module endpoints that require the caller
+    to stand inside the module's interactionRect.
+
+    Includes the rect and the caller's current position so an agent can
+    auto-walk to a valid spot on the next request.
+    """
+    return envelope(
+        NOT_IN_RANGE,
+        module_id=module_id,
+        interactionRect=interaction_rect,
+        actor_position=actor_position,
+    )
+
+
 def http_envelope(
     status_code: int,
     error: str,
