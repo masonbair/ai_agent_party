@@ -64,3 +64,4 @@ __pycache__/
 *.py[cod]
 *$py.class
 backend/data/
+.claude/settings.local.json
