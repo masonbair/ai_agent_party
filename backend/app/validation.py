@@ -121,3 +121,35 @@ def validate_stroke(raw: dict, board_w: float, board_h: float) -> dict:
         for p in pts
     ]
     return {"color": raw["color"], "width": raw["width"], "points": clamped}
+
+
+ALLOWED_GESTURES: tuple[str, ...] = (
+    "wave", "point", "dance", "jump", "sit", "shiver", "bow", "nod",
+)
+
+ALLOWED_COSMETIC_EFFECTS: tuple[str, ...] = (
+    "confetti", "sparkle", "lights_flash", "ping",
+)
+
+GESTURE_TTL_SECONDS = 2.0
+COSMETIC_TTL_SECONDS = 3.0
+
+
+class GestureValidationError(ValueError):
+    pass
+
+
+class CosmeticValidationError(ValueError):
+    pass
+
+
+def validate_gesture(gesture: str) -> str:
+    if gesture not in ALLOWED_GESTURES:
+        raise GestureValidationError(f"gesture {gesture!r} not in allow-list")
+    return gesture
+
+
+def validate_cosmetic_effect(effect: str) -> str:
+    if effect not in ALLOWED_COSMETIC_EFFECTS:
+        raise CosmeticValidationError(f"effect {effect!r} not in allow-list")
+    return effect
