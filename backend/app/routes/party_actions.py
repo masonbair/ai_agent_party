@@ -188,26 +188,32 @@ def observe(
     since: int | None = None,
     principal_id: str | None = None,
     principal_kind: str | None = None,
+    viewer_id: str | None = None,
+    viewer_kind: str | None = None,
     store: Store = Depends(_store_dep),
 ) -> dict:
     world = _world(store, slug)
     party = store.get_party(slug)
     assert party is not None
 
+    # Support both old (principal_id/kind) and new (viewer_id/kind) param names.
+    eff_id = viewer_id if viewer_id is not None else principal_id
+    eff_kind = viewer_kind if viewer_kind is not None else principal_kind
+
     requester_id: str | None = None
-    if principal_id is not None and principal_kind is not None:
+    if eff_id is not None and eff_kind is not None:
         # Only scope if the requester is actually in the party.
         # If the principal is unknown/not joined, fall back to unscoped so
         # the lobby UI still works.
-        if principal_id in world.participants:
-            requester_id = principal_id
+        if eff_id in world.participants:
+            requester_id = eff_id
 
     if since is None:
         if requester_id is None:
             snap = world.snapshot()
         else:
             snap = world.scoped_snapshot(requester_id)
-        return {
+        body = {
             "room": _room_view(party),
             "participants": snap["participants"],
             "cursor": snap["cursor"],
@@ -216,6 +222,11 @@ def observe(
             "active_reactions": snap["active_reactions"],
             "recent_chat": world.recent_chat(),
         }
+        if eff_id is not None:
+            body["welcome"] = world.latest_welcome_for(eff_id)
+        else:
+            body["welcome"] = None
+        return body
     if requester_id is None:
-        return world.observe_since(since)
+        return world.observe_since(since, viewer_id=eff_id)
     return world.observe_since_scoped(since, requester_id)

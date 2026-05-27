@@ -9,7 +9,7 @@ from typing import Any
 
 _MAX_OPENERS = 3
 _TRUNCATE_AT = 40
-_GENERIC_MUSIC_LABEL = "Music coming soon."
+_GENERIC_MUSIC_LABELS = frozenset({"Music coming soon.", "Music coming soon"})
 
 
 def _truncate_for_quote(text: str, limit: int = _TRUNCATE_AT) -> str:
@@ -40,7 +40,7 @@ def _greeting_target(
 def _ambience_suggestion(room_summary: dict) -> str:
     music = (room_summary or {}).get("music") or ""
     lighting = (room_summary or {}).get("lighting") or ""
-    if music and music != _GENERIC_MUSIC_LABEL:
+    if music and music not in _GENERIC_MUSIC_LABELS:
         return f"Comment on the music ({music})"
     if lighting in ("night", "party"):
         return f"Comment on the {lighting} lighting"
@@ -73,6 +73,10 @@ def suggested_openers(
         out.append(f"Greet @{target['username']}")
 
     out.append(_ambience_suggestion(room_summary))
+
+    # Guarantee minimum of 2: if only Rule C fired, add an introduction prompt.
+    if len(out) < 2:
+        out.insert(0, "Introduce yourself to the room")
 
     # Always 2-3 entries; trim if we ever overflow.
     return out[:_MAX_OPENERS]
