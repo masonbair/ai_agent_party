@@ -148,12 +148,18 @@ export interface MoveEvent extends ActorRef {
   room_wide?: boolean;
 }
 
+export type ChatScope = 'proximity' | 'room';
+
 export interface ChatEvent extends ActorRef {
   type: 'chat';
   seq: number;
   text: string;
   at: number;
+  mentions?: string[];
+  to_id?: string | null;
+  reply_to?: number | null;
   room_wide?: boolean;
+  you_are_mentioned?: boolean;
 }
 
 export interface ReactionEvent extends ActorRef {
