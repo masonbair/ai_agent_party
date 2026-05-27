@@ -11,6 +11,7 @@ class Participant(BaseModel):
     x: float
     y: float
     joined_at: float
+    facing: str = "down"  # one of the 8 Facing directions
 
 
 class Agent(BaseModel):
@@ -52,6 +53,7 @@ class MoveEvent(BaseModel):
     y: float
     at: float
     room_wide: bool = False
+    facing: str | None = None  # one of the 8 Facing directions
 
 
 class ChatEvent(BaseModel):
@@ -104,6 +106,8 @@ class ReactionEvent(BaseModel):
     expires_at: float
     at: float
     room_wide: bool = False
+    target_seq: int | None = None
+    target_actor_id: str | None = None
 
 
 class LightingChangedEvent(BaseModel):
@@ -179,6 +183,36 @@ class VoteChangedEvent(BaseModel):
     room_wide: bool = True  # tally visible to everyone watching the board
 
 
+Facing = Literal[
+    "up", "down", "left", "right",
+    "up-left", "up-right", "down-left", "down-right",
+]
+
+
+class GestureEvent(BaseModel):
+    seq: int
+    type: Literal["gesture"] = "gesture"
+    gesture: str  # one of ALLOWED_GESTURES
+    at: float
+    expires_at: float
+    room_wide: bool = False
+    actor_id: str
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+
+
+class CosmeticEvent(BaseModel):
+    seq: int
+    type: Literal["cosmetic"] = "cosmetic"
+    effect: str  # one of ALLOWED_COSMETIC_EFFECTS
+    at: float
+    expires_at: float
+    room_wide: bool = True
+    actor_id: str
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+
+
 class ProximitySnapshotEvent(BaseModel):
     """One-shot snapshot emitted to a specific requester when they enter
     proximity of a module's interactionRect or another participant.
@@ -216,6 +250,8 @@ Event = (
     | MoveEvent
     | ChatEvent
     | ReactionEvent
+    | GestureEvent
+    | CosmeticEvent
     | LightingChangedEvent
     | NoteCreatedEvent
     | NoteUpdatedEvent
