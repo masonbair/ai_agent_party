@@ -841,6 +841,20 @@ class PartyWorld:
         # Sticky/drawboard: requester inside interactionRect.
         return self.in_zone(ev.module_id, req.x, req.y)
 
+    def _note_reaction_visible_to(self, ev: NoteReactionEvent, req: Participant) -> bool:
+        """Return True if a note_reaction event should be delivered to `req`."""
+        m = self._placed_module(ev.module_id)
+        if isinstance(m, FreeNotesModule):
+            # Proximity: use the note's current position.
+            for n in self.notes_by_module.get(ev.module_id, []):
+                if n.id == ev.note_id:
+                    dx = req.x - n.x
+                    dy = req.y - n.y
+                    return (dx * dx + dy * dy) <= (PROXIMITY_RADIUS ** 2)
+            return False
+        # Sticky/drawboard: requester inside interactionRect.
+        return self.in_zone(ev.module_id, req.x, req.y)
+
     def _participants_visible_to(self, requester_id: str) -> list[dict]:
         """Project participants the requester can see (within radius).
 
@@ -1042,6 +1056,13 @@ class PartyWorld:
             if isinstance(ev, ModuleChatEvent):
                 # Module chat: only visible to participants inside the rect.
                 if self.in_zone(ev.module_id, req.x, req.y):
+                    out.append(ev.model_dump())
+                continue
+
+            if isinstance(ev, NoteReactionEvent):
+                # Note reactions follow the note's position (freenotes: proximity;
+                # stickynotes: inside rect).
+                if self._note_reaction_visible_to(ev, req):
                     out.append(ev.model_dump())
                 continue
 

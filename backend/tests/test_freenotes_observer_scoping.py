@@ -62,3 +62,60 @@ def test_freenote_visible_only_within_proximity_radius(
         e["type"] == "note_created" and e["note"]["text"] == "y"
         for e in resp_far.json()["events"]
     )
+
+
+def test_note_reaction_visible_to_nearby_observer(
+    client: TestClient,
+) -> None:
+    a = _join(client, "alex", x=400.0, y=250.0)
+    b = _join(client, "bee", x=400.0, y=250.0)
+    note = client.post(
+        "/api/parties/cream-terrazzo/modules/freenotes-1/notes",
+        json={
+            "principal": {"kind": "human", "id": a},
+            "text": "g", "color": "pink", "x": 400.0, "y": 250.0,
+        },
+    )
+    nid = note.json()["note"]["id"]
+    cursor = client.get(
+        "/api/parties/cream-terrazzo/observe",
+        params={"principal_id": b, "principal_kind": "human"},
+    ).json()["cursor"]
+    client.post(
+        f"/api/parties/cream-terrazzo/modules/freenotes-1/notes/{nid}/react",
+        json={"principal": {"kind": "human", "id": a}, "emoji": "🎉"},
+    )
+    resp = client.get(
+        "/api/parties/cream-terrazzo/observe",
+        params={"since": cursor, "principal_id": b, "principal_kind": "human"},
+    )
+    assert any(e["type"] == "note_reaction" for e in resp.json()["events"])
+
+
+def test_note_reaction_hidden_from_distant_observer(
+    client: TestClient,
+) -> None:
+    a = _join(client, "alex", x=400.0, y=250.0)
+    b = _join(client, "bee", x=10.0, y=10.0)
+    note = client.post(
+        "/api/parties/cream-terrazzo/modules/freenotes-1/notes",
+        json={
+            "principal": {"kind": "human", "id": a},
+            "text": "g", "color": "pink", "x": 400.0, "y": 250.0,
+        },
+    )
+    assert note.status_code == 200, note.json()
+    nid = note.json()["note"]["id"]
+    cursor = client.get(
+        "/api/parties/cream-terrazzo/observe",
+        params={"principal_id": b, "principal_kind": "human"},
+    ).json()["cursor"]
+    client.post(
+        f"/api/parties/cream-terrazzo/modules/freenotes-1/notes/{nid}/react",
+        json={"principal": {"kind": "human", "id": a}, "emoji": "🎉"},
+    )
+    resp = client.get(
+        "/api/parties/cream-terrazzo/observe",
+        params={"since": cursor, "principal_id": b, "principal_kind": "human"},
+    )
+    assert not any(e["type"] == "note_reaction" for e in resp.json()["events"])
