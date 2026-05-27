@@ -3,11 +3,11 @@ import time
 from fastapi import APIRouter, Depends, Path, Response, status
 from pydantic import BaseModel
 
-from app.errors import INVALID_CHAT_TEXT, NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
+from app.errors import INVALID_CHAT_TEXT, NOT_IN_PARTY, PARTY_NOT_FOUND, envelope, http_envelope
 from app.events import Participant
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
-from app.validation import ChatValidationError
+from app.validation import CHAT_ALLOWED_CHARS_REGEX, CHAT_MAX_LEN, ChatValidationError
 from app.world import ParticipantNotInPartyError, PartyWorld
 
 router = APIRouter(prefix="/api/parties")
@@ -132,7 +132,16 @@ def chat(
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
     except ChatValidationError as exc:
-        raise http_envelope(422, INVALID_CHAT_TEXT, message=str(exc))
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=422,
+            detail=envelope(
+                INVALID_CHAT_TEXT,
+                message=str(exc),
+                allowed_chars_regex=CHAT_ALLOWED_CHARS_REGEX,
+                max_chars=CHAT_MAX_LEN,
+            ),
+        )
     return {"cursor": world.cursor}
 
 

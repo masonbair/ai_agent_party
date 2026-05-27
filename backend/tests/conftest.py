@@ -28,7 +28,7 @@ def register_human(client, *, username: str = "Alice", color: str = "#ff6b9d") -
     }
 
 
-def register_agent(client, *, username: str = "Bot", color: str = "#4ecdc4") -> dict:
+def register_agent(client, *, username: str = "Bot", color: str = "#4dd0e1") -> dict:
     """Register an agent and return a dict with agent info + principal."""
     agent = client.post(
         "/api/agents", json={"username": username, "color": color}
@@ -52,6 +52,23 @@ def join_party(client, principal_dict: dict, slug: str, *, x=None, y=None) -> di
     )
     assert resp.status_code == 200, resp.json()
     return resp.json()
+
+
+_register_agent_fn = register_agent
+_register_human_fn = register_human
+_join_party_fn = join_party
+
+
+@pytest.fixture
+def register_agent():
+    """Fixture: returns the register_agent callable."""
+    return _register_agent_fn
+
+
+@pytest.fixture
+def join_party():
+    """Fixture: returns the join_party callable."""
+    return _join_party_fn
 
 
 @pytest.fixture
