@@ -53,3 +53,25 @@ def test_post_module_chat_over_65_chars_returns_invalid_chat_text(
     )
     assert resp.status_code == 422
     assert resp.json()["detail"]["error"] == "invalid_chat_text"
+
+
+def test_module_chat_cooldown_returns_429_with_retry_after_ms(
+    client: TestClient,
+) -> None:
+    sid = _join(client, "alex", x=700.0, y=450.0)
+    # Burst limit is 2; the 3rd back-to-back fails.
+    for i in range(2):
+        ok = client.post(
+            "/api/parties/cream-terrazzo/modules/draw-1/chat",
+            json={"principal": {"kind": "human", "id": sid}, "text": f"m{i}"},
+        )
+        assert ok.status_code == 200, ok.json()
+    third = client.post(
+        "/api/parties/cream-terrazzo/modules/draw-1/chat",
+        json={"principal": {"kind": "human", "id": sid}, "text": "m2"},
+    )
+    assert third.status_code == 429
+    body = third.json()["detail"]
+    assert body["error"] == "chat_cooldown"
+    assert isinstance(body["retry_after_ms"], (int, float))
+    assert body["scope"] == "module"

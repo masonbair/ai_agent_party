@@ -77,6 +77,11 @@ class PartyWorld:
     class NotAuthorError(LookupError):
         pass
 
+    class ChatCooldownError(Exception):
+        def __init__(self, retry_after_ms: float) -> None:
+            self.retry_after_ms = retry_after_ms
+            super().__init__(f"chat cooldown: retry after {retry_after_ms:.0f}ms")
+
     def __init__(
         self,
         party: PartyConfig,
@@ -106,6 +111,9 @@ class PartyWorld:
         self._last_vote_state: dict[str, tuple[int, int]] = {}
         # Per-module chat history (capped at MODULE_CHAT_HISTORY_LIMIT).
         self.module_chat_by_module: dict[str, list[ModuleChatEvent]] = {}
+        # Token-bucket chat cooldown: {(participant_id, scope): (tokens, last_refill_ts)}
+        # Burst=2, refill 1 token per 3 seconds. Shared across all scopes per participant.
+        self._chat_buckets: dict[tuple[str, str], tuple[float, float]] = {}
         # Per-requester proximity tracking. Cleared on leave().
         self._proximity_trackers: dict[str, ProximityTracker] = {}
         # Position of the actor at the time each event was emitted, keyed by seq.
@@ -273,6 +281,31 @@ class PartyWorld:
         self._emit(ev)
         return ev
 
+    # Chat cooldown constants.
+    _CHAT_BURST = 2.0
+    _CHAT_REFILL_RATE = 1.0 / 3.0  # 1 token per 3 seconds
+
+    def check_chat_cooldown(self, participant_id: str, scope: str) -> None:
+        """Token-bucket rate limiter for chat.
+
+        Raises ``ChatCooldownError`` with ``retry_after_ms`` when the bucket is
+        empty. Scopes are independent so proximity, room, and module each have
+        their own bucket.
+        """
+        key = (participant_id, scope)
+        now = time.time()
+        tokens, last_refill = self._chat_buckets.get(
+            key, (self._CHAT_BURST, now)
+        )
+        elapsed = now - last_refill
+        tokens = min(self._CHAT_BURST, tokens + elapsed * self._CHAT_REFILL_RATE)
+        if tokens < 1.0:
+            # Seconds until one full token is replenished.
+            wait_s = (1.0 - tokens) / self._CHAT_REFILL_RATE
+            self._chat_buckets[key] = (tokens, now)
+            raise PartyWorld.ChatCooldownError(retry_after_ms=wait_s * 1000.0)
+        self._chat_buckets[key] = (tokens - 1.0, now)
+
     def module_chat(
         self, participant_id: str, module_id: str, text: str
     ) -> ModuleChatEvent:
@@ -289,6 +322,8 @@ class PartyWorld:
         m = self._placed_module(module_id)
         if not isinstance(m, FreeNotesModule):
             self._require_in_zone(participant_id, module_id)
+        # Rate limit — same burst/refill as proximity chat.
+        self.check_chat_cooldown(participant_id, scope="module")
         cleaned = validate_chat_text(text)
         at = time.time()
         ev = ModuleChatEvent(

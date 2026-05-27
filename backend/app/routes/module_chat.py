@@ -67,6 +67,15 @@ def post_module_chat(
         raise http_envelope(409, NOT_IN_PARTY)
     except PartyWorld.NotInRangeError:
         raise _not_in_range(world, module_id, resolved.id)
+    except PartyWorld.ChatCooldownError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=envelope(
+                "chat_cooldown",
+                retry_after_ms=exc.retry_after_ms,
+                scope="module",
+            ),
+        )
     except KeyError:
         raise http_envelope(404, "not_found")
     except ChatValidationError as exc:
