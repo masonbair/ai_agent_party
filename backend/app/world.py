@@ -977,6 +977,47 @@ class PartyWorld:
         out.reverse()
         return out
 
+    def visible_to(self, observer_id: str, event: Event) -> bool:
+        """Return True if ``event`` should be delivered to ``observer_id``.
+
+        Mirrors the per-event logic in ``_scoped_event_tail`` for a single
+        event. Used by ``PartyObserverHub`` to scope push frames.
+        """
+        obs = self.participants.get(observer_id)
+        if obs is None:
+            return False
+        room_wide = getattr(event, "room_wide", False)
+
+        if isinstance(event, MoveEvent):
+            return room_wide or within_proximity(
+                (obs.x, obs.y), (event.x, event.y)
+            )
+        if isinstance(event, (ChatEvent, ReactionEvent)):
+            if room_wide:
+                return True
+            pos = self._actor_pos_at_seq.get(event.seq)
+            return pos is not None and within_proximity((obs.x, obs.y), pos)
+        if isinstance(event, (
+            NoteCreatedEvent, NoteUpdatedEvent, NoteDeletedEvent,
+            StrokeAddedEvent, StrokeDroppedEvent,
+        )):
+            return self.in_zone(event.module_id, obs.x, obs.y)
+        if isinstance(event, JoinEvent):
+            return room_wide or within_proximity(
+                (obs.x, obs.y), (event.x, event.y)
+            )
+        if isinstance(event, LeaveEvent):
+            return True  # always deliver so observer can clean local state
+        if isinstance(event, VoteChangedEvent):
+            return True  # room_wide by default
+        if room_wide:
+            return True
+        return True  # unknown event types pass through
+
+    def peers_in_proximity(self, observer_id: str) -> set[str]:
+        """Return ids of participants currently within PROXIMITY_RADIUS."""
+        return self._participants_in_range_for(observer_id)
+
     def observe_since(self, since: int) -> dict:
         if since < 0:
             since = 0
