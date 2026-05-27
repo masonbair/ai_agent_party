@@ -1,6 +1,7 @@
 import sqlite3
 import time
 import uuid
+from dataclasses import dataclass
 from typing import Callable
 
 from app import db as db_module
@@ -17,6 +18,7 @@ from app.events import (
     JoinEvent,
     LeaveEvent,
     MoveEvent,
+    MusicChangedEvent,
     Participant,
     Reaction,
     LightingChangedEvent,
@@ -46,7 +48,11 @@ from app.validation import (
     SLOT_OCCUPIED_RADIUS,
     STROKES_PER_BOARD_MAX,
     VOTE_TTL_SECONDS,
+    MusicValidationError,
     validate_chat_text,
+    validate_music_action,
+    validate_music_track,
+    validate_music_volume,
     validate_note_color,
     validate_note_text,
     validate_reaction_emoji,
@@ -59,6 +65,22 @@ from app.validation import (
 # PROXIMITY_RADIUS``) keep working unchanged.
 
 _LIGHTING_PRESETS = ("day", "dusk", "night", "party")
+
+
+@dataclass
+class MusicState:
+    track_id: str | None = None
+    playing: bool = False
+    volume: int = 50
+    since: float | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "track_id": self.track_id,
+            "playing": self.playing,
+            "volume": self.volume,
+            "since": self.since,
+        }
 
 
 class ParticipantNotInPartyError(LookupError):
@@ -92,6 +114,7 @@ class PartyWorld:
         )
         self._listeners: list[Callable[[Event], None]] = []
         self.lighting: str = "day"
+        self.music: MusicState = MusicState()
         self.notes_by_module: dict[str, list[StickyNote]] = {}
         self.strokes_by_module: dict[str, list[Stroke]] = {}
         self.votes_by_module: dict[str, dict[str, float]] = {}
@@ -963,6 +986,7 @@ class PartyWorld:
             ],
             "cursor": self.cursor,
             "lighting": self.lighting,
+            "music": self.music.to_dict(),
             "modules": [self._module_snapshot(m) for m in placed],
             "active_reactions": active_reactions,
         }
