@@ -18,6 +18,7 @@ from app.events import (
     LeaveEvent,
     ModuleChatEvent,
     MoveEvent,
+    NoteReactionEvent,
     Participant,
     Reaction,
     LightingChangedEvent,
@@ -522,6 +523,42 @@ class PartyWorld:
                     module_id=module_id,
                     note_id=note_id,
                     at=time.time(),
+                )
+                self._events.append(ev)
+                self._emit(ev)
+                return ev
+        raise KeyError(note_id)
+
+    def react_to_note(
+        self,
+        participant_id: str,
+        module_id: str,
+        note_id: str,
+        emoji: str,
+    ) -> NoteReactionEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        m = self._require_placed(module_id)
+        if not isinstance(m, (StickyNoteModule, FreeNotesModule)):
+            raise KeyError(module_id)
+        # Sticky must be inside rect to react; freenotes is open everywhere
+        # in the room (parallel to create_note rules).
+        if isinstance(m, StickyNoteModule):
+            self._require_in_zone(participant_id, module_id)
+        cleaned = validate_reaction_emoji(emoji)
+        notes = self.notes_by_module.get(module_id, [])
+        for i, n in enumerate(notes):
+            if n.id == note_id:
+                new_reactions = dict(n.reactions)
+                new_reactions[cleaned] = new_reactions.get(cleaned, 0) + 1
+                notes[i] = n.model_copy(update={"reactions": new_reactions})
+                ev = NoteReactionEvent(
+                    seq=self._next_seq(),
+                    module_id=module_id,
+                    note_id=note_id,
+                    emoji=cleaned,
+                    at=time.time(),
+                    **self._actor_fields(participant_id),
                 )
                 self._events.append(ev)
                 self._emit(ev)

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Participant(BaseModel):
@@ -87,6 +87,7 @@ class StickyNote(BaseModel):
     x: float
     y: float
     created_at: float
+    reactions: dict[str, int] = Field(default_factory=dict)
 
 
 class Stroke(BaseModel):
@@ -151,6 +152,19 @@ class NoteDeletedEvent(BaseModel):
     module_id: str
     note_id: str
     at: float
+    room_wide: bool = False
+
+
+class NoteReactionEvent(BaseModel):
+    seq: int
+    type: Literal["note_reaction"] = "note_reaction"
+    module_id: str
+    note_id: str
+    emoji: str
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
     room_wide: bool = False
 
 
@@ -233,6 +247,7 @@ Event = (
     | NoteCreatedEvent
     | NoteUpdatedEvent
     | NoteDeletedEvent
+    | NoteReactionEvent
     | StrokeAddedEvent
     | StrokeDroppedEvent
     | BoardClearedEvent
