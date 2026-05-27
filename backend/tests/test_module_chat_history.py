@@ -58,6 +58,8 @@ def test_module_chat_history_returns_last_50_for_module():
     world = _world()
     _participant(world, "p1", x=50.0, y=50.0)  # inside draw-1 rect
     for i in range(60):
+        # Clear bucket each iteration so cooldown doesn't block the test.
+        world._chat_buckets.clear()
         world.module_chat("p1", "draw-1", f"msg{i:02d}")
     hist = world.module_chat_history("draw-1")
     assert len(hist) == 50
@@ -68,6 +70,7 @@ def test_module_chat_history_returns_last_50_for_module():
 def test_module_chat_history_isolated_per_module():
     world = _world()
     _participant(world, "p1", x=50.0, y=50.0)
+    world._chat_buckets.clear()
     world.module_chat("p1", "draw-1", "hello")
     assert world.module_chat_history("draw-1")[0]["text"] == "hello"
     assert world.module_chat_history("other") == []

@@ -99,9 +99,14 @@ class LightingModule(BaseModel):
     preset: LightingPreset = "day"
 
 
-PlacedModule = Union[StickyNoteModule, DrawBoardModule]
+class FreeNotesModule(BaseModel):
+    id: str = Field(pattern=r"^[a-z0-9-]+$")
+    kind: Literal["freenotes"] = "freenotes"
+
+
+PlacedModule = Union[StickyNoteModule, DrawBoardModule, FreeNotesModule]
 Module = Annotated[
-    Union[StickyNoteModule, DrawBoardModule, LightingModule],
+    Union[StickyNoteModule, DrawBoardModule, FreeNotesModule, LightingModule],
     Field(discriminator="kind"),
 ]
 

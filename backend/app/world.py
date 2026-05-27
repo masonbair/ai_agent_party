@@ -34,6 +34,7 @@ from app.events import (
 )
 from app.models import (
     DrawBoardModule,
+    FreeNotesModule,
     LightingModule,
     PartyConfig,
     PlacedModule,
@@ -131,6 +132,8 @@ class PartyWorld:
                 self.strokes_by_module[m.id] = []
                 self.votes_by_module[m.id] = {}
                 self._last_vote_state[m.id] = (0, 1)
+            elif isinstance(m, FreeNotesModule):
+                self.notes_by_module[m.id] = []
 
     def on_event(
         self, callback: Callable[[Event], None]
@@ -312,13 +315,6 @@ class PartyWorld:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
         self._require_placed(module_id)
-        # FreeNotesModule does not gate by interactionRect — room membership only.
-        # We use a local import to avoid a circular import cycle. Once FreeNotesModule
-        # is defined in models.py (Task 7), this import is always available.
-        try:
-            from app.models import FreeNotesModule  # type: ignore[attr-defined]
-        except ImportError:
-            FreeNotesModule = ()  # sentinel: isinstance(m, ()) is always False
         m = self._placed_module(module_id)
         if not isinstance(m, FreeNotesModule):
             self._require_in_zone(participant_id, module_id)
@@ -631,7 +627,7 @@ class PartyWorld:
 
     def _placed_module(self, module_id: str) -> PlacedModule | None:
         for m in self._party.modules:
-            if isinstance(m, (StickyNoteModule, DrawBoardModule)) and m.id == module_id:
+            if isinstance(m, (StickyNoteModule, DrawBoardModule, FreeNotesModule)) and m.id == module_id:
                 return m
         return None
 
@@ -710,6 +706,12 @@ class PartyWorld:
         }
 
     def _module_snapshot(self, m: PlacedModule) -> dict:
+        if isinstance(m, FreeNotesModule):
+            return {
+                "id": m.id,
+                "kind": m.kind,
+                "notes": [n.model_dump() for n in self.notes_by_module.get(m.id, [])],
+            }
         margin = INTERACTION_MARGIN
         ir = {
             "x": m.x - margin,
@@ -753,10 +755,6 @@ class PartyWorld:
         For FreeNotesModule: requester must be within PROXIMITY_RADIUS of the
         note's (x, y). This method is extended in Task 10.
         """
-        try:
-            from app.models import FreeNotesModule  # type: ignore[attr-defined]
-        except ImportError:
-            FreeNotesModule = ()  # sentinel
         m = self._placed_module(ev.module_id)
         if isinstance(m, FreeNotesModule):
             # Proximity-based scoping: note's x/y.
@@ -804,6 +802,7 @@ class PartyWorld:
             return set()
         out: set[str] = set()
         for m in self._party.modules:
+            # FreeNotesModule has no interactionRect — excluded from rect-based tracking.
             if isinstance(m, (StickyNoteModule, DrawBoardModule)):
                 if self.in_zone(m.id, req.x, req.y):
                     out.add(m.id)
@@ -1089,7 +1088,7 @@ class PartyWorld:
         }
         placed = [
             m for m in self._party.modules
-            if isinstance(m, (StickyNoteModule, DrawBoardModule))
+            if isinstance(m, (StickyNoteModule, DrawBoardModule, FreeNotesModule))
         ]
         return {
             "participants": [
