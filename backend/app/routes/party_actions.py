@@ -1,9 +1,9 @@
 import time
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import BaseModel
 
-from app.errors import INVALID_CHAT_TEXT, NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
+from app.errors import INVALID_CHAT_TEXT, NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope, envelope
 from app.events import Participant
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
@@ -134,6 +134,35 @@ def chat(
     except ChatValidationError as exc:
         raise http_envelope(422, INVALID_CHAT_TEXT, message=str(exc))
     return {"cursor": world.cursor}
+
+
+@router.get("/{slug}/participants/{participant_id}")
+def get_participant(
+    slug: str = Path(pattern=_SLUG_PATTERN),
+    participant_id: str = Path(...),
+    store: Store = Depends(_store_dep),
+) -> dict:
+    """Resolve a participant by id, bypassing proximity scoping.
+
+    Returns only the same public fields already visible in the
+    proximity-scoped snapshot whenever the requester sees the target.
+    """
+    world = _world(store, slug)
+    p = world.participants.get(participant_id)
+    if p is None:
+        raise HTTPException(
+            status_code=404, detail=envelope(NOT_IN_PARTY),
+        )
+    return {
+        "id": p.id,
+        "username": p.username,
+        "color": p.color,
+        "kind": p.kind,
+        "x": p.x,
+        "y": p.y,
+        "zone": world.derive_zone(p.x, p.y),
+        "facing": getattr(p, "facing", None),
+    }
 
 
 def _room_view(party) -> dict:
