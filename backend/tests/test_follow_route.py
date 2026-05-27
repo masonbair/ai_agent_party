@@ -48,6 +48,31 @@ def test_follow_unknown_target_returns_404(client: TestClient) -> None:
     assert r.json()["detail"]["error"] == "target_not_in_party"
 
 
+def test_follow_auto_clears_on_follower_leave(client: TestClient) -> None:
+    a = _agent(client, "Fo", "#4dd0e1")
+    b = _agent(client, "To", "#ff6b9d")
+    client.post("/api/parties/cream-terrazzo/join", json={"principal": _p(a)})
+    client.post("/api/parties/cream-terrazzo/join", json={"principal": _p(b)})
+    client.post(
+        "/api/parties/cream-terrazzo/follow",
+        json={"principal": _p(a), "target_id": b["agent_id"]},
+    )
+    client.post("/api/parties/cream-terrazzo/leave", json={"principal": _p(a)})
+    # Re-join a at fixed pos; verify b moving does NOT auto-pull a.
+    client.post(
+        "/api/parties/cream-terrazzo/join",
+        json={"principal": _p(a), "x": 100, "y": 100},
+    )
+    client.post(
+        "/api/parties/cream-terrazzo/move",
+        json={"principal": _p(b), "x": 700, "y": 400},
+    )
+    r = client.get(
+        f"/api/parties/cream-terrazzo/participants/{a['agent_id']}"
+    ).json()
+    assert (r["x"], r["y"]) == (100.0, 100.0)
+
+
 def test_unfollow_clears(client: TestClient) -> None:
     a = _agent(client, "Fa", "#4dd0e1")
     b = _agent(client, "Ta", "#ff6b9d")
