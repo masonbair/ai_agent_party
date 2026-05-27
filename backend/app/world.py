@@ -96,6 +96,12 @@ class PartyWorld:
         self.strokes_by_module: dict[str, list[Stroke]] = {}
         self.votes_by_module: dict[str, dict[str, float]] = {}
         self.active_reactions: dict[str, Reaction] = {}
+        # follow graph: follower_id -> target_id (one target per follower)
+        self.following: dict[str, str] = {}
+        # reverse index: target_id -> set of follower ids
+        self.followers_of: dict[str, set[str]] = {}
+        # proposals (Task 11 fills out shape)
+        self.proposals: dict[str, dict] = {}
         # Last (active_votes, needed) emitted per drawboard. Used to suppress
         # duplicate vote_changed events when participants move without
         # changing the tally — and to detect population-only changes (someone
