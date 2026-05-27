@@ -112,6 +112,7 @@ def move(
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
     return {
+        "event": ev.model_dump(),
         "x": ev.x,
         "y": ev.y,
         "zone": world.derive_zone(ev.x, ev.y),
@@ -128,12 +129,12 @@ def chat(
     world = _world(store, slug)
     resolved = resolve_principal(store, body.principal)
     try:
-        world.chat(resolved.id, body.text)
+        ev = world.chat(resolved.id, body.text)
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
     except ChatValidationError as exc:
         raise http_envelope(422, INVALID_CHAT_TEXT, message=str(exc))
-    return {"cursor": world.cursor}
+    return {"event": ev.model_dump(), "cursor": world.cursor}
 
 
 def _room_view(party) -> dict:

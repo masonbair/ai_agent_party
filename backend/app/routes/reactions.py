@@ -48,4 +48,9 @@ def react(
             message=str(exc),
             allowed_emojis=list(REACTION_EMOJI_ALLOWLIST),
         )
-    return {"emoji": ev.emoji, "expires_at": ev.expires_at, "cursor": world.cursor}
+    return {
+        "event": ev.model_dump(),
+        "emoji": ev.emoji,
+        "expires_at": ev.expires_at,
+        "cursor": world.cursor,
+    }
