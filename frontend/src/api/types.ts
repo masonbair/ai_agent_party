@@ -42,8 +42,17 @@ export type PartyConfig = {
   room: Room;
 };
 
+export type Occupancy = {
+  humans: number;
+  agents: number;
+  total: number;
+  active_last_5min: number;
+};
+
+export type PartyListEntry = PartyConfig & { occupancy: Occupancy };
+
 export type PartiesListResponse = {
-  parties: PartyConfig[];
+  parties: PartyListEntry[];
 };
 
 export type Participant = {
