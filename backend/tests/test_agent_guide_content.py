@@ -88,6 +88,16 @@ def test_agent_guide_documents_proximity_snapshot_and_left(client: TestClient) -
     assert "proximity_left" in body
 
 
+def test_guide_documents_social_primitives(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "## Social primitives" in body
+    assert "/follow" in body
+    assert "/proposals" in body
+    assert "actor_color" in body
+    assert "exclude_self" in body
+    assert "/participants/" in body
+
+
 def test_agent_guide_documents_walls_out_of_scope(client: TestClient) -> None:
     body = client.get("/api/agent-guide").text
     assert "walls" in body.lower()
