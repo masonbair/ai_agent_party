@@ -968,6 +968,10 @@ class PartyWorld:
             "active_reactions": active_reactions,
         }
 
+    def active_proposals(self) -> list[dict]:
+        """Stub — filled in by Task 11 (proposals feature)."""
+        return []
+
     def recent_chat(self, limit: int = RECENT_CHAT_LIMIT) -> list[dict]:
         out: list[dict] = []
         for ev in reversed(self._events):

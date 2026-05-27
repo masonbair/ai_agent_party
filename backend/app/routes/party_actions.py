@@ -209,6 +209,7 @@ def _room_view(party) -> dict:
 def observe(
     slug: str = Path(pattern=_SLUG_PATTERN),
     since: int | None = None,
+    exclude_self: bool = False,
     principal_id: str | None = None,
     principal_kind: str | None = None,
     store: Store = Depends(_store_dep),
@@ -238,7 +239,15 @@ def observe(
             "lighting": snap["lighting"],
             "active_reactions": snap["active_reactions"],
             "recent_chat": world.recent_chat(),
+            "active_proposals": world.active_proposals(),
         }
     if requester_id is None:
-        return world.observe_since(since)
-    return world.observe_since_scoped(since, requester_id)
+        payload = world.observe_since(since)
+    else:
+        payload = world.observe_since_scoped(since, requester_id)
+    if exclude_self and principal_id:
+        payload["events"] = [
+            e for e in payload["events"]
+            if e.get("actor_id") != principal_id
+        ]
+    return payload
