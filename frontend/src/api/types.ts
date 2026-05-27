@@ -243,3 +243,40 @@ export interface ProximityLeftEvent extends BaseEvent {
   type: 'proximity_left';
   left: { kind: 'module' | 'participant'; id: string };
 }
+
+export type MusicTrackId =
+  | 'lofi-loop'
+  | 'jazz-club'
+  | 'synthwave'
+  | 'ambient-1'
+  | 'party-mix';
+
+export const MUSIC_TRACK_IDS: ReadonlyArray<MusicTrackId> = [
+  'lofi-loop',
+  'jazz-club',
+  'synthwave',
+  'ambient-1',
+  'party-mix',
+];
+
+export type MusicAction = 'play' | 'pause' | 'skip' | 'set_volume';
+
+export type MusicState = {
+  track_id: MusicTrackId | null;
+  playing: boolean;
+  volume: number;
+  since: number | null;
+};
+
+export type MusicChangedEvent = {
+  type: 'music_changed';
+  seq: number;
+  track_id: MusicTrackId;
+  playing: boolean;
+  volume: number;
+  at: number;
+  actor_id: string | null;
+  actor_username: string | null;
+  actor_kind: 'human' | 'agent' | null;
+  room_wide: true;
+};
