@@ -59,6 +59,13 @@ def test_preview_returns_last_5_chats_room_wide(client):
         assert isinstance(c["at"], (int, float))
 
 
+def test_preview_includes_static_music_metadata(client):
+    res = client.get("/api/parties/cream-terrazzo/preview")
+    music = res.json()["music"]
+    assert "url" in music
+    assert "label" in music
+
+
 def test_preview_chat_does_not_include_proximity_metadata(client):
     h = register_human(client)
     join_party(client, h, slug="cream-terrazzo")
