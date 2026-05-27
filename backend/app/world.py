@@ -1,4 +1,3 @@
-import math
 import sqlite3
 import time
 import uuid
@@ -6,6 +5,12 @@ from typing import Callable
 
 from app import db as db_module
 from app.collision import Rect, inflate_walls, slide
+from app.proximity import (
+    PROXIMITY_RADIUS,
+    PROXIMITY_SNAPSHOT_CHAT_LIMIT,
+    ProximityTracker,
+    within_proximity,
+)
 from app.events import (
     ChatEvent,
     Event,
@@ -48,77 +53,16 @@ from app.validation import (
     validate_stroke,
 )
 
-# Proximity radius in world units. See plan #02 for justification.
-# Other specs MUST import this constant rather than redefining it.
-PROXIMITY_RADIUS = 180.0
-
-# Max recent chats bundled into a participant-entry proximity_snapshot.
-PROXIMITY_SNAPSHOT_CHAT_LIMIT = 5
-
-
-def within_proximity(
-    a: tuple[float, float], b: tuple[float, float]
-) -> bool:
-    """Return True if points ``a`` and ``b`` are within PROXIMITY_RADIUS.
-
-    Plain Euclidean radius. Walls do NOT block — line-of-sight is explicitly
-    out of scope for v1 (see ``docs/features/feature-backlog.md`` §6 Owner
-    Additions, Open question).
-    """
-    dx = a[0] - b[0]
-    dy = a[1] - b[1]
-    return math.hypot(dx, dy) <= PROXIMITY_RADIUS
-
+# ``PROXIMITY_RADIUS``, ``PROXIMITY_SNAPSHOT_CHAT_LIMIT``, ``within_proximity``
+# and ``ProximityTracker`` are imported from ``app.proximity`` above and
+# re-exported here so existing imports (e.g. ``from app.world import
+# PROXIMITY_RADIUS``) keep working unchanged.
 
 _LIGHTING_PRESETS = ("day", "dusk", "night", "party")
 
 
 class ParticipantNotInPartyError(LookupError):
     pass
-
-
-class ProximityTracker:
-    """Per-requester memory of which participants and modules they were in
-    range of on their last ``observe_since_scoped`` call.
-
-    Used to detect proximity entry (emit ``proximity_snapshot``) and
-    proximity exit (emit ``proximity_left``). Owned by ``PartyWorld``,
-    keyed by requester participant id, cleared on ``leave``.
-    """
-
-    def __init__(self) -> None:
-        self.participants_in_range: set[str] = set()
-        self.modules_in_rect: set[str] = set()
-        # The cursor at the time of the last poll. Used to bound the
-        # ``recent_chat`` slice in a participant-entry snapshot to chats
-        # the requester hadn't yet seen.
-        self.last_observed_cursor: int = 0
-
-    def diff(
-        self,
-        participants_in_range: set[str],
-        modules_in_rect: set[str],
-    ) -> tuple[set[str], set[str], set[str], set[str]]:
-        """Compute entered/left sets relative to current state.
-
-        Does NOT auto-commit — call ``commit()`` when you want to persist the
-        new state so subsequent diffs start from the updated baseline.
-        """
-        entered_p = participants_in_range - self.participants_in_range
-        left_p = self.participants_in_range - participants_in_range
-        entered_m = modules_in_rect - self.modules_in_rect
-        left_m = self.modules_in_rect - modules_in_rect
-        return entered_p, left_p, entered_m, left_m
-
-    def commit(
-        self,
-        participants_in_range: set[str],
-        modules_in_rect: set[str],
-        cursor: int,
-    ) -> None:
-        self.participants_in_range = set(participants_in_range)
-        self.modules_in_rect = set(modules_in_rect)
-        self.last_observed_cursor = cursor
 
 
 class PartyWorld:
@@ -162,6 +106,9 @@ class PartyWorld:
         self._proximity_trackers: dict[str, ProximityTracker] = {}
         # Position of the actor at the time each event was emitted, keyed by seq.
         # Only populated for chat/reaction events; move events carry x/y already.
+        # NOTE: grows unbounded like ``_events`` — pruning is unsafe while
+        # multiple observers hold different cursors, so it is deferred to the
+        # event-log trimming work (see CLAUDE.md "Not Yet Implemented").
         self._actor_pos_at_seq: dict[int, tuple[float, float]] = {}
         for m in party.modules:
             if isinstance(m, LightingModule):
@@ -706,7 +653,12 @@ class PartyWorld:
         return base
 
     def _participants_visible_to(self, requester_id: str) -> list[dict]:
-        """Project participants the requester can see (within radius)."""
+        """Project participants the requester can see (within radius).
+
+        Includes the requester themselves — they need their own avatar in the
+        snapshot. (``_participants_in_range_for`` excludes self, since it feeds
+        the proximity diff, which is about *others* entering/leaving range.)
+        """
         req = self.participants.get(requester_id)
         if req is None:
             return []
@@ -780,15 +732,15 @@ class PartyWorld:
         return base
 
     def _participant_recent_chat(
-        self, participant_id: str, after_seq: int, limit: int
+        self, participant_id: str, limit: int
     ) -> list[dict]:
         """Return up to ``limit`` most-recent chats from ``participant_id``,
         oldest-first.
 
-        ``after_seq`` is retained as a parameter for future use (e.g. once
-        the event log is trimmed), but is not used to filter here: the
-        requester may never have seen these chats if they were out of range,
-        so we catch them up on all recent messages regardless of cursor.
+        Deliberately NOT filtered by the requester's cursor: the requester may
+        never have seen these chats if they were out of range when they were
+        sent, so a proximity-entry snapshot catches them up on all recent
+        messages from the participant they just walked up to.
         """
         out: list[dict] = []
         for ev in reversed(self._events):
@@ -803,7 +755,14 @@ class PartyWorld:
         return out
 
     def observe_since_scoped(self, since: int, requester_id: str) -> dict:
-        """``observe_since`` filtered to what the requester can see."""
+        """``observe_since`` filtered to what the requester can see.
+
+        Composed of two concerns, each in its own helper:
+        - ``_scoped_event_tail`` — the real events since ``since``, filtered
+          and coalesced to what the requester can see.
+        - ``_proximity_transition_events`` — synthetic ``proximity_snapshot`` /
+          ``proximity_left`` events for whoever entered/left range this poll.
+        """
         if since < 0:
             since = 0
         req = self.participants.get(requester_id)
@@ -815,15 +774,40 @@ class PartyWorld:
             requester_id, ProximityTracker()
         )
 
-        tail = self._events[since:]
+        out = self._scoped_event_tail(self._events[since:], req)
+
+        transitions, now_participants, now_modules = (
+            self._proximity_transition_events(requester_id, tracker)
+        )
+        out.extend(transitions)
+
+        out.sort(key=lambda e: e["seq"])
+
+        # Update tracker AFTER diff so subsequent polls start from new state.
+        tracker.commit(
+            participants_in_range=now_participants,
+            modules_in_rect=now_modules,
+            cursor=self.cursor,
+        )
+
+        return {"events": out, "cursor": self.cursor}
+
+    def _scoped_event_tail(
+        self, tail: list[Event], req: Participant
+    ) -> list[dict]:
+        """Filter + coalesce real events to what ``req`` can see.
+
+        Moves coalesce to the actor's latest position; votes coalesce per
+        module; chat/reaction are scoped by the actor's position when emitted;
+        module events require the requester to be in the module's rect; leaves
+        always pass; ``room_wide`` events bypass all proximity filters.
+        """
         latest_move_by_pid: dict[str, MoveEvent] = {}
         latest_vote_by_module: dict[str, VoteChangedEvent] = {}
         out: list[dict] = []
-
         req_pos = (req.x, req.y)
 
         for ev in tail:
-            # room_wide events always pass.
             room_wide = getattr(ev, "room_wide", False)
 
             if isinstance(ev, MoveEvent):
@@ -837,15 +821,7 @@ class PartyWorld:
                 latest_vote_by_module[ev.module_id] = ev
                 continue
 
-            if isinstance(ev, ChatEvent):
-                if not room_wide:
-                    pos = self._actor_pos_at_seq.get(ev.seq)
-                    if pos is None or not within_proximity(req_pos, pos):
-                        continue
-                out.append(ev.model_dump())
-                continue
-
-            if isinstance(ev, ReactionEvent):
+            if isinstance(ev, (ChatEvent, ReactionEvent)):
                 if not room_wide:
                     pos = self._actor_pos_at_seq.get(ev.seq)
                     if pos is None or not within_proximity(req_pos, pos):
@@ -866,20 +842,7 @@ class PartyWorld:
 
             if isinstance(ev, JoinEvent):
                 if within_proximity(req_pos, (ev.x, ev.y)):
-                    out.append(
-                        {
-                            "type": "join",
-                            "seq": ev.seq,
-                            "actor_id": ev.actor_id,
-                            "actor_username": ev.actor_username,
-                            "actor_kind": ev.actor_kind,
-                            "x": ev.x,
-                            "y": ev.y,
-                            "zone": ev.zone,
-                            "at": ev.at,
-                            "room_wide": False,
-                        }
-                    )
+                    out.append(ev.model_dump())
                 continue
 
             if isinstance(ev, LeaveEvent):
@@ -898,15 +861,31 @@ class PartyWorld:
             out.append(d)
         for v in latest_vote_by_module.values():
             out.append(v.model_dump())
+        return out
 
-        # --- Proximity entry: emit one-shot snapshots ---
+    def _proximity_transition_events(
+        self, requester_id: str, tracker: ProximityTracker
+    ) -> tuple[list[dict], set[str], set[str]]:
+        """Build one-shot proximity_snapshot/proximity_left events for whoever
+        entered or left the requester's range since the last poll.
+
+        Returns ``(events, now_participants, now_modules)`` so the caller can
+        commit the tracker without recomputing the in-range sets.
+
+        Synthetic ``seq`` values are derived from the current cursor purely to
+        order these events after the real tail within THIS poll's response.
+        They are ephemeral — never written to the real event log — so they
+        carry no cross-poll meaning (a caveat to revisit under concurrency).
+        """
         now_participants = self._participants_in_range_for(requester_id)
         now_modules = self._modules_in_rect_for(requester_id)
         entered_p, left_p, entered_m, left_m = tracker.diff(
             now_participants, now_modules
         )
+        out: list[dict] = []
         synthetic_seq = self.cursor
         now_ts = time.time()
+
         for module_id in sorted(entered_m):
             m = self._placed_module(module_id)
             if m is None:
@@ -933,15 +912,11 @@ class PartyWorld:
                     "entered": {"kind": "participant", "id": other_id},
                     "module": None,
                     "recent_chat": self._participant_recent_chat(
-                        other_id,
-                        after_seq=tracker.last_observed_cursor,
-                        limit=PROXIMITY_SNAPSHOT_CHAT_LIMIT,
+                        other_id, limit=PROXIMITY_SNAPSHOT_CHAT_LIMIT
                     ),
                     "room_wide": False,
                 }
             )
-
-        # --- Proximity exit: emit proximity_left events ---
         for module_id in sorted(left_m):
             synthetic_seq += 1
             out.append(
@@ -964,17 +939,7 @@ class PartyWorld:
                     "room_wide": False,
                 }
             )
-
-        out.sort(key=lambda e: e["seq"])
-
-        # Update tracker AFTER diff so subsequent polls start from new state.
-        tracker.commit(
-            participants_in_range=now_participants,
-            modules_in_rect=now_modules,
-            cursor=self.cursor,
-        )
-
-        return {"events": out, "cursor": self.cursor}
+        return out, now_participants, now_modules
 
     def snapshot(self) -> dict:
         now = time.time()

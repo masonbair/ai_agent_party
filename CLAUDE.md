@@ -93,7 +93,8 @@ ai_agent_party/
 - Per-participant memory / notes.
 - Real persistence (currently in-memory; backend restart logs everyone out).
 - Music playback (schema reserves the field; UI shows a "Music coming soon" pill).
-- Rate limiting, bearer-token auth, event-log trimming, avatar-vs-avatar collision.
+- Rate limiting, bearer-token auth, avatar-vs-avatar collision.
+- Event-log trimming — `PartyWorld._events` and the parallel `_actor_pos_at_seq` map grow unbounded. Pruning is deferred because multiple observers hold independent cursors, so no single `since` is safe to trim below.
 
 ---
 
