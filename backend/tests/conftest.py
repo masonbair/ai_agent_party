@@ -3,8 +3,10 @@ from fastapi.testclient import TestClient
 
 from app import db as db_module
 from app.main import app, get_store
+from app.rate_limit import TokenBucketRegistry
 from app.routes import agents as agents_routes
 from app.routes import dm as dm_routes
+from app.routes import expressive as expressive_routes
 from app.routes import inbox_ws as inbox_ws_routes
 from app.routes import lighting as lighting_routes
 from app.routes import module_drawboard as module_drawboard_routes
@@ -64,6 +66,8 @@ def store() -> Store:
 
 @pytest.fixture
 def client(store: Store) -> TestClient:
+    rate_limiter = TokenBucketRegistry()
+    rate_limiter.configure_defaults()
     app.dependency_overrides[get_store] = lambda: store
     app.dependency_overrides[session_routes._store_dep] = lambda: store
     app.dependency_overrides[parties_routes._store_dep] = lambda: store
@@ -76,5 +80,7 @@ def client(store: Store) -> TestClient:
     app.dependency_overrides[module_notes_routes._store_dep] = lambda: store
     app.dependency_overrides[module_drawboard_routes._store_dep] = lambda: store
     app.dependency_overrides[history_routes._store_dep] = lambda: store
+    app.dependency_overrides[expressive_routes._store_dep] = lambda: store
+    app.dependency_overrides[expressive_routes._rate_limit_dep] = lambda: rate_limiter
     yield TestClient(app)
     app.dependency_overrides.clear()
