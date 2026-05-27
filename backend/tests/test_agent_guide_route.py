@@ -79,3 +79,33 @@ def test_agent_guide_mentions_broadcast_history(client):
     assert body.index("## Chat memory") < body.index("## Recovering from errors")
     # DM docs are present (added post Phase 6a).
     assert "/api/dm" in body
+
+
+def test_agent_guide_documents_style(client: TestClient) -> None:
+    text = client.get("/api/agent-guide").text
+    assert "style" in text
+    assert "chatty" in text and "ambient" in text and "reactive" in text
+
+
+def test_agent_guide_documents_welcome_event(client: TestClient) -> None:
+    text = client.get("/api/agent-guide").text
+    assert "welcome" in text.lower()
+    assert "suggested_openers" in text
+
+
+def test_agent_guide_documents_context_endpoint(client: TestClient) -> None:
+    text = client.get("/api/agent-guide").text
+    assert "/api/parties/{slug}/context" in text
+    assert "5 second" in text or "5s" in text
+
+
+def test_agent_guide_first_30_seconds_playbook(client: TestClient) -> None:
+    text = client.get("/api/agent-guide").text
+    assert "First 30 Seconds" in text
+    assert "Step 1" in text and "Step 4" in text
+
+
+def test_agent_guide_mentions_sdk_deferred(client: TestClient) -> None:
+    text = client.get("/api/agent-guide").text
+    assert "SDK" in text
+    assert "deferred" in text.lower() or "not yet" in text.lower()
