@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import BaseModel
 
-from app.errors import INVALID_NOTE, LIMIT_REACHED, NOT_AUTHOR, NOT_FOUND, NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope, not_in_range_envelope
+from app.errors import INVALID_NOTE, LIMIT_REACHED, NOT_AUTHOR, NOT_FOUND, NOT_IN_PARTY, PARTY_NOT_FOUND, envelope, http_envelope, not_in_range_envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
-from app.validation import NoteValidationError, STICKY_COLOR_ALLOWLIST
+from app.validation import NoteValidationError, REACTION_EMOJI_ALLOWLIST, ReactionValidationError, STICKY_COLOR_ALLOWLIST
 from app.world import ParticipantNotInPartyError, PartyWorld
 
 router = APIRouter(prefix="/api/parties")
@@ -160,3 +160,52 @@ def delete_note(
     except _NoteErrors as exc:
         raise _map_world_errors(exc, world=world, module_id=module_id, actor_id=resolved.id) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class ReactNoteRequest(BaseModel):
+    principal: Principal
+    emoji: str
+
+
+@router.post("/{slug}/modules/{module_id}/notes/{note_id}/react")
+def react_to_note(
+    body: ReactNoteRequest,
+    slug: str = Path(pattern=_SLUG_PATTERN),
+    module_id: str = Path(pattern=_MODULE_PATTERN),
+    note_id: str = Path(pattern=_NOTE_PATTERN),
+    store: Store = Depends(_store_dep),
+) -> dict:
+    world = _world(store, slug)
+    resolved = resolve_principal(store, body.principal)
+    try:
+        ev = world.react_to_note(resolved.id, module_id, note_id, body.emoji)
+    except ParticipantNotInPartyError:
+        raise http_envelope(409, NOT_IN_PARTY)
+    except PartyWorld.NotInRangeError:
+        rect = world.interaction_rect(module_id) or {
+            "x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0,
+        }
+        pos = world.actor_position(resolved.id) or {"x": 0.0, "y": 0.0}
+        raise HTTPException(
+            status_code=409,
+            detail=not_in_range_envelope(
+                module_id=module_id, interaction_rect=rect, actor_position=pos,
+            ),
+        )
+    except KeyError:
+        raise http_envelope(404, NOT_FOUND)
+    except ReactionValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=envelope(
+                "invalid_emoji",
+                message=str(exc),
+                allowed_emojis=list(REACTION_EMOJI_ALLOWLIST),
+            ),
+        )
+    return {
+        "emoji": ev.emoji,
+        "note_id": ev.note_id,
+        "module_id": ev.module_id,
+        "cursor": world.cursor,
+    }

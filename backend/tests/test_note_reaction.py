@@ -1,3 +1,5 @@
+from fastapi.testclient import TestClient
+
 from app.events import NoteReactionEvent
 
 
@@ -64,3 +66,87 @@ def test_react_to_note_unknown_emoji_raises():
     from app.validation import ReactionValidationError
     with pytest.raises(ReactionValidationError):
         world.react_to_note("p1", "freenotes-1", note_ev.note.id, "💩")
+
+
+def _http_join(client: TestClient, name: str, x: float, y: float) -> str:
+    r = client.post("/api/session", json={"username": name, "color": "#ff6b9d"})
+    sid = r.json()["session_id"]
+    client.post(
+        "/api/parties/cream-terrazzo/join",
+        json={"principal": {"kind": "human", "id": sid}, "x": x, "y": y},
+    )
+    return sid
+
+
+def test_react_to_note_route_succeeds(client: TestClient) -> None:
+    sid = _http_join(client, "alex", x=400.0, y=250.0)
+    note_resp = client.post(
+        "/api/parties/cream-terrazzo/modules/freenotes-1/notes",
+        json={
+            "principal": {"kind": "human", "id": sid},
+            "text": "graf", "color": "pink", "x": 400.0, "y": 250.0,
+        },
+    )
+    assert note_resp.status_code == 200, note_resp.json()
+    note_id = note_resp.json()["note"]["id"]
+    resp = client.post(
+        f"/api/parties/cream-terrazzo/modules/freenotes-1/notes/{note_id}/react",
+        json={"principal": {"kind": "human", "id": sid}, "emoji": "🎉"},
+    )
+    assert resp.status_code == 200, resp.json()
+    body = resp.json()
+    assert body["emoji"] == "🎉"
+    assert "cursor" in body
+
+
+def test_react_to_note_unknown_note_returns_404(client: TestClient) -> None:
+    sid = _http_join(client, "alex", x=400.0, y=250.0)
+    resp = client.post(
+        "/api/parties/cream-terrazzo/modules/freenotes-1/notes/deadbeef/react",
+        json={"principal": {"kind": "human", "id": sid}, "emoji": "🎉"},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"]["error"] == "not_found"
+
+
+def test_react_to_note_invalid_emoji_returns_422(client: TestClient) -> None:
+    sid = _http_join(client, "alex", x=400.0, y=250.0)
+    note_resp = client.post(
+        "/api/parties/cream-terrazzo/modules/freenotes-1/notes",
+        json={
+            "principal": {"kind": "human", "id": sid},
+            "text": "g", "color": "pink", "x": 400.0, "y": 250.0,
+        },
+    )
+    assert note_resp.status_code == 200, note_resp.json()
+    nid = note_resp.json()["note"]["id"]
+    resp = client.post(
+        f"/api/parties/cream-terrazzo/modules/freenotes-1/notes/{nid}/react",
+        json={"principal": {"kind": "human", "id": sid}, "emoji": "💩"},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["error"] == "invalid_emoji"
+
+
+def test_reactions_appear_on_note_in_observe(client: TestClient) -> None:
+    sid = _http_join(client, "alex", x=400.0, y=250.0)
+    note_resp = client.post(
+        "/api/parties/cream-terrazzo/modules/freenotes-1/notes",
+        json={
+            "principal": {"kind": "human", "id": sid},
+            "text": "g", "color": "pink", "x": 400.0, "y": 250.0,
+        },
+    )
+    nid = note_resp.json()["note"]["id"]
+    client.post(
+        f"/api/parties/cream-terrazzo/modules/freenotes-1/notes/{nid}/react",
+        json={"principal": {"kind": "human", "id": sid}, "emoji": "🎉"},
+    )
+    obs = client.get(
+        "/api/parties/cream-terrazzo/observe",
+        params={"principal_id": sid, "principal_kind": "human"},
+    )
+    mods = obs.json()["modules"]
+    free = next(m for m in mods if m["kind"] == "freenotes")
+    note = next(n for n in free["notes"] if n["id"] == nid)
+    assert note["reactions"] == {"🎉": 1}

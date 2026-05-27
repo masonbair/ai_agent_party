@@ -895,6 +895,20 @@ class PartyWorld:
             if k not in ("notes", "strokes", "vote")
         }
 
+    def _freenotes_snapshot_for(self, module_snap: dict, requester_id: str) -> dict:
+        """Return freenotes snapshot with only proximity-visible notes."""
+        req = self.participants.get(requester_id)
+        if req is None:
+            return {**module_snap, "notes": []}
+        visible_notes = [
+            n for n in module_snap.get("notes", [])
+            if (
+                (req.x - n["x"]) ** 2 + (req.y - n["y"]) ** 2
+                <= PROXIMITY_RADIUS ** 2
+            )
+        ]
+        return {**module_snap, "notes": visible_notes}
+
     def scoped_snapshot(self, requester_id: str) -> dict:
         """``snapshot()`` filtered to what the requester can see.
 
@@ -905,10 +919,16 @@ class PartyWorld:
         base = self.snapshot()
         base["participants"] = self._participants_visible_to(requester_id)
         in_rect = self._modules_in_rect_for(requester_id)
-        base["modules"] = [
-            m if m["id"] in in_rect else self._module_stub(m)
-            for m in base["modules"]
-        ]
+        filtered_modules = []
+        for m in base["modules"]:
+            if m["kind"] == "freenotes":
+                # FreeNotesModule: always include but filter notes by proximity.
+                filtered_modules.append(self._freenotes_snapshot_for(m, requester_id))
+            elif m["id"] in in_rect:
+                filtered_modules.append(m)
+            else:
+                filtered_modules.append(self._module_stub(m))
+        base["modules"] = filtered_modules
         # Seed tracker so the next ?since= poll doesn't re-fire snapshot events
         # for participants/modules already visible in this snapshot.
         tracker = self._proximity_trackers.setdefault(
