@@ -189,10 +189,47 @@ class PartyWorld:
         self._recompute_all_drawboard_votes(time.time())
         return ev
 
+    class CannotFollowSelfError(ValueError):
+        pass
+
+    class TargetNotInPartyError(LookupError):
+        pass
+
+    def follow(self, follower_id: str, target_id: str) -> None:
+        if follower_id not in self.participants:
+            raise ParticipantNotInPartyError(follower_id)
+        if follower_id == target_id:
+            raise PartyWorld.CannotFollowSelfError(follower_id)
+        if target_id not in self.participants:
+            raise PartyWorld.TargetNotInPartyError(target_id)
+        # Clear any prior follow target.
+        prev = self.following.get(follower_id)
+        if prev is not None:
+            self.followers_of.get(prev, set()).discard(follower_id)
+        self.following[follower_id] = target_id
+        self.followers_of.setdefault(target_id, set()).add(follower_id)
+
+    def unfollow(self, follower_id: str) -> None:
+        if follower_id not in self.participants:
+            raise ParticipantNotInPartyError(follower_id)
+        prev = self.following.pop(follower_id, None)
+        if prev is not None:
+            self.followers_of.get(prev, set()).discard(follower_id)
+
+    def _clear_follow_links_for(self, participant_id: str) -> None:
+        """Called on leave: removes the participant from both sides."""
+        prev = self.following.pop(participant_id, None)
+        if prev is not None:
+            self.followers_of.get(prev, set()).discard(participant_id)
+        followers = self.followers_of.pop(participant_id, set())
+        for f in followers:
+            self.following.pop(f, None)
+
     def leave(self, participant_id: str) -> LeaveEvent:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
         actor = self._actor_fields(participant_id)
+        self._clear_follow_links_for(participant_id)
         del self.participants[participant_id]
         self._proximity_trackers.pop(participant_id, None)
         ev = LeaveEvent(seq=self._next_seq(), at=time.time(), **actor)
@@ -223,7 +260,56 @@ class PartyWorld:
         )
         self._events.append(ev)
         self._emit(ev)
+        # Auto-move any followers of the participant who just moved.
+        self._apply_follower_moves(participant_id)
         self._recompute_all_drawboard_votes(time.time())
+        return ev
+
+    def _apply_follower_moves(self, target_id: str) -> None:
+        import math
+        followers = list(self.followers_of.get(target_id, set()))
+        if not followers:
+            return
+        target = self.participants.get(target_id)
+        if target is None:
+            return
+        stop_distance = PROXIMITY_RADIUS - 20.0
+        for fid in followers:
+            f = self.participants.get(fid)
+            if f is None:
+                continue
+            dx, dy = target.x - f.x, target.y - f.y
+            dist = math.hypot(dx, dy)
+            if dist <= stop_distance or dist == 0:
+                continue
+            scale = (dist - stop_distance) / dist
+            new_x = f.x + dx * scale
+            new_y = f.y + dy * scale
+            # Reuse normal move pipeline so collision + zone + actor fields apply.
+            self._move_internal(fid, new_x, new_y)
+
+    def _move_internal(self, participant_id: str, x: float, y: float) -> MoveEvent:
+        """Internal move that emits a normal move event but skips recursive
+        follower processing for the actor itself."""
+        current = self.participants[participant_id]
+        new_x, new_y = slide(
+            (current.x, current.y),
+            (float(x), float(y)),
+            self._wall_rects,
+            self._party.worldSize,
+        )
+        self.participants[participant_id] = current.model_copy(
+            update={"x": new_x, "y": new_y}
+        )
+        ev = MoveEvent(
+            seq=self._next_seq(),
+            x=new_x,
+            y=new_y,
+            at=time.time(),
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        self._emit(ev)
         return ev
 
     def chat(self, participant_id: str, text: str) -> ChatEvent:
