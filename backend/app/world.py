@@ -17,7 +17,9 @@ from app.events import (
     Event,
     JoinEvent,
     LeaveEvent,
+    ModuleChatEvent,
     MoveEvent,
+    NoteReactionEvent,
     Participant,
     Reaction,
     LightingChangedEvent,
@@ -37,6 +39,7 @@ from app.events import (
 )
 from app.models import (
     DrawBoardModule,
+    FreeNotesModule,
     LightingModule,
     PartyConfig,
     PlacedModule,
@@ -63,6 +66,7 @@ from app.validation import (
 # PROXIMITY_RADIUS``) keep working unchanged.
 
 _LIGHTING_PRESETS = ("day", "dusk", "night", "party")
+MODULE_CHAT_HISTORY_LIMIT = 50
 
 _MENTION_RE = _re.compile(r"@([A-Za-z0-9]{2,20})")
 
@@ -103,6 +107,11 @@ class PartyWorld:
     class NotAuthorError(LookupError):
         pass
 
+    class ChatCooldownError(Exception):
+        def __init__(self, retry_after_ms: float) -> None:
+            self.retry_after_ms = retry_after_ms
+            super().__init__(f"chat cooldown: retry after {retry_after_ms:.0f}ms")
+
     def __init__(
         self,
         party: PartyConfig,
@@ -136,6 +145,11 @@ class PartyWorld:
         # walked into / out of a board with a vote in flight) so the displayed
         # 'needed' updates without requiring a new vote.
         self._last_vote_state: dict[str, tuple[int, int]] = {}
+        # Per-module chat history (capped at MODULE_CHAT_HISTORY_LIMIT).
+        self.module_chat_by_module: dict[str, list[ModuleChatEvent]] = {}
+        # Token-bucket chat cooldown: {(participant_id, scope): (tokens, last_refill_ts)}
+        # Burst=2, refill 1 token per 3 seconds. Shared across all scopes per participant.
+        self._chat_buckets: dict[tuple[str, str], tuple[float, float]] = {}
         # Per-requester proximity tracking. Cleared on leave().
         self._proximity_trackers: dict[str, ProximityTracker] = {}
         # Position of the actor at the time each event was emitted, keyed by seq.
@@ -153,6 +167,8 @@ class PartyWorld:
                 self.strokes_by_module[m.id] = []
                 self.votes_by_module[m.id] = {}
                 self._last_vote_state[m.id] = (0, 1)
+            elif isinstance(m, FreeNotesModule):
+                self.notes_by_module[m.id] = []
 
     def on_event(
         self, callback: Callable[[Event], None]
@@ -411,6 +427,63 @@ class PartyWorld:
         self._emit(ev)
         return ev
 
+    # Chat cooldown constants.
+    _CHAT_BURST = 2.0
+    _CHAT_REFILL_RATE = 1.0 / 3.0  # 1 token per 3 seconds
+
+    def check_chat_cooldown(self, participant_id: str, scope: str) -> None:
+        """Token-bucket rate limiter for chat.
+
+        Raises ``ChatCooldownError`` with ``retry_after_ms`` when the bucket is
+        empty. Scopes are independent so proximity, room, and module each have
+        their own bucket.
+        """
+        key = (participant_id, scope)
+        now = time.time()
+        tokens, last_refill = self._chat_buckets.get(
+            key, (self._CHAT_BURST, now)
+        )
+        elapsed = now - last_refill
+        tokens = min(self._CHAT_BURST, tokens + elapsed * self._CHAT_REFILL_RATE)
+        if tokens < 1.0:
+            # Seconds until one full token is replenished.
+            wait_s = (1.0 - tokens) / self._CHAT_REFILL_RATE
+            self._chat_buckets[key] = (tokens, now)
+            raise PartyWorld.ChatCooldownError(retry_after_ms=wait_s * 1000.0)
+        self._chat_buckets[key] = (tokens - 1.0, now)
+
+    def module_chat(
+        self, participant_id: str, module_id: str, text: str
+    ) -> ModuleChatEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        self._require_placed(module_id)
+        m = self._placed_module(module_id)
+        if not isinstance(m, FreeNotesModule):
+            self._require_in_zone(participant_id, module_id)
+        # Rate limit — same burst/refill as proximity chat.
+        self.check_chat_cooldown(participant_id, scope="module")
+        cleaned = validate_chat_text(text)
+        at = time.time()
+        ev = ModuleChatEvent(
+            seq=self._next_seq(),
+            module_id=module_id,
+            text=cleaned,
+            at=at,
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        bucket = self.module_chat_by_module.setdefault(module_id, [])
+        bucket.append(ev)
+        if len(bucket) > MODULE_CHAT_HISTORY_LIMIT:
+            del bucket[: len(bucket) - MODULE_CHAT_HISTORY_LIMIT]
+        self._emit(ev)
+        return ev
+
+    def module_chat_history(self, module_id: str) -> list[dict]:
+        bucket = self.module_chat_by_module.get(module_id, [])
+        return [ev.model_dump() for ev in bucket]
+
     def set_lighting(self, changed_by: str, preset: str) -> LightingChangedEvent:
         if changed_by not in self.participants:
             raise ParticipantNotInPartyError(changed_by)
@@ -426,6 +499,24 @@ class PartyWorld:
         self._events.append(ev)
         self._emit(ev)
         return ev
+
+    def interaction_rect(self, module_id: str) -> dict[str, float] | None:
+        m = self._placed_module(module_id)
+        if m is None:
+            return None
+        margin = INTERACTION_MARGIN
+        return {
+            "x": m.x - margin,
+            "y": m.y - margin,
+            "w": m.w + 2 * margin,
+            "h": m.h + 2 * margin,
+        }
+
+    def actor_position(self, participant_id: str) -> dict[str, float] | None:
+        p = self.participants.get(participant_id)
+        if p is None:
+            return None
+        return {"x": p.x, "y": p.y}
 
     def _require_placed(self, module_id: str) -> PlacedModule:
         m = self._placed_module(module_id)
@@ -455,16 +546,26 @@ class PartyWorld:
         y: float,
     ) -> NoteCreatedEvent:
         m = self._require_placed(module_id)
-        if not isinstance(m, StickyNoteModule):
-            raise KeyError(f"module {module_id} is not stickynotes")
-        self._require_in_zone(participant_id, module_id)
+        if not isinstance(m, (StickyNoteModule, FreeNotesModule)):
+            raise KeyError(f"module {module_id} is not a notes module")
+        if isinstance(m, StickyNoteModule):
+            self._require_in_zone(participant_id, module_id)
+        else:  # FreeNotesModule — require room membership only.
+            if participant_id not in self.participants:
+                raise ParticipantNotInPartyError(participant_id)
         cleaned_text = validate_note_text(text)
         cleaned_color = validate_note_color(color)
         notes = self.notes_by_module[module_id]
         own = sum(1 for n in notes if n.author_id == participant_id)
         if own >= NOTES_PER_USER_MAX:
             raise PartyWorld.LimitReachedError(module_id)
-        lx, ly = self._clamp_local(m, x, y)
+        if isinstance(m, FreeNotesModule):
+            wx = self._party.worldSize.width
+            wy = self._party.worldSize.height
+            lx = max(0.0, min(float(wx), float(x)))
+            ly = max(0.0, min(float(wy), float(y)))
+        else:
+            lx, ly = self._clamp_local(m, x, y)
         participant = self.participants[participant_id]
         note = StickyNote(
             id=uuid.uuid4().hex,
@@ -500,9 +601,13 @@ class PartyWorld:
         y: float | None = None,
     ) -> NoteUpdatedEvent:
         m = self._require_placed(module_id)
-        if not isinstance(m, StickyNoteModule):
+        if not isinstance(m, (StickyNoteModule, FreeNotesModule)):
             raise KeyError(module_id)
-        self._require_in_zone(participant_id, module_id)
+        if isinstance(m, StickyNoteModule):
+            self._require_in_zone(participant_id, module_id)
+        else:
+            if participant_id not in self.participants:
+                raise ParticipantNotInPartyError(participant_id)
         notes = self.notes_by_module[module_id]
         for i, n in enumerate(notes):
             if n.id == note_id:
@@ -516,7 +621,13 @@ class PartyWorld:
                 if x is not None or y is not None:
                     nx = n.x if x is None else x
                     ny = n.y if y is None else y
-                    lx, ly = self._clamp_local(m, nx, ny)
+                    if isinstance(m, FreeNotesModule):
+                        wx = self._party.worldSize.width
+                        wy = self._party.worldSize.height
+                        lx = max(0.0, min(float(wx), float(nx)))
+                        ly = max(0.0, min(float(wy), float(ny)))
+                    else:
+                        lx, ly = self._clamp_local(m, nx, ny)
                     fields["x"] = lx
                     fields["y"] = ly
                 updated = n.model_copy(update=fields)
@@ -535,8 +646,14 @@ class PartyWorld:
     def delete_note(
         self, participant_id: str, module_id: str, note_id: str
     ) -> NoteDeletedEvent:
-        self._require_placed(module_id)
-        self._require_in_zone(participant_id, module_id)
+        m = self._require_placed(module_id)
+        if not isinstance(m, (StickyNoteModule, FreeNotesModule)):
+            raise KeyError(module_id)
+        if isinstance(m, StickyNoteModule):
+            self._require_in_zone(participant_id, module_id)
+        else:
+            if participant_id not in self.participants:
+                raise ParticipantNotInPartyError(participant_id)
         notes = self.notes_by_module[module_id]
         for i, n in enumerate(notes):
             if n.id == note_id:
@@ -548,6 +665,42 @@ class PartyWorld:
                     module_id=module_id,
                     note_id=note_id,
                     at=time.time(),
+                )
+                self._events.append(ev)
+                self._emit(ev)
+                return ev
+        raise KeyError(note_id)
+
+    def react_to_note(
+        self,
+        participant_id: str,
+        module_id: str,
+        note_id: str,
+        emoji: str,
+    ) -> NoteReactionEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        m = self._require_placed(module_id)
+        if not isinstance(m, (StickyNoteModule, FreeNotesModule)):
+            raise KeyError(module_id)
+        # Sticky must be inside rect to react; freenotes is open everywhere
+        # in the room (parallel to create_note rules).
+        if isinstance(m, StickyNoteModule):
+            self._require_in_zone(participant_id, module_id)
+        cleaned = validate_reaction_emoji(emoji)
+        notes = self.notes_by_module.get(module_id, [])
+        for i, n in enumerate(notes):
+            if n.id == note_id:
+                new_reactions = dict(n.reactions)
+                new_reactions[cleaned] = new_reactions.get(cleaned, 0) + 1
+                notes[i] = n.model_copy(update={"reactions": new_reactions})
+                ev = NoteReactionEvent(
+                    seq=self._next_seq(),
+                    module_id=module_id,
+                    note_id=note_id,
+                    emoji=cleaned,
+                    at=time.time(),
+                    **self._actor_fields(participant_id),
                 )
                 self._events.append(ev)
                 self._emit(ev)
@@ -679,7 +832,7 @@ class PartyWorld:
 
     def _placed_module(self, module_id: str) -> PlacedModule | None:
         for m in self._party.modules:
-            if isinstance(m, (StickyNoteModule, DrawBoardModule)) and m.id == module_id:
+            if isinstance(m, (StickyNoteModule, DrawBoardModule, FreeNotesModule)) and m.id == module_id:
                 return m
         return None
 
@@ -758,6 +911,12 @@ class PartyWorld:
         }
 
     def _module_snapshot(self, m: PlacedModule) -> dict:
+        if isinstance(m, FreeNotesModule):
+            return {
+                "id": m.id,
+                "kind": m.kind,
+                "notes": [n.model_dump() for n in self.notes_by_module.get(m.id, [])],
+            }
         margin = INTERACTION_MARGIN
         ir = {
             "x": m.x - margin,
@@ -794,6 +953,50 @@ class PartyWorld:
             base["vote"] = {"votes": active, "needed": needed}
         return base
 
+    def _note_event_visible_to(self, ev, req: Participant) -> bool:
+        """Return True if a note/stroke event should be delivered to `req`.
+
+        For placed sticky/drawboard modules: requester must be inside the rect.
+        For FreeNotesModule: requester must be within PROXIMITY_RADIUS of the
+        note's (x, y). This method is extended in Task 10.
+        """
+        m = self._placed_module(ev.module_id)
+        if isinstance(m, FreeNotesModule):
+            # Proximity-based scoping: note's x/y.
+            note_xy = None
+            if hasattr(ev, "note"):
+                note_xy = (ev.note.x, ev.note.y)
+            elif hasattr(ev, "note_id"):
+                nid = ev.note_id
+                for past in self._events:
+                    if (
+                        isinstance(past, NoteCreatedEvent)
+                        and past.note.id == nid
+                    ):
+                        note_xy = (past.note.x, past.note.y)
+                        break
+            if note_xy is None:
+                return False
+            dx = req.x - note_xy[0]
+            dy = req.y - note_xy[1]
+            return (dx * dx + dy * dy) <= (PROXIMITY_RADIUS ** 2)
+        # Sticky/drawboard: requester inside interactionRect.
+        return self.in_zone(ev.module_id, req.x, req.y)
+
+    def _note_reaction_visible_to(self, ev: NoteReactionEvent, req: Participant) -> bool:
+        """Return True if a note_reaction event should be delivered to `req`."""
+        m = self._placed_module(ev.module_id)
+        if isinstance(m, FreeNotesModule):
+            # Proximity: use the note's current position.
+            for n in self.notes_by_module.get(ev.module_id, []):
+                if n.id == ev.note_id:
+                    dx = req.x - n.x
+                    dy = req.y - n.y
+                    return (dx * dx + dy * dy) <= (PROXIMITY_RADIUS ** 2)
+            return False
+        # Sticky/drawboard: requester inside interactionRect.
+        return self.in_zone(ev.module_id, req.x, req.y)
+
     def _participants_visible_to(self, requester_id: str) -> list[dict]:
         """Project participants the requester can see (within radius).
 
@@ -818,6 +1021,7 @@ class PartyWorld:
             return set()
         out: set[str] = set()
         for m in self._party.modules:
+            # FreeNotesModule has no interactionRect — excluded from rect-based tracking.
             if isinstance(m, (StickyNoteModule, DrawBoardModule)):
                 if self.in_zone(m.id, req.x, req.y):
                     out.add(m.id)
@@ -847,6 +1051,20 @@ class PartyWorld:
             if k not in ("notes", "strokes", "vote")
         }
 
+    def _freenotes_snapshot_for(self, module_snap: dict, requester_id: str) -> dict:
+        """Return freenotes snapshot with only proximity-visible notes."""
+        req = self.participants.get(requester_id)
+        if req is None:
+            return {**module_snap, "notes": []}
+        visible_notes = [
+            n for n in module_snap.get("notes", [])
+            if (
+                (req.x - n["x"]) ** 2 + (req.y - n["y"]) ** 2
+                <= PROXIMITY_RADIUS ** 2
+            )
+        ]
+        return {**module_snap, "notes": visible_notes}
+
     def scoped_snapshot(self, requester_id: str) -> dict:
         """``snapshot()`` filtered to what the requester can see.
 
@@ -857,10 +1075,16 @@ class PartyWorld:
         base = self.snapshot()
         base["participants"] = self._participants_visible_to(requester_id)
         in_rect = self._modules_in_rect_for(requester_id)
-        base["modules"] = [
-            m if m["id"] in in_rect else self._module_stub(m)
-            for m in base["modules"]
-        ]
+        filtered_modules = []
+        for m in base["modules"]:
+            if m["kind"] == "freenotes":
+                # FreeNotesModule: always include but filter notes by proximity.
+                filtered_modules.append(self._freenotes_snapshot_for(m, requester_id))
+            elif m["id"] in in_rect:
+                filtered_modules.append(m)
+            else:
+                filtered_modules.append(self._module_stub(m))
+        base["modules"] = filtered_modules
         # Seed tracker so the next ?since= poll doesn't re-fire snapshot events
         # for participants/modules already visible in this snapshot.
         tracker = self._proximity_trackers.setdefault(
@@ -971,6 +1195,19 @@ class PartyWorld:
                 out.append(ev.model_dump())
                 continue
 
+            if isinstance(ev, ModuleChatEvent):
+                # Module chat: only visible to participants inside the rect.
+                if self.in_zone(ev.module_id, req.x, req.y):
+                    out.append(ev.model_dump())
+                continue
+
+            if isinstance(ev, NoteReactionEvent):
+                # Note reactions follow the note's position (freenotes: proximity;
+                # stickynotes: inside rect).
+                if self._note_reaction_visible_to(ev, req):
+                    out.append(ev.model_dump())
+                continue
+
             if isinstance(
                 ev,
                 (NoteCreatedEvent, NoteUpdatedEvent, NoteDeletedEvent,
@@ -978,7 +1215,7 @@ class PartyWorld:
             ):
                 # Module-scoped events: only delivered if requester is inside
                 # the module's interactionRect right now.
-                if self.in_zone(ev.module_id, req.x, req.y):
+                if self._note_event_visible_to(ev, req):
                     out.append(ev.model_dump())
                 continue
 
@@ -1097,7 +1334,7 @@ class PartyWorld:
         }
         placed = [
             m for m in self._party.modules
-            if isinstance(m, (StickyNoteModule, DrawBoardModule))
+            if isinstance(m, (StickyNoteModule, DrawBoardModule, FreeNotesModule))
         ]
         return {
             "participants": [

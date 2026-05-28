@@ -96,6 +96,7 @@ export type StickyNote = {
   x: number;
   y: number;
   created_at: number;
+  reactions: Record<string, number>;
 };
 
 export type Stroke = {
@@ -161,6 +162,25 @@ export interface ChatEvent extends ActorRef {
   reply_to?: number | null;
   room_wide?: boolean;
   you_are_mentioned?: boolean;
+}
+
+export interface ModuleChatEvent extends ActorRef {
+  type: 'module_chat';
+  seq: number;
+  module_id: string;
+  text: string;
+  at: number;
+  room_wide?: boolean;
+}
+
+export interface NoteReactionEvent extends ActorRef {
+  type: 'note_reaction';
+  seq: number;
+  module_id: string;
+  note_id: string;
+  emoji: string;
+  at: number;
+  room_wide?: boolean;
 }
 
 export interface ReactionEvent extends ActorRef {
@@ -234,6 +254,13 @@ export interface ApiErrorResponse {
   detail: ApiError;
 }
 
+export type FreeNotesModule = {
+  id: string;
+  kind: 'freenotes';
+  /** Notes within PROXIMITY_RADIUS of the requester. */
+  notes: StickyNote[];
+};
+
 /**
  * Full module state. When the requesting participant is NOT inside the
  * module's `interactionRect`, the server omits `notes`/`strokes`/`vote`
@@ -265,7 +292,8 @@ export type ModuleSnapshot =
       strokes?: Stroke[];
       /** Only present when requester is inside the module's interactionRect. */
       vote?: { votes: number; needed: number };
-    };
+    }
+  | FreeNotesModule;
 
 // All event types gain an optional room_wide flag (default false when absent).
 export interface BaseEvent {
