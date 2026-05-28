@@ -28,7 +28,7 @@ def register_human(client, *, username: str = "Alice", color: str = "#ff6b9d") -
     }
 
 
-def register_agent(client, *, username: str = "Bot", color: str = "#4ecdc4") -> dict:
+def register_agent(client, *, username: str = "Bot", color: str = "#4dd0e1") -> dict:
     """Register an agent and return a dict with agent info + principal."""
     agent = client.post(
         "/api/agents", json={"username": username, "color": color}
@@ -52,6 +52,16 @@ def join_party(client, principal_dict: dict, slug: str, *, x=None, y=None) -> di
     )
     assert resp.status_code == 200, resp.json()
     return resp.json()
+
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Reset the chat rate limiter singleton before each test to prevent state bleed."""
+    from app.rate_limit import reset_chat_limiter_for_tests
+    reset_chat_limiter_for_tests()
+    yield
+    reset_chat_limiter_for_tests()
 
 
 @pytest.fixture

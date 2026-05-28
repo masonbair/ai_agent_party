@@ -1,13 +1,23 @@
 import time
+from typing import Literal
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import BaseModel
 
-from app.errors import INVALID_CHAT_TEXT, NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope
+from app.errors import (
+    INVALID_CHAT_TEXT,
+    INVALID_REPLY_TO,
+    NOT_IN_PARTY,
+    PARTY_NOT_FOUND,
+    RATE_LIMITED,
+    RECIPIENT_UNKNOWN,
+    envelope,
+    http_envelope,
+)
 from app.events import Participant
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
-from app.validation import ChatValidationError
+from app.validation import CHAT_ALLOWED_CHARS_REGEX, CHAT_MAX_LEN, ChatValidationError
 from app.world import ParticipantNotInPartyError, PartyWorld
 
 router = APIRouter(prefix="/api/parties")
@@ -43,6 +53,9 @@ class MoveRequest(BaseModel):
 class ChatRequest(BaseModel):
     principal: Principal
     text: str
+    to_id: str | None = None
+    reply_to: int | None = None
+    scope: Literal["proximity", "room"] = "proximity"
 
 
 _SLUG_PATTERN = r"^[a-z0-9-]+$"
@@ -125,14 +138,53 @@ def chat(
     slug: str = Path(pattern=_SLUG_PATTERN),
     store: Store = Depends(_store_dep),
 ) -> dict:
+    from app.rate_limit import chat_limiter
     world = _world(store, slug)
     resolved = resolve_principal(store, body.principal)
+    if body.to_id is not None and body.to_id not in world.participants:
+        raise HTTPException(
+            status_code=404,
+            detail=envelope(RECIPIENT_UNKNOWN, message="to_id not in party"),
+        )
+    if body.reply_to is not None and not world.has_chat_at_seq(body.reply_to):
+        raise HTTPException(
+            status_code=404,
+            detail=envelope(
+                INVALID_REPLY_TO,
+                message="reply_to does not reference a known chat event",
+            ),
+        )
+    ok, retry_after_ms = chat_limiter().try_consume(slug, resolved.id, body.scope)
+    if not ok:
+        raise HTTPException(
+            status_code=429,
+            detail=envelope(
+                RATE_LIMITED,
+                message=f"chat cooldown: try again in {retry_after_ms} ms",
+                retry_after_ms=retry_after_ms,
+                scope=body.scope,
+            ),
+        )
     try:
-        world.chat(resolved.id, body.text)
+        world.chat(
+            resolved.id,
+            body.text,
+            to_id=body.to_id,
+            reply_to=body.reply_to,
+            scope=body.scope,
+        )
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
     except ChatValidationError as exc:
-        raise http_envelope(422, INVALID_CHAT_TEXT, message=str(exc))
+        raise HTTPException(
+            status_code=422,
+            detail=envelope(
+                INVALID_CHAT_TEXT,
+                message=str(exc),
+                allowed_chars_regex=CHAT_ALLOWED_CHARS_REGEX,
+                max_chars=CHAT_MAX_LEN,
+            ),
+        )
     return {"cursor": world.cursor}
 
 
@@ -182,6 +234,7 @@ def observe(
     since: int | None = None,
     principal_id: str | None = None,
     principal_kind: str | None = None,
+    viewer_id: str | None = None,
     store: Store = Depends(_store_dep),
 ) -> dict:
     world = _world(store, slug)
@@ -211,5 +264,5 @@ def observe(
             "recent_chat": world.recent_chat(),
         }
     if requester_id is None:
-        return world.observe_since(since)
+        return world.observe_since(since, viewer_id=viewer_id)
     return world.observe_since_scoped(since, requester_id)

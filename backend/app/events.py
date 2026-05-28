@@ -62,6 +62,9 @@ class ChatEvent(BaseModel):
     actor_kind: Literal["human", "agent"]
     text: str
     at: float
+    mentions: list[str] = []
+    to_id: str | None = None
+    reply_to: int | None = None
     room_wide: bool = False
 
 
