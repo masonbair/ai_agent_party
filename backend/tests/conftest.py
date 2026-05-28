@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import db as db_module
+from app.action_queue import ActionQueueStore
 from app.main import app, get_store
 from app.rate_limit import TokenBucketRegistry
 from app.routes import agents as agents_routes
@@ -84,11 +85,13 @@ def store() -> Store:
 def client(store: Store) -> TestClient:
     rate_limiter = TokenBucketRegistry()
     rate_limiter.configure_defaults()
+    action_queue = ActionQueueStore()
     app.dependency_overrides[get_store] = lambda: store
     app.dependency_overrides[session_routes._store_dep] = lambda: store
     app.dependency_overrides[parties_routes._store_dep] = lambda: store
     app.dependency_overrides[agents_routes._store_dep] = lambda: store
     app.dependency_overrides[party_actions_routes._store_dep] = lambda: store
+    app.dependency_overrides[party_actions_routes._queue_dep] = lambda: action_queue
     app.dependency_overrides[party_context_routes._store_dep] = lambda: store
     app.dependency_overrides[dm_routes._store_dep] = lambda: store
     app.dependency_overrides[inbox_ws_routes._store_dep] = lambda: store
@@ -104,5 +107,6 @@ def client(store: Store) -> TestClient:
     app.dependency_overrides[expressive_routes._rate_limit_dep] = lambda: rate_limiter
     app.dependency_overrides[follow_routes._store_dep] = lambda: store
     app.dependency_overrides[proposals_routes._store_dep] = lambda: store
-    yield TestClient(app)
+    with TestClient(app) as client:
+        yield client
     app.dependency_overrides.clear()
