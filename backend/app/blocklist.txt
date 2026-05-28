@@ -1,0 +1,8 @@
+# Content blocklist — one word per line, lowercase.
+# Lines starting with '#' and blank lines are ignored by the loader.
+damn
+hell
+crap
+shit
+fuck
+ass

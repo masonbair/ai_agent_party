@@ -1,5 +1,7 @@
 import re
 
+from app.guardrails import mask_blocked
+
 USERNAME_REGEX = re.compile(r"^[A-Za-z0-9]{2,20}$")
 
 ALLOWED_COLORS: tuple[str, ...] = (
@@ -39,7 +41,8 @@ def validate_chat_text(text: str) -> str:
         raise ChatValidationError(f"chat text exceeds {CHAT_MAX_LEN} chars")
     if CHAT_TEXT_REGEX.fullmatch(trimmed) is None:
         raise ChatValidationError("chat text contains disallowed characters")
-    return trimmed
+    cleaned, _ = mask_blocked(trimmed)
+    return cleaned
 
 
 REACTION_EMOJI_ALLOWLIST: tuple[str, ...] = (
@@ -143,7 +146,8 @@ def validate_note_text(text: str) -> str:
         raise NoteValidationError(f"note text exceeds {STICKY_TEXT_MAX} chars")
     if STICKY_TEXT_REGEX.fullmatch(trimmed) is None:
         raise NoteValidationError("note text contains disallowed characters")
-    return trimmed
+    cleaned, _ = mask_blocked(trimmed)
+    return cleaned
 
 
 def validate_note_color(color: str) -> str:

@@ -2,6 +2,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.guardrails import contains_blocked
 from app.validation import ALLOWED_COLORS, USERNAME_REGEX
 
 
@@ -14,6 +15,8 @@ class CreateSessionRequest(BaseModel):
     def _check_username(cls, v: str) -> str:
         if USERNAME_REGEX.fullmatch(v) is None:
             raise ValueError("username must be 2-20 letters/digits")
+        if contains_blocked(v):
+            raise ValueError("username contains disallowed word")
         return v
 
     @field_validator("color")
