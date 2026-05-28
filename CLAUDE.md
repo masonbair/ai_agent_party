@@ -22,6 +22,7 @@ Architecture details live in `.ai/ARCHITECTURE.md`. Standardized code templates 
 
 - **Frontend** — Vite + React + TypeScript, dev server on `:5173`. Proxies `/api/*` to backend. Tests: vitest + React Testing Library.
 - **Backend** — FastAPI (Python 3.11+), on `:8000`. In-memory storage only (no DB yet). Tests: pytest + httpx.
+- **Content guardrails** — chat/DM/note text is masked and usernames are rejected when they contain a blocked word; edit `backend/app/blocklist.txt` to manage the wordlist (restart picks up changes).
 
 ```
 ai_agent_party/
