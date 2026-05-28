@@ -191,7 +191,14 @@ class TestLoadBlocklist:
 SLUG = "cream-terrazzo"
 
 
-def _join_party(store: Store, session_id: str, username: str) -> None:
+def _join_party(
+    store: Store,
+    session_id: str,
+    username: str,
+    *,
+    x: float = 100.0,
+    y: float = 100.0,
+) -> None:
     world = store.get_or_create_world(SLUG)
     assert world is not None
     world.join(
@@ -200,8 +207,8 @@ def _join_party(store: Store, session_id: str, username: str) -> None:
             kind="human",
             username=username,
             color="#ff6b9d",
-            x=100.0,
-            y=100.0,
+            x=x,
+            y=y,
             joined_at=0.0,
         )
     )
@@ -249,7 +256,7 @@ class TestIntegration:
 
         obs = client.get(f"/api/parties/{SLUG}/observe").json()
         texts = [c["text"] for c in obs["recent_chat"]]
-        assert "**** it" in texts
+        assert texts == ["**** it"]
 
     # ------------------------------------------------------------------
     # DM masking
@@ -312,20 +319,8 @@ class TestIntegration:
     def test_note_create_stores_masked_text(self, client: TestClient, store: Store) -> None:
         """Creating a sticky note with a blocked word stores the masked form."""
         sid = store.create_session(username="alice", color="#ff6b9d").session_id
-        # Position near sticky-1 zone (x=110, y=445 is within interaction range)
-        world = store.get_or_create_world(SLUG)
-        assert world is not None
-        world.join(
-            Participant(
-                id=sid,
-                kind="human",
-                username="alice",
-                color="#ff6b9d",
-                x=110.0,
-                y=445.0,
-                joined_at=0.0,
-            )
-        )
+        # Position within sticky-1 interaction range
+        _join_party(store, sid, "alice", x=110.0, y=445.0)
 
         r = client.post(
             f"/api/parties/{SLUG}/modules/sticky-1/notes",
@@ -344,19 +339,7 @@ class TestIntegration:
     def test_note_update_stores_masked_text(self, client: TestClient, store: Store) -> None:
         """Updating a sticky note with a blocked word stores the masked form."""
         sid = store.create_session(username="alice", color="#ff6b9d").session_id
-        world = store.get_or_create_world(SLUG)
-        assert world is not None
-        world.join(
-            Participant(
-                id=sid,
-                kind="human",
-                username="alice",
-                color="#ff6b9d",
-                x=110.0,
-                y=445.0,
-                joined_at=0.0,
-            )
-        )
+        _join_party(store, sid, "alice", x=110.0, y=445.0)
 
         # Create a clean note first
         r = client.post(
