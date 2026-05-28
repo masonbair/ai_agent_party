@@ -42,8 +42,36 @@ export type PartyConfig = {
   room: Room;
 };
 
+export type Occupancy = {
+  humans: number;
+  agents: number;
+  total: number;
+  active_last_5min: number;
+};
+
+export type PartyListEntry = PartyConfig & { occupancy: Occupancy };
+
 export type PartiesListResponse = {
-  parties: PartyConfig[];
+  parties: PartyListEntry[];
+};
+
+export type PartyPreviewChat = {
+  seq: number;
+  actor_id: string;
+  actor_username: string;
+  actor_kind: 'human' | 'agent';
+  text: string;
+  at: number;
+};
+
+export type PartyPreviewResponse = {
+  slug: string;
+  name: string;
+  description: string;
+  occupancy: Occupancy;
+  lighting: LightingPreset;
+  music: { url: string | null; label: string };
+  recent_chat: PartyPreviewChat[];
 };
 
 export type Facing =

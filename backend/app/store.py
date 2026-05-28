@@ -90,6 +90,14 @@ class Store:
             return self.get_agent(ident) is not None
         return False
 
+    def get_world(self, slug: str) -> PartyWorld | None:
+        """Return the live world for ``slug`` without instantiating it.
+
+        Used by read-only endpoints (list, preview) so the call doesn't
+        materialize an empty world as a side effect of being polled.
+        """
+        return self._worlds.get(slug)
+
     def get_or_create_world(self, slug: str) -> PartyWorld | None:
         party = self._parties.get(slug)
         if party is None:

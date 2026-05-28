@@ -107,3 +107,12 @@ def test_agent_guide_documents_walls_out_of_scope(client: TestClient) -> None:
         or "do not block" in body.lower()
         or "ignore walls" in body.lower()
     )
+
+
+def test_agent_guide_mentions_occupancy_and_preview(client):
+    res = client.get("/api/agent-guide")
+    assert res.status_code == 200
+    body = res.text
+    assert "occupancy" in body
+    assert "/api/parties/{slug}/preview" in body
+    assert "active_last_5min" in body

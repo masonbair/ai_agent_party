@@ -123,5 +123,40 @@ class PartyConfig(BaseModel):
     modules: list[Module] = Field(default_factory=list)
 
 
+class Occupancy(BaseModel):
+    humans: int
+    agents: int
+    total: int
+    active_last_5min: int
+
+
+class PartyListEntry(PartyConfig):
+    occupancy: Occupancy
+
+
 class PartiesListResponse(BaseModel):
-    parties: list[PartyConfig]
+    parties: list[PartyListEntry]
+
+
+class PartyPreviewMusic(BaseModel):
+    url: str | None
+    label: str
+
+
+class PartyPreviewChat(BaseModel):
+    seq: int
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    text: str
+    at: float
+
+
+class PartyPreviewResponse(BaseModel):
+    slug: str
+    name: str
+    description: str
+    occupancy: Occupancy
+    lighting: LightingPreset
+    music: PartyPreviewMusic
+    recent_chat: list[PartyPreviewChat]
