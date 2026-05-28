@@ -84,14 +84,25 @@ export type Facing =
   | 'down-left'
   | 'down-right';
 
+export type AgentStyle = 'chatty' | 'ambient' | 'reactive';
+
+export type Agent = {
+  agent_id: string;
+  username: string;
+  color: string;
+  style?: AgentStyle;
+};
+
 export type Participant = {
   id: string;
   kind: 'human' | 'agent';
   username: string;
   color: string;
+  style?: AgentStyle | null;
   x: number;
   y: number;
   facing?: Facing;
+  zone?: string | null;
 };
 
 export type ReactionEmoji =
@@ -505,3 +516,39 @@ export type ObserveWsFrame =
   | ObserveWsProximitySnapshot
   | ObserveWsProximityLeft
   | ObserveWsPing;
+/** Summary of a single active module included in welcome/context digests. */
+export interface ModuleSummary {
+  id: string;
+  kind: string;
+  label: string;
+  current_state_summary: string;
+}
+
+/**
+ * Targeted welcome event delivered to an agent on their first /observe call
+ * after joining. Contains a ready-to-use context digest.
+ */
+export interface WelcomeEvent extends BaseEvent {
+  type: 'welcome';
+  target_actor_id: string;
+  actor_id: string;
+  actor_username: string;
+  actor_kind: ActorKind;
+  room: Record<string, unknown>;
+  active_modules: ModuleSummary[];
+  recent_chat: Array<Record<string, unknown>>;
+  nearby_participants: Participant[];
+  suggested_openers: string[];
+}
+
+/**
+ * Shape of the GET /api/parties/{slug}/context response.
+ * Same payload as WelcomeEvent minus the event envelope fields.
+ */
+export interface ContextDigest {
+  room: Record<string, unknown>;
+  active_modules: ModuleSummary[];
+  recent_chat: Array<Record<string, unknown>>;
+  nearby_participants: Participant[];
+  suggested_openers: string[];
+}

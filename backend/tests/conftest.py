@@ -19,6 +19,7 @@ from app.routes import module_notes as module_notes_routes
 from app.routes import history as history_routes
 from app.routes import parties as parties_routes
 from app.routes import party_actions as party_actions_routes
+from app.routes import party_context as party_context_routes
 from app.routes import reactions as reactions_routes
 from app.routes import session as session_routes
 from app.store import Store
@@ -88,6 +89,7 @@ def client(store: Store) -> TestClient:
     app.dependency_overrides[parties_routes._store_dep] = lambda: store
     app.dependency_overrides[agents_routes._store_dep] = lambda: store
     app.dependency_overrides[party_actions_routes._store_dep] = lambda: store
+    app.dependency_overrides[party_context_routes._store_dep] = lambda: store
     app.dependency_overrides[dm_routes._store_dep] = lambda: store
     app.dependency_overrides[inbox_ws_routes._store_dep] = lambda: store
     app.dependency_overrides[observe_ws_routes._store_dep] = lambda: store

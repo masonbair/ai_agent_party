@@ -40,6 +40,7 @@ from app.events import (
     Stroke,
     StrokeAddedEvent,
     StrokeDroppedEvent,
+    WelcomeEvent,
 )
 from app.models import (
     DrawBoardModule,
@@ -290,6 +291,38 @@ class PartyWorld:
         elif horiz == 1:
             pieces.append("right")
         return "-".join(pieces)
+    def latest_welcome_for(self, viewer_id: str) -> dict | None:
+        """Return the most-recent WelcomeEvent addressed to viewer_id, or None."""
+        for ev in reversed(self._events):
+            if isinstance(ev, WelcomeEvent) and ev.target_actor_id == viewer_id:
+                return ev.model_dump()
+        return None
+
+    def _build_welcome(self, participant: Participant) -> WelcomeEvent | None:
+        """Build a WelcomeEvent for an agent that just joined."""
+        # Lazy import to avoid a circular dep with party_actions._room_view.
+        from app.routes.party_actions import _room_view
+        from app.onboarding import build_context_digest
+
+        digest = build_context_digest(
+            self,
+            self._party,
+            viewer_id=participant.id,
+            room_view_fn=_room_view,
+        )
+        return WelcomeEvent(
+            seq=self._next_seq(),
+            at=time.time(),
+            target_actor_id=participant.id,
+            actor_id=participant.id,
+            actor_username=participant.username,
+            actor_kind=participant.kind,
+            room=digest["room"],
+            active_modules=digest["active_modules"],
+            recent_chat=digest["recent_chat"],
+            nearby_participants=digest["nearby_participants"],
+            suggested_openers=digest["suggested_openers"],
+        )
 
     def join(self, participant: Participant) -> JoinEvent:
         self.participants[participant.id] = participant
@@ -305,6 +338,11 @@ class PartyWorld:
         )
         self._events.append(ev)
         self._emit(ev)
+        if participant.kind == "agent":
+            welcome = self._build_welcome(participant)
+            if welcome is not None:
+                self._events.append(welcome)
+                self._emit(welcome)
         self._recompute_all_drawboard_votes(time.time())
         return ev
 
@@ -1091,6 +1129,7 @@ class PartyWorld:
             "kind": p.kind,
             "username": p.username,
             "color": p.color,
+            "style": p.style,
             "x": p.x,
             "y": p.y,
             "facing": p.facing,
@@ -1417,6 +1456,12 @@ class PartyWorld:
                 out.append(ev.model_dump())
                 continue
 
+            if isinstance(ev, WelcomeEvent):
+                # Targeted delivery: only the addressed actor sees it.
+                if ev.target_actor_id == req.id:
+                    out.append(ev.model_dump())
+                continue
+
             # Default: room_wide or unrecognized → pass through.
             if room_wide:
                 out.append(ev.model_dump())
@@ -1697,6 +1742,12 @@ class PartyWorld:
         latest_vote_by_module: dict[str, VoteChangedEvent] = {}
         out: list[dict] = []
         for ev in tail:
+            # Welcome events are addressed to a single agent (Plan 11) — hide
+            # from others. (Reactions also carry target_actor_id for UI highlight
+            # but remain visible to everyone, so don't filter those.)
+            if isinstance(ev, WelcomeEvent):
+                if ev.target_actor_id != viewer_id:
+                    continue
             if isinstance(ev, MoveEvent):
                 latest_move_by_actor[ev.actor_id] = ev
                 continue

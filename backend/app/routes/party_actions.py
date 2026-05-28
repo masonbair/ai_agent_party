@@ -73,6 +73,10 @@ def join(
     assert party is not None
     x = body.x if body.x is not None else party.worldSize.width / 2
     y = body.y if body.y is not None else party.worldSize.height / 2
+    style: str | None = None
+    if resolved.kind == "agent":
+        agent = store.get_agent(resolved.id)
+        style = agent.style if agent is not None else "reactive"
     participant = Participant(
         id=resolved.id,
         kind=resolved.kind,
@@ -81,6 +85,7 @@ def join(
         x=float(x),
         y=float(y),
         joined_at=time.time(),
+        style=style,
     )
     world.join(participant)
     return {
@@ -89,6 +94,7 @@ def join(
             "kind": participant.kind,
             "username": participant.username,
             "color": participant.color,
+            "style": participant.style,
             "x": participant.x,
             "y": participant.y,
             "zone": world.derive_zone(participant.x, participant.y),
@@ -266,26 +272,31 @@ def observe(
     principal_id: str | None = None,
     principal_kind: str | None = None,
     viewer_id: str | None = None,
+    viewer_kind: str | None = None,
     store: Store = Depends(_store_dep),
 ) -> dict:
     world = _world(store, slug)
     party = store.get_party(slug)
     assert party is not None
 
+    # Support both old (principal_id/kind) and new (viewer_id/kind) param names.
+    eff_id = viewer_id if viewer_id is not None else principal_id
+    eff_kind = viewer_kind if viewer_kind is not None else principal_kind
+
     requester_id: str | None = None
-    if principal_id is not None and principal_kind is not None:
+    if eff_id is not None and eff_kind is not None:
         # Only scope if the requester is actually in the party.
         # If the principal is unknown/not joined, fall back to unscoped so
         # the lobby UI still works.
-        if principal_id in world.participants:
-            requester_id = principal_id
+        if eff_id in world.participants:
+            requester_id = eff_id
 
     if since is None:
         if requester_id is None:
             snap = world.snapshot()
         else:
             snap = world.scoped_snapshot(requester_id)
-        return {
+        body = {
             "room": _room_view(party),
             "participants": snap["participants"],
             "cursor": snap["cursor"],
@@ -296,8 +307,13 @@ def observe(
             "recent_chat": world.recent_chat(),
             "active_proposals": world.active_proposals(),
         }
+        if eff_id is not None:
+            body["welcome"] = world.latest_welcome_for(eff_id)
+        else:
+            body["welcome"] = None
+        return body
     if requester_id is None:
-        payload = world.observe_since(since, viewer_id=viewer_id)
+        payload = world.observe_since(since, viewer_id=viewer_id or eff_id)
     else:
         payload = world.observe_since_scoped(since, requester_id)
     if exclude_self and principal_id:

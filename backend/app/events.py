@@ -12,12 +12,14 @@ class Participant(BaseModel):
     y: float
     joined_at: float
     facing: str = "down"  # one of the 8 Facing directions
+    style: str | None = None
 
 
 class Agent(BaseModel):
     agent_id: str
     username: str
     color: str
+    style: Literal["chatty", "ambient", "reactive"] = "reactive"
 
 
 class JoinEvent(BaseModel):
@@ -329,6 +331,26 @@ class ProximityLeftEvent(BaseModel):
     room_wide: bool = False
 
 
+class WelcomeEvent(BaseModel):
+    seq: int
+    type: Literal["welcome"] = "welcome"
+    at: float
+    # Targeted-delivery field — see "per-participant event delivery extension"
+    # in the onboarding plan. When set, ONLY this actor sees the event.
+    target_actor_id: str
+    # Unified-event-shape (spec #01) fields. For welcome these mirror the
+    # joining participant so consumers can render uniformly.
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    # Payload (matches GET /context shape minus type/seq/at).
+    room: dict
+    active_modules: list[dict]
+    recent_chat: list[dict]
+    nearby_participants: list[dict]
+    suggested_openers: list[str]
+
+
 Event = (
     JoinEvent
     | LeaveEvent
@@ -353,4 +375,5 @@ Event = (
     | MusicChangedEvent
     | ProximitySnapshotEvent
     | ProximityLeftEvent
+    | WelcomeEvent
 )
