@@ -1,8 +1,11 @@
 """Tests for backend/app/guardrails.py — content masking via blocklist."""
 
 import pytest
+from fastapi.testclient import TestClient
 
 import app.guardrails as guardrails
+from app.events import Participant
+from app.store import Store
 
 
 # ---------------------------------------------------------------------------
@@ -179,3 +182,203 @@ class TestLoadBlocklist:
         f.write_text("# comment 1\n# comment 2\n")
         result = guardrails._load_blocklist(f)
         assert result == frozenset()
+
+
+# ---------------------------------------------------------------------------
+# Integration — masking flows through chat, DM, and sticky-note validators
+# ---------------------------------------------------------------------------
+
+SLUG = "cream-terrazzo"
+
+
+def _join_party(store: Store, session_id: str, username: str) -> None:
+    world = store.get_or_create_world(SLUG)
+    assert world is not None
+    world.join(
+        Participant(
+            id=session_id,
+            kind="human",
+            username=username,
+            color="#ff6b9d",
+            x=100.0,
+            y=100.0,
+            joined_at=0.0,
+        )
+    )
+
+
+class TestIntegration:
+    """Verify that blocked words are masked in chat, DMs, and sticky notes."""
+
+    # ------------------------------------------------------------------
+    # Chat masking
+    # ------------------------------------------------------------------
+
+    def test_chat_response_contains_masked_text(self, client: TestClient, store: Store) -> None:
+        """POST /chat with a blocked word: the observe snapshot shows the masked form."""
+        sid = store.create_session(username="Alice", color="#ff6b9d").session_id
+        _join_party(store, sid, "Alice")
+        principal = {"kind": "human", "id": sid}
+
+        # Capture cursor before the chat
+        cur = client.get(f"/api/parties/{SLUG}/observe").json()["cursor"]
+
+        # Send a message with a blocked word
+        r = client.post(
+            f"/api/parties/{SLUG}/chat",
+            json={"principal": principal, "text": "what the damn thing"},
+        )
+        assert r.status_code == 200
+
+        # The observe diff should show the masked form in the broadcast event
+        diff = client.get(f"/api/parties/{SLUG}/observe?since={cur}").json()
+        chat_events = [e for e in diff["events"] if e["type"] == "chat"]
+        assert len(chat_events) == 1
+        assert chat_events[0]["text"] == "what the **** thing"
+
+    def test_chat_observe_snapshot_contains_masked_text(self, client: TestClient, store: Store) -> None:
+        """The recent_chat snapshot on the initial observe also shows the masked text."""
+        sid = store.create_session(username="Alice", color="#ff6b9d").session_id
+        _join_party(store, sid, "Alice")
+        principal = {"kind": "human", "id": sid}
+
+        client.post(
+            f"/api/parties/{SLUG}/chat",
+            json={"principal": principal, "text": "damn it"},
+        )
+
+        obs = client.get(f"/api/parties/{SLUG}/observe").json()
+        texts = [c["text"] for c in obs["recent_chat"]]
+        assert "**** it" in texts
+
+    # ------------------------------------------------------------------
+    # DM masking
+    # ------------------------------------------------------------------
+
+    def test_dm_stored_text_is_masked(self, client: TestClient, store: Store) -> None:
+        """POST /dm/send with a blocked word: the thread history stores the masked form."""
+        alice = store.create_session(username="Alice", color="#ff6b9d")
+        bob = store.create_session(username="Bob", color="#9c27b0")
+        _join_party(store, alice.session_id, "Alice")
+        _join_party(store, bob.session_id, "Bob")
+
+        a, b = alice.session_id, bob.session_id
+
+        r = client.post(
+            "/api/dm/send",
+            json={
+                "principal": {"kind": "human", "id": a},
+                "recipient": {"kind": "human", "id": b},
+                "text": "damn right",
+            },
+        )
+        assert r.status_code == 200
+
+        tk = f"human:{min(a, b)}|human:{max(a, b)}"
+        history = client.get(
+            f"/api/dm/threads/{tk}/history",
+            params={"principal_kind": "human", "principal_id": a},
+        ).json()
+        assert history["messages"][0]["text"] == "**** right"
+
+    def test_dm_thread_list_shows_masked_last_text(self, client: TestClient, store: Store) -> None:
+        """The thread list last_text field also reflects the masked form."""
+        alice = store.create_session(username="Alice", color="#ff6b9d")
+        bob = store.create_session(username="Bob", color="#9c27b0")
+        _join_party(store, alice.session_id, "Alice")
+        _join_party(store, bob.session_id, "Bob")
+
+        a, b = alice.session_id, bob.session_id
+
+        client.post(
+            "/api/dm/send",
+            json={
+                "principal": {"kind": "human", "id": a},
+                "recipient": {"kind": "human", "id": b},
+                "text": "what the damn",
+            },
+        )
+
+        threads = client.get(
+            "/api/dm/threads",
+            params={"principal_kind": "human", "principal_id": a},
+        ).json()["threads"]
+        assert threads[0]["last_text"] == "what the ****"
+
+    # ------------------------------------------------------------------
+    # Sticky-note masking
+    # ------------------------------------------------------------------
+
+    def test_note_create_stores_masked_text(self, client: TestClient, store: Store) -> None:
+        """Creating a sticky note with a blocked word stores the masked form."""
+        sid = store.create_session(username="alice", color="#ff6b9d").session_id
+        # Position near sticky-1 zone (x=110, y=445 is within interaction range)
+        world = store.get_or_create_world(SLUG)
+        assert world is not None
+        world.join(
+            Participant(
+                id=sid,
+                kind="human",
+                username="alice",
+                color="#ff6b9d",
+                x=110.0,
+                y=445.0,
+                joined_at=0.0,
+            )
+        )
+
+        r = client.post(
+            f"/api/parties/{SLUG}/modules/sticky-1/notes",
+            json={
+                "principal": {"kind": "human", "id": sid},
+                "text": "damn good idea",
+                "color": "yellow",
+                "x": 5,
+                "y": 5,
+            },
+        )
+        assert r.status_code == 200, r.text
+        note = r.json()["note"]
+        assert note["text"] == "**** good idea"
+
+    def test_note_update_stores_masked_text(self, client: TestClient, store: Store) -> None:
+        """Updating a sticky note with a blocked word stores the masked form."""
+        sid = store.create_session(username="alice", color="#ff6b9d").session_id
+        world = store.get_or_create_world(SLUG)
+        assert world is not None
+        world.join(
+            Participant(
+                id=sid,
+                kind="human",
+                username="alice",
+                color="#ff6b9d",
+                x=110.0,
+                y=445.0,
+                joined_at=0.0,
+            )
+        )
+
+        # Create a clean note first
+        r = client.post(
+            f"/api/parties/{SLUG}/modules/sticky-1/notes",
+            json={
+                "principal": {"kind": "human", "id": sid},
+                "text": "clean text",
+                "color": "yellow",
+                "x": 5,
+                "y": 5,
+            },
+        )
+        assert r.status_code == 200, r.text
+        note_id = r.json()["note"]["id"]
+
+        # Update the note with a blocked word
+        r2 = client.patch(
+            f"/api/parties/{SLUG}/modules/sticky-1/notes/{note_id}",
+            json={
+                "principal": {"kind": "human", "id": sid},
+                "text": "damn update",
+            },
+        )
+        assert r2.status_code == 200, r2.text
+        assert r2.json()["note"]["text"] == "**** update"
