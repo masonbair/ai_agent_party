@@ -14,7 +14,9 @@ from app.proximity import (
 )
 from app.events import (
     ChatEvent,
+    CosmeticEvent,
     Event,
+    GestureEvent,
     JoinEvent,
     LeaveEvent,
     ModuleChatEvent,
@@ -46,6 +48,8 @@ from app.models import (
     StickyNoteModule,
 )
 from app.validation import (
+    COSMETIC_TTL_SECONDS,
+    GESTURE_TTL_SECONDS,
     INTERACTION_MARGIN,
     NOTES_PER_USER_MAX,
     REACTION_LIFETIME_SECONDS,
@@ -54,6 +58,8 @@ from app.validation import (
     STROKES_PER_BOARD_MAX,
     VOTE_TTL_SECONDS,
     validate_chat_text,
+    validate_cosmetic_effect,
+    validate_gesture,
     validate_note_color,
     validate_note_text,
     validate_reaction_emoji,
@@ -94,6 +100,14 @@ PROPOSAL_TEXT_MAX = 65  # mirrors chat cap (shared brief: do not raise)
 
 
 class ParticipantNotInPartyError(LookupError):
+    pass
+
+
+class ReactionTargetNotFoundError(LookupError):
+    pass
+
+
+class ReactionTargetConflictError(ValueError):
     pass
 
 
@@ -224,6 +238,36 @@ class PartyWorld:
             "actor_color": p.color,
         }
 
+    def _derive_facing(self, dx: float, dy: float, fallback: str) -> str:
+        """Compute 8-directional facing from a movement delta.
+
+        Uses a small dead-zone to ignore sub-pixel jitter from the slide solver.
+        Returns ``fallback`` when the delta is effectively zero.
+        """
+        epsilon = 0.5
+        horiz = 0
+        vert = 0
+        if dx > epsilon:
+            horiz = 1
+        elif dx < -epsilon:
+            horiz = -1
+        if dy > epsilon:
+            vert = 1
+        elif dy < -epsilon:
+            vert = -1
+        if horiz == 0 and vert == 0:
+            return fallback
+        pieces: list[str] = []
+        if vert == -1:
+            pieces.append("up")
+        elif vert == 1:
+            pieces.append("down")
+        if horiz == -1:
+            pieces.append("left")
+        elif horiz == 1:
+            pieces.append("right")
+        return "-".join(pieces)
+
     def join(self, participant: Participant) -> JoinEvent:
         self.participants[participant.id] = participant
         ev = JoinEvent(
@@ -300,14 +344,18 @@ class PartyWorld:
             self._wall_rects,
             self._party.worldSize,
         )
+        new_facing = self._derive_facing(
+            new_x - current.x, new_y - current.y, fallback=current.facing
+        )
         self.participants[participant_id] = current.model_copy(
-            update={"x": new_x, "y": new_y}
+            update={"x": new_x, "y": new_y, "facing": new_facing}
         )
         ev = MoveEvent(
             seq=self._next_seq(),
             x=new_x,
             y=new_y,
             at=time.time(),
+            facing=new_facing,
             **self._actor_fields(participant_id),
         )
         self._events.append(ev)
@@ -405,9 +453,26 @@ class PartyWorld:
         self._emit(ev)
         return ev
 
-    def react(self, participant_id: str, emoji: str) -> ReactionEvent:
+    def react(
+        self,
+        participant_id: str,
+        emoji: str,
+        *,
+        target_seq: int | None = None,
+        target_actor_id: str | None = None,
+    ) -> ReactionEvent:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
+        if target_seq is not None and target_actor_id is not None:
+            raise ReactionTargetConflictError(
+                "set at most one of target_seq/target_actor_id"
+            )
+        if target_actor_id is not None and target_actor_id not in self.participants:
+            raise ReactionTargetNotFoundError(target_actor_id)
+        if target_seq is not None and (
+            target_seq < 1 or target_seq > len(self._events)
+        ):
+            raise ReactionTargetNotFoundError(str(target_seq))
         cleaned = validate_reaction_emoji(emoji)
         now = time.time()
         expires_at = now + REACTION_LIFETIME_SECONDS
@@ -420,6 +485,8 @@ class PartyWorld:
             emoji=cleaned,
             expires_at=expires_at,
             at=now,
+            target_seq=target_seq,
+            target_actor_id=target_actor_id,
             **self._actor_fields(participant_id),
         )
         self._events.append(ev)
@@ -483,6 +550,42 @@ class PartyWorld:
     def module_chat_history(self, module_id: str) -> list[dict]:
         bucket = self.module_chat_by_module.get(module_id, [])
         return [ev.model_dump() for ev in bucket]
+
+    def gesture(self, participant_id: str, gesture: str) -> GestureEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        cleaned = validate_gesture(gesture)
+        now = time.time()
+        p = self.participants[participant_id]
+        ev = GestureEvent(
+            seq=self._next_seq(),
+            gesture=cleaned,
+            at=now,
+            expires_at=now + GESTURE_TTL_SECONDS,
+            room_wide=False,
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        self._actor_pos_at_seq[ev.seq] = (p.x, p.y)
+        self._emit(ev)
+        return ev
+
+    def cosmetic(self, participant_id: str, effect: str) -> CosmeticEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        cleaned = validate_cosmetic_effect(effect)
+        now = time.time()
+        ev = CosmeticEvent(
+            seq=self._next_seq(),
+            effect=cleaned,
+            at=now,
+            expires_at=now + COSMETIC_TTL_SECONDS,
+            room_wide=True,
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
 
     def set_lighting(self, changed_by: str, preset: str) -> LightingChangedEvent:
         if changed_by not in self.participants:
@@ -907,6 +1010,7 @@ class PartyWorld:
             "color": p.color,
             "x": p.x,
             "y": p.y,
+            "facing": p.facing,
             "zone": self.derive_zone(p.x, p.y),
         }
 
@@ -1187,7 +1291,7 @@ class PartyWorld:
                 latest_vote_by_module[ev.module_id] = ev
                 continue
 
-            if isinstance(ev, (ChatEvent, ReactionEvent)):
+            if isinstance(ev, (ChatEvent, ReactionEvent, GestureEvent)):
                 if not room_wide:
                     pos = self._actor_pos_at_seq.get(ev.seq)
                     if pos is None or not within_proximity(req_pos, pos):

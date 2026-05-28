@@ -21,6 +21,8 @@ from app.routes import module_notes as module_notes_routes
 from app.routes import history as history_routes
 from app.routes import parties as parties_routes
 from app.routes import party_actions as party_actions_routes
+from app.rate_limit import TokenBucketRegistry
+from app.routes import expressive as expressive_routes
 from app.routes import reactions as reactions_routes
 from app.routes import session as session_routes
 from app.store import Store
@@ -82,6 +84,8 @@ app.add_middleware(
 )
 
 _store = Store()
+_rate_limiter = TokenBucketRegistry()
+_rate_limiter.configure_defaults()
 
 
 @app.on_event("startup")
@@ -104,6 +108,10 @@ def get_store() -> Store:
     return _store
 
 
+def get_rate_limiter() -> TokenBucketRegistry:
+    return _rate_limiter
+
+
 app.dependency_overrides[follow_routes._store_dep] = get_store
 app.dependency_overrides[proposals_routes._store_dep] = get_store
 app.dependency_overrides[session_routes._store_dep] = get_store
@@ -118,6 +126,8 @@ app.dependency_overrides[module_chat_routes._store_dep] = get_store
 app.dependency_overrides[module_notes_routes._store_dep] = get_store
 app.dependency_overrides[module_drawboard_routes._store_dep] = get_store
 app.dependency_overrides[history_routes._store_dep] = get_store
+app.dependency_overrides[expressive_routes._store_dep] = get_store
+app.dependency_overrides[expressive_routes._rate_limit_dep] = get_rate_limiter
 app.include_router(session_routes.router)
 app.include_router(parties_routes.router)
 app.include_router(agents_routes.router)
@@ -131,6 +141,7 @@ app.include_router(module_chat_routes.router)
 app.include_router(module_notes_routes.router)
 app.include_router(module_drawboard_routes.router)
 app.include_router(history_routes.router)
+app.include_router(expressive_routes.router)
 app.include_router(follow_routes.router)
 app.include_router(proposals_routes.router)
 

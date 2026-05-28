@@ -46,6 +46,16 @@ export type PartiesListResponse = {
   parties: PartyConfig[];
 };
 
+export type Facing =
+  | 'up'
+  | 'down'
+  | 'left'
+  | 'right'
+  | 'up-left'
+  | 'up-right'
+  | 'down-left'
+  | 'down-right';
+
 export type Participant = {
   id: string;
   kind: 'human' | 'agent';
@@ -53,6 +63,7 @@ export type Participant = {
   color: string;
   x: number;
   y: number;
+  facing?: Facing;
 };
 
 export type ReactionEmoji =
@@ -148,6 +159,7 @@ export interface MoveEvent extends ActorRef {
   zone?: string | null;
   at: number;
   room_wide?: boolean;
+  facing?: Facing;
 }
 
 export type ChatScope = 'proximity' | 'room';
@@ -190,6 +202,40 @@ export interface ReactionEvent extends ActorRef {
   expires_at: number;
   at: number;
   room_wide?: boolean;
+  target_seq?: number;
+  target_actor_id?: string;
+}
+
+export interface GestureEvent {
+  type: 'gesture';
+  seq: number;
+  gesture:
+    | 'wave'
+    | 'point'
+    | 'dance'
+    | 'jump'
+    | 'sit'
+    | 'shiver'
+    | 'bow'
+    | 'nod';
+  at: number;
+  expires_at: number;
+  room_wide: false;
+  actor_id: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+}
+
+export interface CosmeticEvent {
+  type: 'cosmetic';
+  seq: number;
+  effect: 'confetti' | 'sparkle' | 'lights_flash' | 'ping';
+  at: number;
+  expires_at: number;
+  room_wide: true;
+  actor_id: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
 }
 
 export interface Proposal {
