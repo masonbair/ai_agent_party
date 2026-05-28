@@ -188,6 +188,35 @@ def chat(
     return {"cursor": world.cursor}
 
 
+@router.get("/{slug}/participants/{participant_id}")
+def get_participant(
+    slug: str = Path(pattern=_SLUG_PATTERN),
+    participant_id: str = Path(...),
+    store: Store = Depends(_store_dep),
+) -> dict:
+    """Resolve a participant by id, bypassing proximity scoping.
+
+    Returns only the same public fields already visible in the
+    proximity-scoped snapshot whenever the requester sees the target.
+    """
+    world = _world(store, slug)
+    p = world.participants.get(participant_id)
+    if p is None:
+        raise HTTPException(
+            status_code=404, detail=envelope(NOT_IN_PARTY),
+        )
+    return {
+        "id": p.id,
+        "username": p.username,
+        "color": p.color,
+        "kind": p.kind,
+        "x": p.x,
+        "y": p.y,
+        "zone": world.derive_zone(p.x, p.y),
+        "facing": getattr(p, "facing", None),
+    }
+
+
 def _room_view(party) -> dict:
     w = party.worldSize
     return {
@@ -232,6 +261,7 @@ def _room_view(party) -> dict:
 def observe(
     slug: str = Path(pattern=_SLUG_PATTERN),
     since: int | None = None,
+    exclude_self: bool = False,
     principal_id: str | None = None,
     principal_kind: str | None = None,
     viewer_id: str | None = None,
@@ -262,7 +292,15 @@ def observe(
             "lighting": snap["lighting"],
             "active_reactions": snap["active_reactions"],
             "recent_chat": world.recent_chat(),
+            "active_proposals": world.active_proposals(),
         }
     if requester_id is None:
-        return world.observe_since(since, viewer_id=viewer_id)
-    return world.observe_since_scoped(since, requester_id)
+        payload = world.observe_since(since, viewer_id=viewer_id)
+    else:
+        payload = world.observe_since_scoped(since, requester_id)
+    if exclude_self and principal_id:
+        payload["events"] = [
+            e for e in payload["events"]
+            if e.get("actor_id") != principal_id
+        ]
+    return payload

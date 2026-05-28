@@ -25,6 +25,9 @@ from app.events import (
     NoteCreatedEvent,
     NoteDeletedEvent,
     NoteUpdatedEvent,
+    ProposalCreatedEvent,
+    ProposalResolvedEvent,
+    ProposalVoteEvent,
     ReactionEvent,
     VoteChangedEvent,
     StickyNote,
@@ -83,6 +86,9 @@ def parse_mentions(text: str, participants: dict) -> list[str]:
     return out
 
 
+PROPOSAL_TEXT_MAX = 65  # mirrors chat cap (shared brief: do not raise)
+
+
 class ParticipantNotInPartyError(LookupError):
     pass
 
@@ -118,6 +124,12 @@ class PartyWorld:
         self.strokes_by_module: dict[str, list[Stroke]] = {}
         self.votes_by_module: dict[str, dict[str, float]] = {}
         self.active_reactions: dict[str, Reaction] = {}
+        # follow graph: follower_id -> target_id (one target per follower)
+        self.following: dict[str, str] = {}
+        # reverse index: target_id -> set of follower ids
+        self.followers_of: dict[str, set[str]] = {}
+        # proposals (Task 11 fills out shape)
+        self.proposals: dict[str, dict] = {}
         # Last (active_votes, needed) emitted per drawboard. Used to suppress
         # duplicate vote_changed events when participants move without
         # changing the tally — and to detect population-only changes (someone
@@ -193,6 +205,7 @@ class PartyWorld:
             "actor_id": p.id,
             "actor_username": p.username,
             "actor_kind": p.kind,
+            "actor_color": p.color,
         }
 
     def join(self, participant: Participant) -> JoinEvent:
@@ -212,10 +225,47 @@ class PartyWorld:
         self._recompute_all_drawboard_votes(time.time())
         return ev
 
+    class CannotFollowSelfError(ValueError):
+        pass
+
+    class TargetNotInPartyError(LookupError):
+        pass
+
+    def follow(self, follower_id: str, target_id: str) -> None:
+        if follower_id not in self.participants:
+            raise ParticipantNotInPartyError(follower_id)
+        if follower_id == target_id:
+            raise PartyWorld.CannotFollowSelfError(follower_id)
+        if target_id not in self.participants:
+            raise PartyWorld.TargetNotInPartyError(target_id)
+        # Clear any prior follow target.
+        prev = self.following.get(follower_id)
+        if prev is not None:
+            self.followers_of.get(prev, set()).discard(follower_id)
+        self.following[follower_id] = target_id
+        self.followers_of.setdefault(target_id, set()).add(follower_id)
+
+    def unfollow(self, follower_id: str) -> None:
+        if follower_id not in self.participants:
+            raise ParticipantNotInPartyError(follower_id)
+        prev = self.following.pop(follower_id, None)
+        if prev is not None:
+            self.followers_of.get(prev, set()).discard(follower_id)
+
+    def _clear_follow_links_for(self, participant_id: str) -> None:
+        """Called on leave: removes the participant from both sides."""
+        prev = self.following.pop(participant_id, None)
+        if prev is not None:
+            self.followers_of.get(prev, set()).discard(participant_id)
+        followers = self.followers_of.pop(participant_id, set())
+        for f in followers:
+            self.following.pop(f, None)
+
     def leave(self, participant_id: str) -> LeaveEvent:
         if participant_id not in self.participants:
             raise ParticipantNotInPartyError(participant_id)
         actor = self._actor_fields(participant_id)
+        self._clear_follow_links_for(participant_id)
         del self.participants[participant_id]
         self._proximity_trackers.pop(participant_id, None)
         ev = LeaveEvent(seq=self._next_seq(), at=time.time(), **actor)
@@ -246,7 +296,56 @@ class PartyWorld:
         )
         self._events.append(ev)
         self._emit(ev)
+        # Auto-move any followers of the participant who just moved.
+        self._apply_follower_moves(participant_id)
         self._recompute_all_drawboard_votes(time.time())
+        return ev
+
+    def _apply_follower_moves(self, target_id: str) -> None:
+        import math
+        followers = list(self.followers_of.get(target_id, set()))
+        if not followers:
+            return
+        target = self.participants.get(target_id)
+        if target is None:
+            return
+        stop_distance = PROXIMITY_RADIUS - 20.0
+        for fid in followers:
+            f = self.participants.get(fid)
+            if f is None:
+                continue
+            dx, dy = target.x - f.x, target.y - f.y
+            dist = math.hypot(dx, dy)
+            if dist <= stop_distance or dist == 0:
+                continue
+            scale = (dist - stop_distance) / dist
+            new_x = f.x + dx * scale
+            new_y = f.y + dy * scale
+            # Reuse normal move pipeline so collision + zone + actor fields apply.
+            self._move_internal(fid, new_x, new_y)
+
+    def _move_internal(self, participant_id: str, x: float, y: float) -> MoveEvent:
+        """Internal move that emits a normal move event but skips recursive
+        follower processing for the actor itself."""
+        current = self.participants[participant_id]
+        new_x, new_y = slide(
+            (current.x, current.y),
+            (float(x), float(y)),
+            self._wall_rects,
+            self._party.worldSize,
+        )
+        self.participants[participant_id] = current.model_copy(
+            update={"x": new_x, "y": new_y}
+        )
+        ev = MoveEvent(
+            seq=self._next_seq(),
+            x=new_x,
+            y=new_y,
+            at=time.time(),
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        self._emit(ev)
         return ev
 
     def chat(
@@ -1010,6 +1109,109 @@ class PartyWorld:
             "active_reactions": active_reactions,
         }
 
+    def create_proposal(
+        self, participant_id: str, text: str, expires_in_sec: int
+    ) -> ProposalCreatedEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        if not (1 <= int(expires_in_sec) <= 60):
+            raise ValueError("invalid_expiry")
+        cleaned = validate_chat_text(text)
+        if len(cleaned) == 0 or len(cleaned) > PROPOSAL_TEXT_MAX:
+            raise ValueError("invalid_proposal_text")
+        now = time.time()
+        pid = uuid.uuid4().hex
+        expires_at = now + float(expires_in_sec)
+        self.proposals[pid] = {
+            "id": pid,
+            "text": cleaned,
+            "expires_at": expires_at,
+            "created_by": participant_id,
+            "votes": {},  # participant_id -> "yes"|"no"|"abstain"
+            "resolved": False,
+        }
+        ev = ProposalCreatedEvent(
+            seq=self._next_seq(),
+            proposal_id=pid,
+            text=cleaned,
+            expires_at=expires_at,
+            at=now,
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
+
+    def _tally(self, proposal_id: str) -> dict:
+        votes = self.proposals[proposal_id]["votes"]
+        out: dict = {"yes": 0, "no": 0, "abstain": 0}
+        for v in votes.values():
+            if v in out:
+                out[v] += 1
+        return out
+
+    def vote_proposal(
+        self, participant_id: str, proposal_id: str, vote: str
+    ) -> ProposalVoteEvent:
+        if participant_id not in self.participants:
+            raise ParticipantNotInPartyError(participant_id)
+        p = self.proposals.get(proposal_id)
+        if p is None or p["resolved"]:
+            raise KeyError(proposal_id)
+        now = time.time()
+        if now >= p["expires_at"]:
+            raise TimeoutError(proposal_id)
+        if vote not in ("yes", "no", "abstain"):
+            raise ValueError("invalid_vote")
+        p["votes"][participant_id] = vote
+        tallies = self._tally(proposal_id)
+        ev = ProposalVoteEvent(
+            seq=self._next_seq(),
+            proposal_id=proposal_id,
+            vote=vote,
+            tallies=tallies,
+            at=now,
+            **self._actor_fields(participant_id),
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
+
+    def resolve_expired_proposals(self) -> list[ProposalResolvedEvent]:
+        now = time.time()
+        out: list[ProposalResolvedEvent] = []
+        for pid, p in list(self.proposals.items()):
+            if p["resolved"]:
+                continue
+            if now >= p["expires_at"]:
+                p["resolved"] = True
+                ev = ProposalResolvedEvent(
+                    seq=self._next_seq(),
+                    proposal_id=pid,
+                    text=p["text"],
+                    tallies=self._tally(pid),
+                    at=now,
+                )
+                self._events.append(ev)
+                self._emit(ev)
+                out.append(ev)
+        return out
+
+    def active_proposals(self) -> list[dict]:
+        # Lazy resolution: anything past expiry is resolved on next read.
+        self.resolve_expired_proposals()
+        return [
+            {
+                "id": p["id"],
+                "text": p["text"],
+                "expires_at": p["expires_at"],
+                "created_by": p["created_by"],
+                "tallies": self._tally(p["id"]),
+            }
+            for p in self.proposals.values()
+            if not p["resolved"]
+        ]
+
     def recent_chat(self, limit: int = RECENT_CHAT_LIMIT) -> list[dict]:
         out: list[dict] = []
         for ev in reversed(self._events):
@@ -1021,6 +1223,7 @@ class PartyWorld:
         return out
 
     def observe_since(self, since: int, viewer_id: str | None = None) -> dict:
+        self.resolve_expired_proposals()
         if since < 0:
             since = 0
         tail = self._events[since:]

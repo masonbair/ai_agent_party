@@ -37,6 +37,14 @@ INVALID_STROKE = "invalid_stroke"
 INVALID_NOTE = "invalid_note"
 INVALID_REPLY_TO = "invalid_reply_to"
 RATE_LIMITED = "rate_limited"
+CANNOT_FOLLOW_SELF = "cannot_follow_self"
+TARGET_NOT_IN_PARTY = "target_not_in_party"
+NOT_FOLLOWING = "not_following"
+PROPOSAL_NOT_FOUND = "proposal_not_found"
+PROPOSAL_EXPIRED = "proposal_expired"
+INVALID_VOTE = "invalid_vote"
+INVALID_PROPOSAL_TEXT = "invalid_proposal_text"
+INVALID_EXPIRY = "invalid_expiry"
 
 
 # Default human-readable messages keyed by code. Routes may override.
@@ -67,6 +75,14 @@ _DEFAULT_MESSAGES: dict[str, str] = {
     INVALID_NOTE: "The note failed validation.",
     INVALID_REPLY_TO: "reply_to does not reference a known chat event.",
     RATE_LIMITED: "Chat rate limit exceeded.",
+    CANNOT_FOLLOW_SELF: "You cannot follow yourself.",
+    TARGET_NOT_IN_PARTY: "The follow target is not in this party.",
+    NOT_FOLLOWING: "You are not following anyone.",
+    PROPOSAL_NOT_FOUND: "No proposal exists with that id.",
+    PROPOSAL_EXPIRED: "This proposal has already expired.",
+    INVALID_VOTE: "Vote must be 'yes', 'no', or 'abstain'.",
+    INVALID_PROPOSAL_TEXT: "Proposal text failed validation.",
+    INVALID_EXPIRY: "expires_in_sec must be between 1 and 60 inclusive.",
 }
 
 

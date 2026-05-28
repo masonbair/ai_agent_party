@@ -119,6 +119,7 @@ export interface ActorRef {
   actor_id: string;
   actor_username: string;
   actor_kind: ActorKind;
+  actor_color?: string;
 }
 
 export interface JoinEvent extends ActorRef {
@@ -169,6 +170,52 @@ export interface ReactionEvent extends ActorRef {
   expires_at: number;
   at: number;
   room_wide?: boolean;
+}
+
+export interface Proposal {
+  id: string;
+  text: string;
+  expires_at: number;
+  created_by: string;
+  tallies: { yes: number; no: number; abstain: number };
+}
+
+export interface ProposalCreatedEvent {
+  type: 'proposal_created';
+  seq: number;
+  proposal_id: string;
+  text: string;
+  expires_at: number;
+  at: number;
+  actor_id?: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+  actor_color?: string;
+  room_wide: true;
+}
+
+export interface ProposalVoteEvent {
+  type: 'proposal_vote';
+  seq: number;
+  proposal_id: string;
+  vote: 'yes' | 'no' | 'abstain';
+  tallies: { yes: number; no: number; abstain: number };
+  at: number;
+  actor_id?: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+  actor_color?: string;
+  room_wide: true;
+}
+
+export interface ProposalResolvedEvent {
+  type: 'proposal_resolved';
+  seq: number;
+  proposal_id: string;
+  text: string;
+  tallies: { yes: number; no: number; abstain: number };
+  at: number;
+  room_wide: true;
 }
 
 export interface ApiError {
