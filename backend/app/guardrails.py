@@ -21,7 +21,7 @@ def _load_blocklist(path: Path) -> frozenset[str]:
     return frozenset(words)
 
 
-def _build_regex(words: frozenset[str]) -> "re.Pattern | None":
+def _build_regex(words: frozenset[str]) -> re.Pattern | None:
     """Build a whole-word IGNORECASE regex from *words*, longest-first."""
     if not words:
         return None
@@ -31,7 +31,7 @@ def _build_regex(words: frozenset[str]) -> "re.Pattern | None":
 
 
 BLOCKLIST: frozenset[str] = _load_blocklist(_BLOCKLIST_PATH)
-BLOCKLIST_REGEX: "re.Pattern | None" = _build_regex(BLOCKLIST)
+BLOCKLIST_REGEX: re.Pattern | None = _build_regex(BLOCKLIST)
 
 
 def mask_blocked(text: str) -> tuple[str, bool]:

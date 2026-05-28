@@ -1,9 +1,5 @@
 """Tests for backend/app/guardrails.py — content masking via blocklist."""
 
-import importlib
-import sys
-from pathlib import Path
-
 import pytest
 
 import app.guardrails as guardrails
