@@ -71,6 +71,54 @@ SLOT_OCCUPIED_RADIUS = 32.0
 VOTE_TTL_SECONDS = 30.0
 REACTION_LIFETIME_SECONDS = 1.0
 
+# --- music module ---------------------------------------------------------
+
+MUSIC_TRACK_ALLOWLIST: tuple[str, ...] = (
+    "lofi-loop",
+    "jazz-club",
+    "synthwave",
+    "ambient-1",
+    "party-mix",
+)
+
+MUSIC_VOLUME_MIN = 0
+MUSIC_VOLUME_MAX = 100
+
+MUSIC_ACTIONS: tuple[str, ...] = ("play", "pause", "skip", "set_volume")
+
+
+class MusicValidationError(ValueError):
+    pass
+
+
+def validate_music_track(track_id: str) -> str:
+    if not isinstance(track_id, str) or not track_id:
+        raise MusicValidationError("track_id is required")
+    if track_id not in MUSIC_TRACK_ALLOWLIST:
+        raise MusicValidationError(
+            f"unknown track {track_id!r}; allowed={list(MUSIC_TRACK_ALLOWLIST)}"
+        )
+    return track_id
+
+
+def validate_music_volume(volume: int) -> int:
+    # bool is a subclass of int — reject explicitly so True/False can't slip in.
+    if isinstance(volume, bool) or not isinstance(volume, int):
+        raise MusicValidationError("volume must be an integer")
+    if volume < MUSIC_VOLUME_MIN or volume > MUSIC_VOLUME_MAX:
+        raise MusicValidationError(
+            f"volume must be {MUSIC_VOLUME_MIN}..{MUSIC_VOLUME_MAX}"
+        )
+    return volume
+
+
+def validate_music_action(action: str) -> str:
+    if action not in MUSIC_ACTIONS:
+        raise MusicValidationError(
+            f"unknown action {action!r}; allowed={list(MUSIC_ACTIONS)}"
+        )
+    return action
+
 
 class ReactionValidationError(ValueError):
     pass
@@ -130,3 +178,35 @@ def validate_stroke(raw: dict, board_w: float, board_h: float) -> dict:
         for p in pts
     ]
     return {"color": raw["color"], "width": raw["width"], "points": clamped}
+
+
+ALLOWED_GESTURES: tuple[str, ...] = (
+    "wave", "point", "dance", "jump", "sit", "shiver", "bow", "nod",
+)
+
+ALLOWED_COSMETIC_EFFECTS: tuple[str, ...] = (
+    "confetti", "sparkle", "lights_flash", "ping",
+)
+
+GESTURE_TTL_SECONDS = 2.0
+COSMETIC_TTL_SECONDS = 3.0
+
+
+class GestureValidationError(ValueError):
+    pass
+
+
+class CosmeticValidationError(ValueError):
+    pass
+
+
+def validate_gesture(gesture: str) -> str:
+    if gesture not in ALLOWED_GESTURES:
+        raise GestureValidationError(f"gesture {gesture!r} not in allow-list")
+    return gesture
+
+
+def validate_cosmetic_effect(effect: str) -> str:
+    if effect not in ALLOWED_COSMETIC_EFFECTS:
+        raise CosmeticValidationError(f"effect {effect!r} not in allow-list")
+    return effect

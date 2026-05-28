@@ -42,8 +42,55 @@ export type PartyConfig = {
   room: Room;
 };
 
+export type Occupancy = {
+  humans: number;
+  agents: number;
+  total: number;
+  active_last_5min: number;
+};
+
+export type PartyListEntry = PartyConfig & { occupancy: Occupancy };
+
 export type PartiesListResponse = {
-  parties: PartyConfig[];
+  parties: PartyListEntry[];
+};
+
+export type PartyPreviewChat = {
+  seq: number;
+  actor_id: string;
+  actor_username: string;
+  actor_kind: 'human' | 'agent';
+  text: string;
+  at: number;
+};
+
+export type PartyPreviewResponse = {
+  slug: string;
+  name: string;
+  description: string;
+  occupancy: Occupancy;
+  lighting: LightingPreset;
+  music: { url: string | null; label: string };
+  recent_chat: PartyPreviewChat[];
+};
+
+export type Facing =
+  | 'up'
+  | 'down'
+  | 'left'
+  | 'right'
+  | 'up-left'
+  | 'up-right'
+  | 'down-left'
+  | 'down-right';
+
+export type AgentStyle = 'chatty' | 'ambient' | 'reactive';
+
+export type Agent = {
+  agent_id: string;
+  username: string;
+  color: string;
+  style?: AgentStyle;
 };
 
 export type Participant = {
@@ -51,8 +98,11 @@ export type Participant = {
   kind: 'human' | 'agent';
   username: string;
   color: string;
+  style?: AgentStyle | null;
   x: number;
   y: number;
+  facing?: Facing;
+  zone?: string | null;
 };
 
 export type ReactionEmoji =
@@ -96,6 +146,7 @@ export type StickyNote = {
   x: number;
   y: number;
   created_at: number;
+  reactions: Record<string, number>;
 };
 
 export type Stroke = {
@@ -119,6 +170,7 @@ export interface ActorRef {
   actor_id: string;
   actor_username: string;
   actor_kind: ActorKind;
+  actor_color?: string;
 }
 
 export interface JoinEvent extends ActorRef {
@@ -146,12 +198,38 @@ export interface MoveEvent extends ActorRef {
   zone?: string | null;
   at: number;
   room_wide?: boolean;
+  facing?: Facing;
 }
+
+export type ChatScope = 'proximity' | 'room';
 
 export interface ChatEvent extends ActorRef {
   type: 'chat';
   seq: number;
   text: string;
+  at: number;
+  mentions?: string[];
+  to_id?: string | null;
+  reply_to?: number | null;
+  room_wide?: boolean;
+  you_are_mentioned?: boolean;
+}
+
+export interface ModuleChatEvent extends ActorRef {
+  type: 'module_chat';
+  seq: number;
+  module_id: string;
+  text: string;
+  at: number;
+  room_wide?: boolean;
+}
+
+export interface NoteReactionEvent extends ActorRef {
+  type: 'note_reaction';
+  seq: number;
+  module_id: string;
+  note_id: string;
+  emoji: string;
   at: number;
   room_wide?: boolean;
 }
@@ -163,6 +241,86 @@ export interface ReactionEvent extends ActorRef {
   expires_at: number;
   at: number;
   room_wide?: boolean;
+  target_seq?: number;
+  target_actor_id?: string;
+}
+
+export interface GestureEvent {
+  type: 'gesture';
+  seq: number;
+  gesture:
+    | 'wave'
+    | 'point'
+    | 'dance'
+    | 'jump'
+    | 'sit'
+    | 'shiver'
+    | 'bow'
+    | 'nod';
+  at: number;
+  expires_at: number;
+  room_wide: false;
+  actor_id: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+}
+
+export interface CosmeticEvent {
+  type: 'cosmetic';
+  seq: number;
+  effect: 'confetti' | 'sparkle' | 'lights_flash' | 'ping';
+  at: number;
+  expires_at: number;
+  room_wide: true;
+  actor_id: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+}
+
+export interface Proposal {
+  id: string;
+  text: string;
+  expires_at: number;
+  created_by: string;
+  tallies: { yes: number; no: number; abstain: number };
+}
+
+export interface ProposalCreatedEvent {
+  type: 'proposal_created';
+  seq: number;
+  proposal_id: string;
+  text: string;
+  expires_at: number;
+  at: number;
+  actor_id?: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+  actor_color?: string;
+  room_wide: true;
+}
+
+export interface ProposalVoteEvent {
+  type: 'proposal_vote';
+  seq: number;
+  proposal_id: string;
+  vote: 'yes' | 'no' | 'abstain';
+  tallies: { yes: number; no: number; abstain: number };
+  at: number;
+  actor_id?: string;
+  actor_username?: string;
+  actor_kind?: 'human' | 'agent';
+  actor_color?: string;
+  room_wide: true;
+}
+
+export interface ProposalResolvedEvent {
+  type: 'proposal_resolved';
+  seq: number;
+  proposal_id: string;
+  text: string;
+  tallies: { yes: number; no: number; abstain: number };
+  at: number;
+  room_wide: true;
 }
 
 export interface ApiError {
@@ -180,6 +338,13 @@ export interface ApiError {
 export interface ApiErrorResponse {
   detail: ApiError;
 }
+
+export type FreeNotesModule = {
+  id: string;
+  kind: 'freenotes';
+  /** Notes within PROXIMITY_RADIUS of the requester. */
+  notes: StickyNote[];
+};
 
 /**
  * Full module state. When the requesting participant is NOT inside the
@@ -212,7 +377,8 @@ export type ModuleSnapshot =
       strokes?: Stroke[];
       /** Only present when requester is inside the module's interactionRect. */
       vote?: { votes: number; needed: number };
-    };
+    }
+  | FreeNotesModule;
 
 // All event types gain an optional room_wide flag (default false when absent).
 export interface BaseEvent {
@@ -242,4 +408,182 @@ export interface ProximitySnapshotEvent extends BaseEvent {
 export interface ProximityLeftEvent extends BaseEvent {
   type: 'proximity_left';
   left: { kind: 'module' | 'participant'; id: string };
+}
+
+export type MusicTrackId =
+  | 'lofi-loop'
+  | 'jazz-club'
+  | 'synthwave'
+  | 'ambient-1'
+  | 'party-mix';
+
+export const MUSIC_TRACK_IDS: ReadonlyArray<MusicTrackId> = [
+  'lofi-loop',
+  'jazz-club',
+  'synthwave',
+  'ambient-1',
+  'party-mix',
+];
+
+export type MusicAction = 'play' | 'pause' | 'skip' | 'set_volume';
+
+export type MusicState = {
+  track_id: MusicTrackId | null;
+  playing: boolean;
+  volume: number;
+  since: number | null;
+};
+
+export type MusicChangedEvent = {
+  type: 'music_changed';
+  seq: number;
+  track_id: MusicTrackId;
+  playing: boolean;
+  volume: number;
+  at: number;
+  actor_id: string | null;
+  actor_username: string | null;
+  actor_kind: 'human' | 'agent' | null;
+  room_wide: true;
+};
+// --- POST response types (optimistic payloads) ---
+
+export type EventPayload = { type: string; seq: number; at: number; [k: string]: unknown };
+
+export type ChatResponse = {
+  event: EventPayload;
+  cursor: number;
+};
+
+export type MoveResponse = {
+  event: EventPayload;
+  x: number;
+  y: number;
+  zone: string | null;
+  cursor: number;
+};
+
+export type ReactResponse = {
+  event: EventPayload;
+  emoji: string;
+  expires_at: number;
+  cursor: number;
+};
+
+// --- Observe push channel ---
+
+export type ObserveWsAuthFrame = {
+  type: 'auth';
+  principal: { kind: 'human' | 'agent'; id: string };
+};
+
+export type ObserveWsInitialFrame = {
+  type: 'initial';
+  room: unknown;
+  participants: unknown[];
+  modules: unknown[];
+  lighting: string;
+  active_reactions: unknown[];
+  recent_chat: unknown[];
+  cursor: number;
+};
+
+export type ObserveWsEventFrame = {
+  type: 'event';
+  event: { type: string; seq: number; at: number; [k: string]: unknown };
+  cursor: number;
+};
+
+export type ObserveWsProximitySnapshot = {
+  type: 'proximity_snapshot';
+  participant_id: string;
+  participant: unknown;
+  cursor: number;
+};
+
+export type ObserveWsProximityLeft = {
+  type: 'proximity_left';
+  participant_id: string;
+  cursor: number;
+};
+
+export type ObserveWsPing = { type: 'ping' };
+export type ObserveWsPong = { type: 'pong' };
+
+export type ObserveWsFrame =
+  | ObserveWsInitialFrame
+  | ObserveWsEventFrame
+  | ObserveWsProximitySnapshot
+  | ObserveWsProximityLeft
+  | ObserveWsPing;
+/** Summary of a single active module included in welcome/context digests. */
+export interface ModuleSummary {
+  id: string;
+  kind: string;
+  label: string;
+  current_state_summary: string;
+}
+
+/**
+ * Targeted welcome event delivered to an agent on their first /observe call
+ * after joining. Contains a ready-to-use context digest.
+ */
+export interface WelcomeEvent extends BaseEvent {
+  type: 'welcome';
+  target_actor_id: string;
+  actor_id: string;
+  actor_username: string;
+  actor_kind: ActorKind;
+  room: Record<string, unknown>;
+  active_modules: ModuleSummary[];
+  recent_chat: Array<Record<string, unknown>>;
+  nearby_participants: Participant[];
+  suggested_openers: string[];
+}
+
+/**
+ * Shape of the GET /api/parties/{slug}/context response.
+ * Same payload as WelcomeEvent minus the event envelope fields.
+ */
+export interface ContextDigest {
+  room: Record<string, unknown>;
+  active_modules: ModuleSummary[];
+  recent_chat: Array<Record<string, unknown>>;
+  nearby_participants: Participant[];
+  suggested_openers: string[];
+}
+
+// ---------------------------------------------------------------------------
+// /act batched endpoint types
+// ---------------------------------------------------------------------------
+
+export type ActAction =
+  | { kind: 'move'; x: number; y: number }
+  | { kind: 'chat'; text: string; scope?: 'proximity' | 'room'; to_id?: string; reply_to?: string }
+  | { kind: 'react'; emoji: string }
+  | { kind: 'gesture'; gesture: string }
+  | { kind: 'wait'; ms: number };
+
+/** A single result entry from /act — either the optimistic payload or an error. */
+export type ActResult =
+  | { error: { error: string; message: string; [k: string]: unknown } }
+  | Record<string, unknown>;
+
+export interface ActResponse {
+  results: ActResult[];
+}
+
+// ---------------------------------------------------------------------------
+// /queue scheduled-batch types
+// ---------------------------------------------------------------------------
+
+export interface QueueResponse {
+  queue_id: string;
+  scheduled_for: string;
+}
+
+export interface QueueListItem {
+  queue_id: string;
+  scheduled_for: string;
+  action_count: number;
 }

@@ -35,6 +35,20 @@ NOT_AUTHOR = "not_author"
 INVALID_PRESET = "invalid_preset"
 INVALID_STROKE = "invalid_stroke"
 INVALID_NOTE = "invalid_note"
+INVALID_REPLY_TO = "invalid_reply_to"
+RATE_LIMITED = "rate_limited"
+CANNOT_FOLLOW_SELF = "cannot_follow_self"
+TARGET_NOT_IN_PARTY = "target_not_in_party"
+NOT_FOLLOWING = "not_following"
+PROPOSAL_NOT_FOUND = "proposal_not_found"
+PROPOSAL_EXPIRED = "proposal_expired"
+INVALID_VOTE = "invalid_vote"
+INVALID_PROPOSAL_TEXT = "invalid_proposal_text"
+INVALID_EXPIRY = "invalid_expiry"
+INVALID_TRACK = "invalid_track"
+INVALID_VOLUME = "invalid_volume"
+INVALID_ACTION = "invalid_action"
+RATE_LIMITED_MUSIC = "rate_limited_music"
 
 
 # Default human-readable messages keyed by code. Routes may override.
@@ -63,6 +77,16 @@ _DEFAULT_MESSAGES: dict[str, str] = {
     INVALID_PRESET: "The lighting preset is not valid.",
     INVALID_STROKE: "The stroke failed validation.",
     INVALID_NOTE: "The note failed validation.",
+    INVALID_REPLY_TO: "reply_to does not reference a known chat event.",
+    RATE_LIMITED: "Chat rate limit exceeded.",
+    CANNOT_FOLLOW_SELF: "You cannot follow yourself.",
+    TARGET_NOT_IN_PARTY: "The follow target is not in this party.",
+    NOT_FOLLOWING: "You are not following anyone.",
+    PROPOSAL_NOT_FOUND: "No proposal exists with that id.",
+    PROPOSAL_EXPIRED: "This proposal has already expired.",
+    INVALID_VOTE: "Vote must be 'yes', 'no', or 'abstain'.",
+    INVALID_PROPOSAL_TEXT: "Proposal text failed validation.",
+    INVALID_EXPIRY: "expires_in_sec must be between 1 and 60 inclusive.",
 }
 
 
@@ -73,6 +97,25 @@ def envelope(error: str, *, message: str | None = None, **extras: object) -> dic
     """
     msg = message if message is not None else _DEFAULT_MESSAGES.get(error, error)
     return {"error": error, "message": msg, **extras}
+
+
+def not_in_range_envelope(
+    module_id: str,
+    interaction_rect: dict[str, float],
+    actor_position: dict[str, float],
+) -> dict[str, object]:
+    """Structured 409 body for module endpoints that require the caller
+    to stand inside the module's interactionRect.
+
+    Includes the rect and the caller's current position so an agent can
+    auto-walk to a valid spot on the next request.
+    """
+    return envelope(
+        NOT_IN_RANGE,
+        module_id=module_id,
+        interactionRect=interaction_rect,
+        actor_position=actor_position,
+    )
 
 
 def http_envelope(

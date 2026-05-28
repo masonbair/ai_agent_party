@@ -1,5 +1,6 @@
 from app.models import (
     DrawBoardModule,
+    FreeNotesModule,
     LightingModule,
     Music,
     PartyConfig,
@@ -80,6 +81,7 @@ CREAM_TERRAZZO = PartyConfig(
         LightingModule(preset="dusk"),
         StickyNoteModule(id="sticky-1", x=0, y=420, w=180, h=80),
         DrawBoardModule(id="draw-1", x=620, y=420, w=180, h=80),
+        FreeNotesModule(id="freenotes-1"),
     ],
 )
 

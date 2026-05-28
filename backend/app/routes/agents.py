@@ -1,13 +1,18 @@
 from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel, field_validator
 
-from app.errors import AGENT_NOT_FOUND, INVALID_COLOR, http_envelope
+from app.errors import AGENT_NOT_FOUND, INVALID_COLOR, http_envelope, envelope
 from app.events import Agent
 from app.guardrails import contains_blocked
 from app.store import Store
 from app.validation import ALLOWED_COLORS, USERNAME_REGEX
+from fastapi import HTTPException
 
 router = APIRouter(prefix="/api/agents")
+
+
+ALLOWED_STYLES = ("chatty", "ambient", "reactive")
+INVALID_STYLE = "invalid_style"
 
 
 def _store_dep() -> Store:  # pragma: no cover - overridden by main
@@ -17,6 +22,7 @@ def _store_dep() -> Store:  # pragma: no cover - overridden by main
 class CreateAgentRequest(BaseModel):
     username: str
     color: str
+    style: str = "reactive"
 
     @field_validator("username")
     @classmethod
@@ -36,7 +42,18 @@ def create_agent(
         raise http_envelope(
             422, INVALID_COLOR, allowed_colors=list(ALLOWED_COLORS)
         )
-    return store.register_agent(username=body.username, color=body.color)
+    if body.style not in ALLOWED_STYLES:
+        raise HTTPException(
+            status_code=422,
+            detail=envelope(
+                INVALID_STYLE,
+                message="The provided style is not in the allow-list.",
+                allowed_styles=list(ALLOWED_STYLES),
+            ),
+        )
+    return store.register_agent(
+        username=body.username, color=body.color, style=body.style
+    )
 
 
 @router.get("/{agent_id}", response_model=Agent)

@@ -4,6 +4,7 @@ import type {
   ChatEvent,
   LightingPreset,
   ModuleSnapshot,
+  MusicState,
   Participant,
   PartyConfig,
   User,
@@ -47,6 +48,7 @@ type Props = {
   principal?: Principal;
   modules?: ModuleSnapshot[];
   lighting?: LightingPreset;
+  music?: MusicState | null;
   reactions?: Map<string, { emoji: string; expiresAt: number }>;
   applyObserveInitial?: ApplyObserveInitial;
   bubbles?: Record<string, { text: string; expiresAt: number }>;
@@ -64,6 +66,7 @@ export default function PartySpace({
   principal,
   modules,
   lighting,
+  music,
   reactions,
   applyObserveInitial,
   bubbles,
@@ -269,7 +272,7 @@ export default function PartySpace({
           />
         ) : null}
         {lighting ? <LightingOverlay preset={lighting} /> : null}
-        <MusicPill label={party.music.label} />
+        <MusicPill label={party.music.label} trackId={music?.track_id ?? null} />
         {principal ? (
           <RadialReactionPicker
             open={pickerOpen && status !== 'closed'}

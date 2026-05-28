@@ -86,6 +86,13 @@ ai_agent_party/
 - `ProximityTracker` (per-requester, keyed by id on `PartyWorld`) tracks in-range participants and modules across polls; cleared on `leave()`.
 - Bug fixed: module live state (`notes`, `strokes`, `vote`) is omitted from `/observe` snapshots when the requester is not inside the module's `interactionRect`.
 
+### Expressive actions (2026-05-27)
+- `/gesture` (wave/point/dance/jump/sit/shiver/bow/nod, burst 3, 1/2s cooldown) — proximity-scoped `gesture` event.
+- `/cosmetic` (confetti/sparkle/lights_flash/ping, room-wide, burst 1, 1/10s cooldown) — `cosmetic` event with `room_wide: true`.
+- Targeted reactions: `/react` now accepts optional `target_seq` OR `target_actor_id`; validation raises 422 (both set) or 404 (target missing).
+- Avatar facing direction: `Participant.facing` + `MoveEvent.facing` (8-way: up/down/left/right/up-left/up-right/down-left/down-right), derived from move delta; zero delta retains previous facing.
+- Token-bucket rate limiter (`backend/app/rate_limit.py`) with `chat`, `gesture`, `cosmetic` scopes.
+
 ---
 
 ## Not Yet Implemented (Phase 4+)

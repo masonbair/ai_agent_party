@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Participant(BaseModel):
@@ -11,12 +11,15 @@ class Participant(BaseModel):
     x: float
     y: float
     joined_at: float
+    facing: str = "down"  # one of the 8 Facing directions
+    style: str | None = None
 
 
 class Agent(BaseModel):
     agent_id: str
     username: str
     color: str
+    style: Literal["chatty", "ambient", "reactive"] = "reactive"
 
 
 class JoinEvent(BaseModel):
@@ -38,6 +41,7 @@ class LeaveEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     at: float
     room_wide: bool = False
 
@@ -48,10 +52,12 @@ class MoveEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     x: float
     y: float
     at: float
     room_wide: bool = False
+    facing: str | None = None  # one of the 8 Facing directions
 
 
 class ChatEvent(BaseModel):
@@ -60,8 +66,24 @@ class ChatEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     text: str
     at: float
+    mentions: list[str] = []
+    to_id: str | None = None
+    reply_to: int | None = None
+    room_wide: bool = False
+
+
+class ModuleChatEvent(BaseModel):
+    seq: int
+    type: Literal["module_chat"] = "module_chat"
+    module_id: str
+    text: str
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
     room_wide: bool = False
 
 
@@ -75,6 +97,7 @@ class StickyNote(BaseModel):
     x: float
     y: float
     created_at: float
+    reactions: dict[str, int] = Field(default_factory=dict)
 
 
 class Stroke(BaseModel):
@@ -100,10 +123,13 @@ class ReactionEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     emoji: str
     expires_at: float
     at: float
     room_wide: bool = False
+    target_seq: int | None = None
+    target_actor_id: str | None = None
 
 
 class LightingChangedEvent(BaseModel):
@@ -139,6 +165,19 @@ class NoteDeletedEvent(BaseModel):
     module_id: str
     note_id: str
     at: float
+    room_wide: bool = False
+
+
+class NoteReactionEvent(BaseModel):
+    seq: int
+    type: Literal["note_reaction"] = "note_reaction"
+    module_id: str
+    note_id: str
+    emoji: str
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
     room_wide: bool = False
 
 
@@ -179,6 +218,88 @@ class VoteChangedEvent(BaseModel):
     room_wide: bool = True  # tally visible to everyone watching the board
 
 
+class ProposalCreatedEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_created"] = "proposal_created"
+    proposal_id: str
+    text: str
+    expires_at: float
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
+class MusicChangedEvent(BaseModel):
+    seq: int
+    type: Literal["music_changed"] = "music_changed"
+    track_id: str
+    playing: bool
+    volume: int
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
+class ProposalVoteEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_vote"] = "proposal_vote"
+    proposal_id: str
+    vote: Literal["yes", "no", "abstain"]
+    tallies: dict  # {"yes": int, "no": int, "abstain": int}
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
+class ProposalResolvedEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_resolved"] = "proposal_resolved"
+    proposal_id: str
+    text: str
+    tallies: dict
+    at: float
+    room_wide: bool = True
+
+
+Facing = Literal[
+    "up", "down", "left", "right",
+    "up-left", "up-right", "down-left", "down-right",
+]
+
+
+class GestureEvent(BaseModel):
+    seq: int
+    type: Literal["gesture"] = "gesture"
+    gesture: str  # one of ALLOWED_GESTURES
+    at: float
+    expires_at: float
+    room_wide: bool = False
+    actor_id: str
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+
+
+class CosmeticEvent(BaseModel):
+    seq: int
+    type: Literal["cosmetic"] = "cosmetic"
+    effect: str  # one of ALLOWED_COSMETIC_EFFECTS
+    at: float
+    expires_at: float
+    room_wide: bool = True
+    actor_id: str
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+
+
 class ProximitySnapshotEvent(BaseModel):
     """One-shot snapshot emitted to a specific requester when they enter
     proximity of a module's interactionRect or another participant.
@@ -210,20 +331,49 @@ class ProximityLeftEvent(BaseModel):
     room_wide: bool = False
 
 
+class WelcomeEvent(BaseModel):
+    seq: int
+    type: Literal["welcome"] = "welcome"
+    at: float
+    # Targeted-delivery field — see "per-participant event delivery extension"
+    # in the onboarding plan. When set, ONLY this actor sees the event.
+    target_actor_id: str
+    # Unified-event-shape (spec #01) fields. For welcome these mirror the
+    # joining participant so consumers can render uniformly.
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    # Payload (matches GET /context shape minus type/seq/at).
+    room: dict
+    active_modules: list[dict]
+    recent_chat: list[dict]
+    nearby_participants: list[dict]
+    suggested_openers: list[str]
+
+
 Event = (
     JoinEvent
     | LeaveEvent
     | MoveEvent
     | ChatEvent
+    | ModuleChatEvent
     | ReactionEvent
+    | GestureEvent
+    | CosmeticEvent
     | LightingChangedEvent
     | NoteCreatedEvent
     | NoteUpdatedEvent
     | NoteDeletedEvent
+    | NoteReactionEvent
     | StrokeAddedEvent
     | StrokeDroppedEvent
     | BoardClearedEvent
     | VoteChangedEvent
+    | ProposalCreatedEvent
+    | ProposalVoteEvent
+    | ProposalResolvedEvent
+    | MusicChangedEvent
     | ProximitySnapshotEvent
     | ProximityLeftEvent
+    | WelcomeEvent
 )

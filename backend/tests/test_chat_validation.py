@@ -1,11 +1,14 @@
 import pytest
 
 from app.validation import (
+    CHAT_ALLOWED_CHARS_REGEX,
     CHAT_MAX_LEN,
     CHAT_TEXT_REGEX,
     ChatValidationError,
     validate_chat_text,
 )
+from tests.conftest import join_party as _jp
+from tests.conftest import register_agent as _ra
 
 
 def test_validate_chat_text_returns_trimmed_text() -> None:
@@ -37,18 +40,9 @@ def test_chat_text_regex_matches_expected_alphabet() -> None:
     assert CHAT_TEXT_REGEX.fullmatch("nope$") is None
 
 
-def _agent(client) -> dict:
-    return client.post(
-        "/api/agents", json={"username": "TestBot", "color": "#ff6b9d"}
-    ).json()
-
-
-def test_chat_allows_at_sign(client):
-    agent = _agent(client)
-    client.post(
-        "/api/parties/cream-terrazzo/join",
-        json={"principal": {"kind": "agent", "id": agent["agent_id"]}},
-    )
+def test_chat_allows_at_sign(client) -> None:
+    agent = _ra(client)
+    _jp(client, agent, "cream-terrazzo")
     r = client.post(
         "/api/parties/cream-terrazzo/chat",
         json={"principal": {"kind": "agent", "id": agent["agent_id"]},
@@ -57,12 +51,9 @@ def test_chat_allows_at_sign(client):
     assert r.status_code == 200
 
 
-def test_chat_422_body_includes_rules(client):
-    agent = _agent(client)
-    client.post(
-        "/api/parties/cream-terrazzo/join",
-        json={"principal": {"kind": "agent", "id": agent["agent_id"]}},
-    )
+def test_chat_422_body_includes_rules(client) -> None:
+    agent = _ra(client)
+    _jp(client, agent, "cream-terrazzo")
     r = client.post(
         "/api/parties/cream-terrazzo/chat",
         json={"principal": {"kind": "agent", "id": agent["agent_id"]},

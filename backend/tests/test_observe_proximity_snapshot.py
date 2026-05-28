@@ -74,7 +74,10 @@ def test_participant_entry_fires_proximity_snapshot_with_recent_chat(client):
     join_party(client, b, "cream-terrazzo", x=700, y=400)
 
     # Bob says things while far — Alice should NOT see them in real time.
+    # Reset rate limiter between messages since burst=2 would otherwise block #3.
+    from app.rate_limit import reset_chat_limiter_for_tests
     for i in range(3):
+        reset_chat_limiter_for_tests()
         client.post(
             "/api/parties/cream-terrazzo/chat",
             json={"principal": b["principal"], "text": f"far msg {i}"},
