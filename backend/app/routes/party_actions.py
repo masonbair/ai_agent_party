@@ -125,6 +125,7 @@ def move(
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
     return {
+        "event": ev.model_dump(),
         "x": ev.x,
         "y": ev.y,
         "zone": world.derive_zone(ev.x, ev.y),
@@ -166,7 +167,7 @@ def chat(
             ),
         )
     try:
-        world.chat(
+        ev = world.chat(
             resolved.id,
             body.text,
             to_id=body.to_id,
@@ -185,7 +186,7 @@ def chat(
                 max_chars=CHAT_MAX_LEN,
             ),
         )
-    return {"cursor": world.cursor}
+    return {"event": ev.model_dump(), "cursor": world.cursor}
 
 
 @router.get("/{slug}/participants/{participant_id}")

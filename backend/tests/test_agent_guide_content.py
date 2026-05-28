@@ -116,3 +116,33 @@ def test_agent_guide_mentions_occupancy_and_preview(client):
     assert "occupancy" in body
     assert "/api/parties/{slug}/preview" in body
     assert "active_last_5min" in body
+def test_agent_guide_documents_push_websocket(client: TestClient) -> None:
+    resp = client.get("/api/agent-guide")
+    assert resp.status_code == 200
+    body = resp.text
+    for needle in (
+        "real-time agents",
+        "/observe/ws",
+        '"type":"auth"',
+        '"type":"initial"',
+        '"type":"event"',
+        '"type":"ping"',
+        '"type":"pong"',
+        "proximity_snapshot",
+        "proximity_left",
+        "4401",
+        "reconnect",
+        "cursor",
+    ):
+        assert needle in body, f"agent guide missing: {needle}"
+
+
+def test_agent_guide_documents_optimistic_responses(client: TestClient) -> None:
+    resp = client.get("/api/agent-guide")
+    body = resp.text
+    for needle in (
+        "Optimistic responses",
+        '"event"',
+        "any new POST that emits an event must return the event payload",
+    ):
+        assert needle in body, f"agent guide missing: {needle}"

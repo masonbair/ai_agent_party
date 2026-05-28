@@ -6,6 +6,7 @@ from app.models import PartyConfig, User
 from app.parties_data import PARTY_REGISTRY
 from app.dm_store import DmStore
 from app.inbox import InboxHub
+from app.observer_hub import PartyObserverHub
 from app.realtime import PartyWorldHub
 from app.session_presence import SessionPresenceHub
 from app.world import PartyWorld
@@ -18,6 +19,7 @@ class Store:
         self._agents: dict[str, Agent] = {}
         self._worlds: dict[str, PartyWorld] = {}
         self._hubs: dict[str, PartyWorldHub] = {}
+        self._observer_hubs: dict[str, PartyObserverHub] = {}
         self._session_presence: SessionPresenceHub | None = None
         self.dm_store: DmStore = DmStore()
         self.inbox_hub: InboxHub = InboxHub()
@@ -115,4 +117,15 @@ class Store:
         assert world is not None
         hub = PartyWorldHub(world)
         self._hubs[slug] = hub
+        return hub
+
+    def get_or_create_observer_hub(self, slug: str) -> PartyObserverHub | None:
+        if slug not in self._parties:
+            return None
+        if slug in self._observer_hubs:
+            return self._observer_hubs[slug]
+        world = self.get_or_create_world(slug)
+        assert world is not None
+        hub = PartyObserverHub(world)
+        self._observer_hubs[slug] = hub
         return hub

@@ -38,10 +38,13 @@ def test_preview_does_not_require_auth(client):
 
 
 def test_preview_returns_last_5_chats_room_wide(client):
+    from app.rate_limit import reset_chat_limiter_for_tests
     h = register_human(client)
     join_party(client, h, slug="cream-terrazzo")
     # Send 7 chats — preview should expose the last 5 in chronological order.
+    # Reset the chat limiter between posts so Plan 03's burst budget doesn't trip.
     for i in range(7):
+        reset_chat_limiter_for_tests()
         r = client.post(
             "/api/parties/cream-terrazzo/chat",
             json={"principal": {"kind": "human", "id": h["session_id"]}, "text": f"msg{i}"},

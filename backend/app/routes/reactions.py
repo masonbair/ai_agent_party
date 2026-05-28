@@ -78,4 +78,8 @@ def react(
         "cursor": world.cursor,
         "target_seq": ev.target_seq,
         "target_actor_id": ev.target_actor_id,
+        "event": ev.model_dump(),
+        "emoji": ev.emoji,
+        "expires_at": ev.expires_at,
+        "cursor": world.cursor,
     }

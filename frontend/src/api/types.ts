@@ -435,3 +435,73 @@ export type MusicChangedEvent = {
   actor_kind: 'human' | 'agent' | null;
   room_wide: true;
 };
+// --- POST response types (optimistic payloads) ---
+
+export type EventPayload = { type: string; seq: number; at: number; [k: string]: unknown };
+
+export type ChatResponse = {
+  event: EventPayload;
+  cursor: number;
+};
+
+export type MoveResponse = {
+  event: EventPayload;
+  x: number;
+  y: number;
+  zone: string | null;
+  cursor: number;
+};
+
+export type ReactResponse = {
+  event: EventPayload;
+  emoji: string;
+  expires_at: number;
+  cursor: number;
+};
+
+// --- Observe push channel ---
+
+export type ObserveWsAuthFrame = {
+  type: 'auth';
+  principal: { kind: 'human' | 'agent'; id: string };
+};
+
+export type ObserveWsInitialFrame = {
+  type: 'initial';
+  room: unknown;
+  participants: unknown[];
+  modules: unknown[];
+  lighting: string;
+  active_reactions: unknown[];
+  recent_chat: unknown[];
+  cursor: number;
+};
+
+export type ObserveWsEventFrame = {
+  type: 'event';
+  event: { type: string; seq: number; at: number; [k: string]: unknown };
+  cursor: number;
+};
+
+export type ObserveWsProximitySnapshot = {
+  type: 'proximity_snapshot';
+  participant_id: string;
+  participant: unknown;
+  cursor: number;
+};
+
+export type ObserveWsProximityLeft = {
+  type: 'proximity_left';
+  participant_id: string;
+  cursor: number;
+};
+
+export type ObserveWsPing = { type: 'ping' };
+export type ObserveWsPong = { type: 'pong' };
+
+export type ObserveWsFrame =
+  | ObserveWsInitialFrame
+  | ObserveWsEventFrame
+  | ObserveWsProximitySnapshot
+  | ObserveWsProximityLeft
+  | ObserveWsPing;

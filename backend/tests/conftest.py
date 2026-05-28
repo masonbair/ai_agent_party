@@ -10,6 +10,7 @@ from app.routes import expressive as expressive_routes
 from app.routes import follow as follow_routes
 from app.routes import proposals as proposals_routes
 from app.routes import inbox_ws as inbox_ws_routes
+from app.routes import observe_ws as observe_ws_routes
 from app.routes import lighting as lighting_routes
 from app.routes import module_chat as module_chat_routes
 from app.routes import music as music_routes
@@ -89,6 +90,7 @@ def client(store: Store) -> TestClient:
     app.dependency_overrides[party_actions_routes._store_dep] = lambda: store
     app.dependency_overrides[dm_routes._store_dep] = lambda: store
     app.dependency_overrides[inbox_ws_routes._store_dep] = lambda: store
+    app.dependency_overrides[observe_ws_routes._store_dep] = lambda: store
     app.dependency_overrides[reactions_routes._store_dep] = lambda: store
     app.dependency_overrides[lighting_routes._store_dep] = lambda: store
     app.dependency_overrides[module_chat_routes._store_dep] = lambda: store
