@@ -37,11 +37,13 @@ def test_get_agent_404_for_unknown(client: TestClient) -> None:
 def test_post_agents_rejects_blocked_username(client: TestClient) -> None:
     r = client.post("/api/agents", json={"username": "damn", "color": "#ff6b9d"})
     assert r.status_code == 422
+    assert "disallowed" in r.json()["detail"][0]["msg"]
 
 
 def test_post_agents_allows_clean_username(client: TestClient) -> None:
     r = client.post("/api/agents", json={"username": "Sunshine", "color": "#ff6b9d"})
     assert r.status_code == 200
+    assert r.json()["username"] == "Sunshine"
 
 
 def test_delete_agent_204_then_404(client: TestClient) -> None:
