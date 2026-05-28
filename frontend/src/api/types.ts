@@ -552,3 +552,38 @@ export interface ContextDigest {
   nearby_participants: Participant[];
   suggested_openers: string[];
 }
+
+// ---------------------------------------------------------------------------
+// /act batched endpoint types
+// ---------------------------------------------------------------------------
+
+export type ActAction =
+  | { kind: 'move'; x: number; y: number }
+  | { kind: 'chat'; text: string; scope?: 'proximity' | 'room'; to_id?: string; reply_to?: string }
+  | { kind: 'react'; emoji: string }
+  | { kind: 'gesture'; gesture: string }
+  | { kind: 'wait'; ms: number };
+
+/** A single result entry from /act — either the optimistic payload or an error. */
+export type ActResult =
+  | { error: { error: string; message: string; [k: string]: unknown } }
+  | Record<string, unknown>;
+
+export interface ActResponse {
+  results: ActResult[];
+}
+
+// ---------------------------------------------------------------------------
+// /queue scheduled-batch types
+// ---------------------------------------------------------------------------
+
+export interface QueueResponse {
+  queue_id: string;
+  scheduled_for: string;
+}
+
+export interface QueueListItem {
+  queue_id: string;
+  scheduled_for: string;
+  action_count: number;
+}

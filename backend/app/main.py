@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import db as db_module
+from app.action_queue import ActionQueueStore
 from app.errors import FORBIDDEN, HTTP_ERROR, METHOD_NOT_ALLOWED, NOT_FOUND, UNAUTHORIZED, VALIDATION_ERROR, envelope
 from app.routes import agent_guide as agent_guide_routes
 from app.routes import agents as agents_routes
@@ -99,12 +100,15 @@ def _open_db() -> None:
         if parent:
             os.makedirs(parent, exist_ok=True)
     _store.db = db_module.init_db(path)
+    app.state.action_queue = ActionQueueStore()
 
 
 @app.on_event("shutdown")
-def _close_db() -> None:
+async def _close_db() -> None:
     db_module.close_db(_store.db)
     _store.db = None
+    if hasattr(app.state, "action_queue"):
+        await app.state.action_queue.shutdown()
 
 
 def get_store() -> Store:

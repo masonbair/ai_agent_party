@@ -1,9 +1,20 @@
+import datetime as dt
 import time
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
+from pydantic import BaseModel, Field
 
+from app.action_dispatch import (
+    Action,
+    DispatchContext,
+    _Chat,
+    _Move,
+    _act_dispatch,
+    _do_chat,
+    _do_move,
+)
+from app.action_queue import ActionQueueStore, NotOwnerError, QueueLimitError
 from app.errors import (
     INVALID_CHAT_TEXT,
     INVALID_REPLY_TO,
@@ -25,6 +36,10 @@ router = APIRouter(prefix="/api/parties")
 
 def _store_dep() -> Store:  # pragma: no cover - overridden by main
     raise NotImplementedError
+
+
+def _queue_dep(request: Request) -> ActionQueueStore:  # pragma: no cover - overridden by tests
+    return request.app.state.action_queue
 
 
 def _world(store: Store, slug: str) -> PartyWorld:
@@ -56,6 +71,21 @@ class ChatRequest(BaseModel):
     to_id: str | None = None
     reply_to: int | None = None
     scope: Literal["proximity", "room"] = "proximity"
+
+
+class ActRequest(BaseModel):
+    principal: Principal
+    actions: list[Action] = Field(min_length=1, max_length=5)
+
+
+class QueueRequest(BaseModel):
+    principal: Principal
+    actions: list[Action] = Field(min_length=1, max_length=5)
+    start_at: dt.datetime | None = None
+
+
+class QueueCancelRequest(BaseModel):
+    principal: Principal
 
 
 _SLUG_PATTERN = r"^[a-z0-9-]+$"
@@ -127,16 +157,9 @@ def move(
     world = _world(store, slug)
     resolved = resolve_principal(store, body.principal)
     try:
-        ev = world.move(resolved.id, body.x, body.y)
+        return _do_move(world, resolved.id, _Move(kind="move", x=body.x, y=body.y))
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
-    return {
-        "event": ev.model_dump(),
-        "x": ev.x,
-        "y": ev.y,
-        "zone": world.derive_zone(ev.x, ev.y),
-        "cursor": world.cursor,
-    }
 
 
 @router.post("/{slug}/chat")
@@ -145,9 +168,9 @@ def chat(
     slug: str = Path(pattern=_SLUG_PATTERN),
     store: Store = Depends(_store_dep),
 ) -> dict:
-    from app.rate_limit import chat_limiter
     world = _world(store, slug)
     resolved = resolve_principal(store, body.principal)
+    # Extra validations only the single endpoint needs (target/reply checks).
     if body.to_id is not None and body.to_id not in world.participants:
         raise HTTPException(
             status_code=404,
@@ -161,24 +184,25 @@ def chat(
                 message="reply_to does not reference a known chat event",
             ),
         )
-    ok, retry_after_ms = chat_limiter().try_consume(slug, resolved.id, body.scope)
-    if not ok:
+    action = _Chat(
+        kind="chat",
+        text=body.text,
+        scope=body.scope,
+        to_id=body.to_id,
+        reply_to=body.reply_to,
+    )
+    from app.action_dispatch import _ChatCooldownError
+    try:
+        result = _do_chat(world, resolved.id, action, slug=slug)
+    except _ChatCooldownError as exc:
         raise HTTPException(
             status_code=429,
             detail=envelope(
                 RATE_LIMITED,
-                message=f"chat cooldown: try again in {retry_after_ms} ms",
-                retry_after_ms=retry_after_ms,
-                scope=body.scope,
+                message=str(exc),
+                retry_after_ms=exc.retry_after_ms,
+                scope=exc.scope,
             ),
-        )
-    try:
-        ev = world.chat(
-            resolved.id,
-            body.text,
-            to_id=body.to_id,
-            reply_to=body.reply_to,
-            scope=body.scope,
         )
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
@@ -192,7 +216,10 @@ def chat(
                 max_chars=CHAT_MAX_LEN,
             ),
         )
-    return {"event": ev.model_dump(), "cursor": world.cursor}
+    # /chat single endpoint returns {"event": ..., "cursor": ...}
+    # _do_chat returns {"chat": ev.model_dump(), "cursor": ...}
+    # Translate for backwards compat.
+    return {"event": result["chat"], "cursor": result["cursor"]}
 
 
 @router.get("/{slug}/participants/{participant_id}")
@@ -322,3 +349,118 @@ def observe(
             if e.get("actor_id") != principal_id
         ]
     return payload
+
+
+# ---------------------------------------------------------------------------
+# Batched /act endpoint
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{slug}/act")
+async def act(
+    body: ActRequest,
+    slug: str = Path(pattern=_SLUG_PATTERN),
+    store: Store = Depends(_store_dep),
+) -> dict:
+    """Run an ordered list of 1-5 actions sequentially in one request.
+
+    Actions execute in order. If action N fails (validation, cooldown, etc.)
+    actions N+1..end are still attempted; each result is independent. The
+    response is ``{"results": [...]}`` with one entry per submitted action —
+    either the optimistic shape from the equivalent single endpoint or
+    ``{"error": {"error": "...", "message": "..."}}`` (spec #01 envelope).
+
+    Worst-case latency: 5 × ``wait.ms`` = up to 10 seconds. Callers should
+    set a client-side timeout >= 12s when using ``wait`` in the batch.
+    """
+    world = _world(store, slug)
+    resolved = resolve_principal(store, body.principal)
+    ctx = DispatchContext(
+        world=world,
+        principal_id=resolved.id,
+        principal_username=resolved.username,
+        principal_kind=resolved.kind,
+        slug=slug,
+    )
+    results = await _act_dispatch(ctx, body.actions)
+    return {"results": results}
+
+
+# ---------------------------------------------------------------------------
+# Server-side action queue routes
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{slug}/queue")
+async def queue_actions(
+    body: QueueRequest,
+    slug: str = Path(pattern=_SLUG_PATTERN),
+    store: Store = Depends(_store_dep),
+    queue: ActionQueueStore = Depends(_queue_dep),
+) -> dict:
+    world = _world(store, slug)
+    resolved = resolve_principal(store, body.principal)
+    ctx = DispatchContext(
+        world=world,
+        principal_id=resolved.id,
+        principal_username=resolved.username,
+        principal_kind=resolved.kind,
+        slug=slug,
+    )
+    try:
+        qid, when = queue.schedule(
+            ctx=ctx,
+            actions=body.actions,
+            start_at=body.start_at,
+            runner=_act_dispatch,
+        )
+    except QueueLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail=envelope(
+                "queue_limit",
+                message="max 3 pending queues per principal",
+            ),
+        )
+    return {
+        "queue_id": qid,
+        "scheduled_for": dt.datetime.fromtimestamp(
+            when, tz=dt.timezone.utc
+        ).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    }
+
+
+@router.get("/{slug}/queue")
+def list_queues(
+    slug: str = Path(pattern=_SLUG_PATTERN),
+    agent_id: str = "",
+    queue: ActionQueueStore = Depends(_queue_dep),
+) -> dict:
+    return {"queues": queue.list_for(agent_id, slug)}
+
+
+@router.delete("/{slug}/queue/{queue_id}", status_code=204)
+def cancel_queue(
+    body: QueueCancelRequest,
+    slug: str = Path(pattern=_SLUG_PATTERN),
+    queue_id: str = Path(...),
+    store: Store = Depends(_store_dep),
+    queue: ActionQueueStore = Depends(_queue_dep),
+) -> Response:
+    resolved = resolve_principal(store, body.principal)
+    try:
+        ok = queue.cancel(queue_id, resolved.id)
+    except NotOwnerError:
+        raise HTTPException(
+            status_code=403,
+            detail=envelope(
+                "not_owner",
+                message="queue belongs to another principal",
+            ),
+        )
+    if not ok:
+        raise HTTPException(
+            status_code=404,
+            detail=envelope("queue_not_found", message=queue_id),
+        )
+    return Response(status_code=204)
