@@ -1,6 +1,7 @@
 // frontend/src/components/ChatInput.tsx
 import { useEffect, useRef, useState } from 'react';
 import { chatInParty, type Principal } from '../api/party';
+import { ApiError } from '../api/client';
 import { CHAT_MAX_LEN, validateChatText } from '../api/validation';
 
 type Props = {
@@ -16,6 +17,23 @@ const REASON_MESSAGES: Record<string, string> = {
 };
 
 const FOCUS_KEY = 't';
+
+function describeChatError(err: unknown): string {
+  if (err instanceof ApiError) {
+    const detail = (err.body as { detail?: { error?: string; retry_after_ms?: number } } | null)?.detail;
+    if (err.status === 429 && detail?.error === 'rate_limited') {
+      const seconds = Math.max(1, Math.ceil((detail.retry_after_ms ?? 0) / 1000));
+      return `Slow down — try again in ${seconds}s`;
+    }
+    if (err.status === 422 && detail?.error === 'invalid_chat_text') {
+      return 'That message has disallowed characters or is too long.';
+    }
+    if (err.status === 404 && detail?.error === 'recipient_unknown') {
+      return "Couldn't find that recipient.";
+    }
+  }
+  return 'Failed to send';
+}
 
 export default function ChatInput({ slug, principal, disabled }: Props) {
   const [value, setValue] = useState('');
@@ -63,8 +81,8 @@ export default function ChatInput({ slug, principal, disabled }: Props) {
     const sentText = result.text;
     setValue('');
     chatInParty(slug, principal, sentText)
-      .catch(() => {
-        setError('Failed to send');
+      .catch((err: unknown) => {
+        setError(describeChatError(err));
         setValue(sentText);
       })
       .finally(() => {

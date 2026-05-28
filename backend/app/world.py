@@ -331,6 +331,7 @@ class PartyWorld:
             actor_id=participant.id,
             actor_username=participant.username,
             actor_kind=participant.kind,
+            actor_color=participant.color,
             x=participant.x,
             y=participant.y,
             zone=self.derive_zone(participant.x, participant.y),

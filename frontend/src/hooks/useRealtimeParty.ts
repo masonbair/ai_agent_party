@@ -121,15 +121,17 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
               actor_id: string;
               actor_username: string;
               actor_kind: 'human' | 'agent';
+              actor_color?: string;
               x: number;
               y: number;
             };
             // Build a minimal participant from join event flat fields.
-            // color is available via the snapshot participants list; for
-            // late arrivals we use a placeholder until the next snapshot.
+            // The server stamps the joiner's chosen color on the event so
+            // other clients render the avatar correctly; fall back to a
+            // neutral placeholder only if the server omitted it.
             setParticipants((prev) => {
               if (prev.some((q) => q.id === j.actor_id)) return prev;
-              const color = '#aaaaaa';
+              const color = j.actor_color ?? '#aaaaaa';
               return [...prev, {
                 id: j.actor_id,
                 kind: j.actor_kind,

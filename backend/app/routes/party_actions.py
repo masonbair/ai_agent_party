@@ -207,7 +207,6 @@ def chat(
     except ParticipantNotInPartyError:
         raise http_envelope(409, NOT_IN_PARTY)
     except ChatValidationError as exc:
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=422,
             detail=envelope(

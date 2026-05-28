@@ -265,6 +265,10 @@ function NoteView({
     offsetY: number;
     moved: boolean;
   } | null>(null);
+  // Survives across the pointerup→click boundary so the click handler can
+  // tell that the just-finished pointer sequence was a drag, not a tap.
+  // (dragRef itself is cleared on pointerup, before click fires.)
+  const wasDraggingRef = useRef(false);
 
   const displayX = dragPos ? dragPos.x : note.x;
   const displayY = dragPos ? dragPos.y : note.y;
@@ -348,6 +352,7 @@ function NoteView({
   async function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
+    wasDraggingRef.current = drag.moved;
     dragRef.current = null;
     const finalPos = dragPos;
     setDragPos(null);
@@ -395,13 +400,17 @@ function NoteView({
     <div
       onClick={(e) => {
         e.stopPropagation();
+        // Suppress the click that immediately follows a drag.
+        if (wasDraggingRef.current) {
+          wasDraggingRef.current = false;
+          return;
+        }
         if (viewing) {
           onCloseView();
           return;
         }
         const target = e.target as HTMLElement;
         if (target.closest('button')) return;
-        if (dragRef.current?.moved) return;
         onView();
       }}
       onPointerDown={onPointerDown}

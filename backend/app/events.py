@@ -28,6 +28,7 @@ class JoinEvent(BaseModel):
     actor_id: str
     actor_username: str
     actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     x: float
     y: float
     zone: str | None = None
