@@ -45,6 +45,10 @@ PROPOSAL_EXPIRED = "proposal_expired"
 INVALID_VOTE = "invalid_vote"
 INVALID_PROPOSAL_TEXT = "invalid_proposal_text"
 INVALID_EXPIRY = "invalid_expiry"
+INVALID_TRACK = "invalid_track"
+INVALID_VOLUME = "invalid_volume"
+INVALID_ACTION = "invalid_action"
+RATE_LIMITED_MUSIC = "rate_limited_music"
 
 
 # Default human-readable messages keyed by code. Routes may override.

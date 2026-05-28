@@ -2,6 +2,7 @@ import re as _re
 import sqlite3
 import time
 import uuid
+from dataclasses import dataclass
 from typing import Callable
 
 from app import db as db_module
@@ -21,6 +22,7 @@ from app.events import (
     LeaveEvent,
     ModuleChatEvent,
     MoveEvent,
+    MusicChangedEvent,
     NoteReactionEvent,
     Participant,
     Reaction,
@@ -57,9 +59,13 @@ from app.validation import (
     SLOT_OCCUPIED_RADIUS,
     STROKES_PER_BOARD_MAX,
     VOTE_TTL_SECONDS,
+    MusicValidationError,
     validate_chat_text,
     validate_cosmetic_effect,
     validate_gesture,
+    validate_music_action,
+    validate_music_track,
+    validate_music_volume,
     validate_note_color,
     validate_note_text,
     validate_reaction_emoji,
@@ -97,6 +103,22 @@ def parse_mentions(text: str, participants: dict) -> list[str]:
 
 
 PROPOSAL_TEXT_MAX = 65  # mirrors chat cap (shared brief: do not raise)
+
+
+@dataclass
+class MusicState:
+    track_id: str | None = None
+    playing: bool = False
+    volume: int = 50
+    since: float | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "track_id": self.track_id,
+            "playing": self.playing,
+            "volume": self.volume,
+            "since": self.since,
+        }
 
 
 class ParticipantNotInPartyError(LookupError):
@@ -143,6 +165,7 @@ class PartyWorld:
         )
         self._listeners: list[Callable[[Event], None]] = []
         self.lighting: str = "day"
+        self.music: MusicState = MusicState()
         self.notes_by_module: dict[str, list[StickyNote]] = {}
         self.strokes_by_module: dict[str, list[Stroke]] = {}
         self.votes_by_module: dict[str, dict[str, float]] = {}
@@ -620,6 +643,66 @@ class PartyWorld:
         if p is None:
             return None
         return {"x": p.x, "y": p.y}
+
+    def set_music(
+        self,
+        changed_by: str,
+        *,
+        action: str,
+        track_id: str,
+        volume: int | None = None,
+    ) -> MusicChangedEvent:
+        if changed_by not in self.participants:
+            raise ParticipantNotInPartyError(changed_by)
+        a = validate_music_action(action)
+        t = validate_music_track(track_id)
+        now = time.time()
+
+        if a == "play":
+            new_playing = True
+            new_track = t
+            new_volume = (
+                validate_music_volume(volume)
+                if volume is not None else self.music.volume
+            )
+        elif a == "pause":
+            new_playing = False
+            new_track = t
+            new_volume = self.music.volume
+        elif a == "skip":
+            new_playing = True
+            new_track = t
+            new_volume = self.music.volume
+        elif a == "set_volume":
+            if volume is None:
+                raise MusicValidationError(
+                    "volume is required for action 'set_volume'"
+                )
+            new_playing = self.music.playing
+            new_track = t
+            new_volume = validate_music_volume(volume)
+        else:
+            # validate_music_action already excluded this path.
+            raise MusicValidationError(f"unknown action {a!r}")
+
+        self.music = MusicState(
+            track_id=new_track,
+            playing=new_playing,
+            volume=new_volume,
+            since=now,
+        )
+        ev = MusicChangedEvent(
+            seq=self._next_seq(),
+            track_id=new_track,
+            playing=new_playing,
+            volume=new_volume,
+            at=now,
+            room_wide=True,
+            **self._actor_fields(changed_by),
+        )
+        self._events.append(ev)
+        self._emit(ev)
+        return ev
 
     def _require_placed(self, module_id: str) -> PlacedModule:
         m = self._placed_module(module_id)
@@ -1446,6 +1529,7 @@ class PartyWorld:
             ],
             "cursor": self.cursor,
             "lighting": self.lighting,
+            "music": self.music.to_dict(),
             "modules": [self._module_snapshot(m) for m in placed],
             "active_reactions": active_reactions,
         }

@@ -16,6 +16,7 @@ from app.routes import proposals as proposals_routes
 from app.routes import inbox_ws as inbox_ws_routes
 from app.routes import lighting as lighting_routes
 from app.routes import module_chat as module_chat_routes
+from app.routes import music as music_routes
 from app.routes import module_drawboard as module_drawboard_routes
 from app.routes import module_notes as module_notes_routes
 from app.routes import history as history_routes
@@ -123,6 +124,7 @@ app.dependency_overrides[inbox_ws_routes._store_dep] = get_store
 app.dependency_overrides[reactions_routes._store_dep] = get_store
 app.dependency_overrides[lighting_routes._store_dep] = get_store
 app.dependency_overrides[module_chat_routes._store_dep] = get_store
+app.dependency_overrides[music_routes._store_dep] = get_store
 app.dependency_overrides[module_notes_routes._store_dep] = get_store
 app.dependency_overrides[module_drawboard_routes._store_dep] = get_store
 app.dependency_overrides[history_routes._store_dep] = get_store
@@ -138,6 +140,7 @@ app.include_router(inbox_ws_routes.router)
 app.include_router(reactions_routes.router)
 app.include_router(lighting_routes.router)
 app.include_router(module_chat_routes.router)
+app.include_router(music_routes.router)
 app.include_router(module_notes_routes.router)
 app.include_router(module_drawboard_routes.router)
 app.include_router(history_routes.router)

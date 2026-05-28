@@ -230,6 +230,20 @@ class ProposalCreatedEvent(BaseModel):
     room_wide: bool = True
 
 
+class MusicChangedEvent(BaseModel):
+    seq: int
+    type: Literal["music_changed"] = "music_changed"
+    track_id: str
+    playing: bool
+    volume: int
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
 class ProposalVoteEvent(BaseModel):
     seq: int
     type: Literal["proposal_vote"] = "proposal_vote"
@@ -336,6 +350,7 @@ Event = (
     | ProposalCreatedEvent
     | ProposalVoteEvent
     | ProposalResolvedEvent
+    | MusicChangedEvent
     | ProximitySnapshotEvent
     | ProximityLeftEvent
 )

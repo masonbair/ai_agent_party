@@ -290,6 +290,7 @@ def observe(
             "cursor": snap["cursor"],
             "modules": snap["modules"],
             "lighting": snap["lighting"],
+            "music": snap["music"],
             "active_reactions": snap["active_reactions"],
             "recent_chat": world.recent_chat(),
             "active_proposals": world.active_proposals(),

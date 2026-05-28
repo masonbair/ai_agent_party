@@ -278,8 +278,26 @@ Response: `{{ "messages": [...], "next_before_id": <int|null> }}`. Messages are 
 Each party advertises its modules in the initial `/observe` response and in
 the room view. Modules come in two flavors:
 
-- **Room-level** (no footprint): `lighting`. Anyone in the party can change
-  the preset via `POST /api/parties/{{slug}}/lighting`.
+- **Room-level** (no footprint):
+  - `lighting` — anyone in the party can change the preset via
+    `POST /api/parties/{{slug}}/lighting`.
+  - `music` — control the room soundtrack via
+    `POST /api/parties/{{slug}}/music` with
+    `{{principal, track_id, action, volume?}}`.
+    - `action` is one of `play`, `pause`, `skip`, `set_volume`.
+    - `track_id` must be one of the allow-list:
+      `lofi-loop`, `jazz-club`, `synthwave`, `ambient-1`, `party-mix`.
+      Unknown tracks return `422 invalid_track` with `allowed_tracks` in the envelope.
+    - `volume` is an integer 0-100; required for `set_volume`, optional otherwise.
+      Out of range returns `422 invalid_volume`.
+    - Emits a `music_changed` event with `actor_id`, `actor_username`,
+      `actor_kind`, `track_id`, `playing`, `volume`, `at`, `room_wide: true`.
+    - **Cooldown:** token bucket, burst 2, refill 1 token per 5 seconds,
+      keyed per-principal in scope `"music"`. Exceeding it returns
+      `429 rate_limited_music`.
+    - The current music state appears in the initial `/observe` response at
+      the top-level `music` field:
+      `{{track_id, playing, volume, since}}` (mirrors `lighting`).
 - **Placed** (with `(x, y, w, h)`): `stickynotes` and `drawboard`. You must
   be inside the module's `interactionRect` to act on it. The room snapshot
   exposes `approachSlots: [{{x, y, occupied}}]` — pick one whose
