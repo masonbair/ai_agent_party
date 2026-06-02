@@ -1,7 +1,29 @@
 """Content guardrails — blocklist-driven word masking."""
 
 import re
+import unicodedata
 from pathlib import Path
+
+# Whitespace that is legitimate inside user text and must survive normalization.
+_KEPT_WHITESPACE = frozenset("\n\t")
+
+
+def normalize_text(text: str) -> str:
+    """Canonicalize *text* before validation and masking.
+
+    Applies NFKC normalization so compatibility lookalikes (e.g. fullwidth
+    ``ｂａｄ``) fold to their ASCII form, then strips invisible characters —
+    control (Cc) and format (Cf, e.g. zero-width space, RTL override) chars
+    plus line/paragraph separators — while keeping newline and tab. This
+    runs first in every validator so lookalike and invisible-char tricks
+    cannot slip past the charset check or the blocklist.
+    """
+    normalized = unicodedata.normalize("NFKC", text)
+    return "".join(
+        ch
+        for ch in normalized
+        if ch in _KEPT_WHITESPACE or unicodedata.category(ch) not in ("Cc", "Cf", "Zl", "Zp")
+    )
 
 _BLOCKLIST_PATH = Path(__file__).parent / "blocklist.txt"
 

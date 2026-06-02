@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 import app.guardrails as guardrails
 from app.events import Participant
 from app.store import Store
+from app.validation import validate_chat_text
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +110,46 @@ class TestMaskBlockedEmptyBlocklist:
         masked, was = guardrails.mask_blocked("shit damn hell")
         assert masked == "shit damn hell"
         assert was is False
+
+
+# ---------------------------------------------------------------------------
+# normalize_text — canonicalize before validation/masking
+# ---------------------------------------------------------------------------
+
+class TestNormalizeText:
+    def test_plain_ascii_unchanged(self):
+        assert guardrails.normalize_text("hello, world! :)") == "hello, world! :)"
+
+    def test_nfkc_folds_fullwidth_lookalikes(self):
+        # Fullwidth latin "ｂａｄ" canonicalizes to ASCII "bad".
+        assert guardrails.normalize_text("ｂａｄ") == "bad"
+
+    def test_strips_zero_width_space(self):
+        assert guardrails.normalize_text("ba​d") == "bad"
+
+    def test_strips_rtl_override(self):
+        # U+202E (RIGHT-TO-LEFT OVERRIDE) is a spoofing format char.
+        assert guardrails.normalize_text("ab‮cd") == "abcd"
+
+    def test_strips_control_chars(self):
+        assert guardrails.normalize_text("a\x00b\x07c") == "abc"
+
+    def test_keeps_newline_and_tab(self):
+        assert guardrails.normalize_text("a\nb\tc") == "a\nb\tc"
+
+
+class TestNormalizeMaskingHardening:
+    """The blocklist can't be bypassed with lookalike / invisible chars."""
+
+    def test_fullwidth_blocked_word_is_masked_through_validator(self, monkeypatch):
+        _patch_blocklist(monkeypatch, frozenset(["bad"]))
+        # Fullwidth "ｂａｄ" normalizes to "bad" before masking.
+        assert validate_chat_text("that is ｂａｄ") == "that is ***"
+
+    def test_zero_width_split_blocked_word_is_masked(self, monkeypatch):
+        _patch_blocklist(monkeypatch, frozenset(["bad"]))
+        # Zero-width space between letters is stripped, exposing the word.
+        assert validate_chat_text("ba​d vibes") == "*** vibes"
 
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,11 @@
 import re
 
-from app.guardrails import mask_blocked
+from app.guardrails import contains_blocked, mask_blocked, normalize_text
 
-USERNAME_REGEX = re.compile(r"^[A-Za-z0-9]{2,20}$")
+# Usernames: 2–20 printable-ASCII chars, excluding space (0x20) so they stay
+# single-token for @mention parsing and can't be spoofed with leading/trailing
+# whitespace. Punctuation (foo.bar, a_b-c) is allowed; emoji / non-Latin are not.
+USERNAME_REGEX = re.compile(r"^[\x21-\x7E]{2,20}$")
 
 ALLOWED_COLORS: tuple[str, ...] = (
     "#ff6b9d",  # pink
@@ -20,11 +23,13 @@ ALLOWED_COLORS: tuple[str, ...] = (
 )
 
 CHAT_MAX_LEN = 65
-# Allowed characters in chat text:
-# letters, digits, spaces, the punctuation set .,!?'-, and @ for mentions.
-# Owner is conservative on character expansion — do not add more without
-# an explicit owner decision (see docs/features/feature-backlog.md §1).
-CHAT_ALLOWED_CHARS_REGEX = r"^[A-Za-z0-9 .,!?'\-@]+$"
+# Allowed characters in chat text: the full printable-ASCII range (0x20–0x7E)
+# — letters, digits, space, and every common punctuation mark (@, :), #, /, etc).
+# This is intentionally permissive: injection safety comes from parameterized
+# SQL (db.py) and React's auto-escaping, NOT from a narrow charset. Emoji and
+# non-Latin scripts are out of scope. Control/invisible chars are stripped by
+# normalize_text before this check (see docs/features/feature-backlog.md §1).
+CHAT_ALLOWED_CHARS_REGEX = r"^[\x20-\x7E]+$"
 CHAT_TEXT_REGEX = re.compile(CHAT_ALLOWED_CHARS_REGEX)
 RECENT_CHAT_LIMIT = 20
 
@@ -33,8 +38,28 @@ class ChatValidationError(ValueError):
     pass
 
 
+class UsernameValidationError(ValueError):
+    pass
+
+
+def validate_username(v: str) -> str:
+    """Normalize and validate a username; the single source of truth.
+
+    Returns the canonical (NFKC-normalized) username. Raises
+    ``UsernameValidationError`` if it fails the charset rule or contains a
+    blocked word. Used by both human session and agent registration so the
+    rule lives in exactly one place.
+    """
+    name = normalize_text(v)
+    if USERNAME_REGEX.fullmatch(name) is None:
+        raise UsernameValidationError("username must be 2-20 printable chars, no spaces")
+    if contains_blocked(name):
+        raise UsernameValidationError("username contains disallowed word")
+    return name
+
+
 def validate_chat_text(text: str) -> str:
-    trimmed = text.strip()
+    trimmed = normalize_text(text).strip()
     if not trimmed:
         raise ChatValidationError("chat text must not be empty")
     if len(trimmed) > CHAT_MAX_LEN:
@@ -51,7 +76,8 @@ REACTION_EMOJI_ALLOWLIST: tuple[str, ...] = (
 )
 
 STICKY_TEXT_MAX = 140
-STICKY_TEXT_REGEX = re.compile(r"^[A-Za-z0-9 .,!?'\-\n]+$")
+# Printable ASCII plus newline (notes are multi-line). Same rationale as chat.
+STICKY_TEXT_REGEX = re.compile(r"^[\x20-\x7E\n]+$")
 STICKY_COLOR_ALLOWLIST: tuple[str, ...] = ("yellow", "pink", "blue", "green")
 
 STROKE_MAX_POINTS = 200
@@ -139,7 +165,7 @@ def validate_reaction_emoji(emoji: str) -> str:
 
 
 def validate_note_text(text: str) -> str:
-    trimmed = text.strip()
+    trimmed = normalize_text(text).strip()
     if not trimmed:
         raise NoteValidationError("note text must not be empty")
     if len(trimmed) > STICKY_TEXT_MAX:

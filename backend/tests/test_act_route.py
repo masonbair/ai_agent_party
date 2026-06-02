@@ -87,7 +87,7 @@ def test_act_continues_after_action_fails(client: TestClient) -> None:
             "principal": agent["principal"],
             "actions": [
                 {"kind": "move", "x": 50, "y": 50},
-                {"kind": "chat", "text": "<<invalid chars>>"},
+                {"kind": "chat", "text": "nope 🙂"},
                 {"kind": "react", "emoji": "🎉"},
             ],
         },

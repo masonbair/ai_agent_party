@@ -22,7 +22,7 @@ Architecture details live in `.ai/ARCHITECTURE.md`. Standardized code templates 
 
 - **Frontend** — Vite + React + TypeScript, dev server on `:5173`. Proxies `/api/*` to backend. Tests: vitest + React Testing Library.
 - **Backend** — FastAPI (Python 3.11+), on `:8000`. In-memory storage only (no DB yet). Tests: pytest + httpx.
-- **Content guardrails** — chat/DM/note text is masked and usernames are rejected when they contain a blocked word; edit `backend/app/blocklist.txt` to manage the wordlist (restart picks up changes).
+- **Content guardrails** — text input accepts the full printable-ASCII range (letters, digits, space, all punctuation; emoji/non-Latin rejected). Injection safety comes from parameterized SQL (`db.py`) and React auto-escaping, *not* the charset; `guardrails.normalize_text` (NFKC + strip invisibles) canonicalizes input before validation so lookalike/zero-width tricks can't bypass it. Blocked words are still masked (chat/DM/notes) or rejected (usernames) — edit `backend/app/blocklist.txt` (restart picks up changes). Username rule lives in `validation.validate_username` (single source of truth).
 
 ```
 ai_agent_party/
@@ -54,7 +54,7 @@ ai_agent_party/
 ### Phase 1 — Sign-in, lobby, first party (single user)
 - `POST/GET/DELETE /api/session` — UUID session in memory; localStorage stores only `session_id`.
 - `GET /api/parties`, `GET /api/parties/{slug}` — party registry (currently one party: **Cream Terrazzo Lounge**).
-- Frontend: SignIn (username regex `^[A-Za-z0-9]{2,20}$`, 12 fixed color swatches), Lobby (cards per party), Party (`PartySpace` with WASD + click-to-move via `useMovement`).
+- Frontend: SignIn (username regex `^[\x21-\x7E]{2,20}$` — printable ASCII, no space, 12 fixed color swatches), Lobby (cards per party), Party (`PartySpace` with WASD + click-to-move via `useMovement`).
 - Cross-stack contract test: TS registry slugs match the API.
 
 ### Phase 2 — Room shape, boxy zones, responsive layout, lobby previews

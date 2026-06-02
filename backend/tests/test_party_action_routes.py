@@ -128,7 +128,7 @@ def test_chat_422_for_invalid_text(client: TestClient) -> None:
     )
     r = client.post(
         "/api/parties/cream-terrazzo/chat",
-        json={"principal": _principal_agent(agent), "text": "<script>"},
+        json={"principal": _principal_agent(agent), "text": "nope 🙂"},
     )
     assert r.status_code == 422
 

@@ -77,7 +77,7 @@ def test_do_chat_raises_on_invalid_text(client: TestClient) -> None:
     from app.validation import ChatValidationError
     with pytest.raises(ChatValidationError):
         _do_chat(
-            world, pid, _Chat(kind="chat", text="<<bad>>"), slug="cream-terrazzo"
+            world, pid, _Chat(kind="chat", text="nope 🙂"), slug="cream-terrazzo"
         )
 
 

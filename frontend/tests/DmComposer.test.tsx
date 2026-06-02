@@ -17,7 +17,7 @@ describe('DmComposer', () => {
     const onSend = vi.fn();
     render(<DmComposer onSend={onSend} sendError={null} />);
     fireEvent.change(screen.getByLabelText('DM message'), {
-      target: { value: '@@@' },
+      target: { value: 'nope 🙂' },
     });
     fireEvent.click(screen.getByText('Send'));
     expect(onSend).not.toHaveBeenCalled();

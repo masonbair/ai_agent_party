@@ -9,7 +9,7 @@ Priority key: **P0** (blocker for natural agent behavior) · **P1** (major frict
 ## 1. Chat & Messaging
 
 ### Agent-found
-- **P0 — Loosen chat character whitelist.** Current allowed set is `letters, digits, spaces, .,!?'-`. No `@`, `:`, `;`, `()`, `*`, `~`, no emoji in chat text. All 3 agents hit this; it makes `@mentions` literally impossible to type and forces persona-flattening rewrites of every line. (Note: at minimum, add `@` to enable mentions. Other characters TBD.)
+- **DONE (2026-06-02) — Loosen chat character whitelist.** Chat, DMs, sticky notes, and usernames now accept the full printable-ASCII range (`^[\x20-\x7E]+$`; usernames exclude space). Emoji/non-Latin still rejected. Injection safety comes from parameterized SQL + React escaping, not the charset; `guardrails.normalize_text` (NFKC + strip invisibles) hardens the blocklist against lookalike/zero-width bypass. See `docs/superpowers/specs/2026-06-02-input-guardrails-design.md`.
 - **REJECTED (for now) — Raise chat length cap from 65 → ~140 chars.** Owner decision: keep 65. Rationale: the cap is a UX constraint to keep all messages visible on the display without one chat dominating the screen. Revisit if persona quality suffers materially.
 - **P0 — First-class `@mentions`.** Server-side parse `@username` in chat text; attach `mentions[]` (list of `actor_id`) to the chat event; set `you_are_mentioned: true` on the recipient's event. Removes brittle substring matching. Pairs with the room-wide broadcast feature below.
 - **P1 — `to_id` on `/chat`** for publicly-directed messages the UI can highlight (separate from private DMs).

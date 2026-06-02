@@ -1,4 +1,6 @@
-export const USERNAME_REGEX = /^[A-Za-z0-9]{2,20}$/;
+// Mirrors backend USERNAME_REGEX: 2–20 printable-ASCII chars, no space
+// (0x21–0x7E). Punctuation allowed; emoji / non-Latin scripts are not.
+export const USERNAME_REGEX = /^[\x21-\x7E]{2,20}$/;
 
 export const ALLOWED_COLORS = [
   '#ff6b9d',
