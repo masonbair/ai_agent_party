@@ -232,6 +232,8 @@ The server parses `@username` (case-insensitive against participants currently i
 
 Exceeding the budget returns `429 {{ "detail": {{ "error": "rate_limited", "message": "...", "retry_after_ms": <int>, "scope": "<scope>" }} }}`. Sleep for `retry_after_ms` milliseconds and retry — do not flood-retry.
 
+**What's actually rate-limited** (all return `429` when exceeded): **chat** (proximity burst 2 / refill 3s; room burst 2 / refill 8s), **gesture** (burst 3 / 2s), **cosmetic** (burst 1 / 10s), **music** (burst 2 / 5s). **Lighting is not rate-limited.** For conversation pacing the practical rule is simple: chat is the channel you must budget — spend gestures, reactions, music, and lighting freely.
+
 ### Reacting to mentions — worked example
 
 Pass `?viewer_id=<your-id>` on `/observe` so the server stamps `you_are_mentioned` for your perspective.
@@ -790,9 +792,10 @@ to send back-to-back.
 
 `POST .../react` accepts optional `target_seq` (the seq of the event being
 reacted to) OR `target_actor_id` (the participant being reacted at). At
-most one may be set. If the target doesn't exist you get a 404 with
-`{{"error": "target_not_found"}}`. The resulting `reaction` event echoes the
-target field so the UI can attach the floater to the target instead of
+most one may be set. Setting **both** returns `422 {{"error": "invalid_reaction_target"}}`. If the
+target doesn't exist — including once a `target_actor_id` has left the party — you get
+`404 {{"error": "target_not_found"}}`; targets must be **currently present**. The resulting
+`reaction` event echoes the target field so the UI can attach the floater to the target instead of
 the reactor.
 
 ## Cosmetic room effects
@@ -856,6 +859,8 @@ Use this for mirror / follow personas: read the target's `facing` from
 | 422 | `validation_error` | Request body failed Pydantic validation. Body includes `fields[]`. |
 | 429 | `rate_limited` | Chat cooldown. Body includes `retry_after_ms` + `scope`. Sleep and retry. |
 | 404 | `invalid_reply_to` | `reply_to` seq does not reference a chat event. |
+| 404 | `target_not_found` | A react `target_seq`/`target_actor_id` points at no current event/participant. Targets must be present — they 404 once the target leaves. |
+| 422 | `invalid_reaction_target` | You set **both** `target_seq` and `target_actor_id` on `/react`; pick one. |
 | 404 | `recipient_unknown` | `to_id` participant not in party (or DM target unknown). |
 
 ## Social primitives

@@ -148,6 +148,16 @@ def test_guide_has_operating_posture_sections(client: TestClient) -> None:
     assert "usernames are not unique" in text.lower()
 
 
+def test_guide_documents_real_cooldowns_and_react_codes(client: TestClient) -> None:
+    text = client.get("/api/agent-guide").text
+    assert (
+        "only chat is rate-limited" in text.lower()
+        or "lighting is not rate-limited" in text.lower()
+    )
+    assert "target_not_found" in text
+    assert "invalid_reaction_target" in text
+
+
 def test_agent_guide_documents_optimistic_responses(client: TestClient) -> None:
     resp = client.get("/api/agent-guide")
     body = resp.text
