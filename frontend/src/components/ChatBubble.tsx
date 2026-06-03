@@ -6,9 +6,14 @@ type Props = {
   worldWidth: number;
   worldHeight: number;
   expiresAt: number;
+  color?: string;
+  ambient?: boolean;
+  /** Extra upward shift (px) applied by the anti-overlap layout. */
+  offsetY?: number;
 };
 
 const FADE_WINDOW_MS = 500;
+const DEFAULT_BORDER = '#c9b58a';
 
 export default function ChatBubble({
   text,
@@ -17,16 +22,46 @@ export default function ChatBubble({
   worldWidth,
   worldHeight,
   expiresAt,
+  color,
+  ambient = false,
+  offsetY = 0,
 }: Props) {
   const leftPct = (x / worldWidth) * 100;
   const topPct = (y / worldHeight) * 100;
   const fading = expiresAt - Date.now() <= FADE_WINDOW_MS;
-  // Keep the bubble at its natural content width by shifting its anchor as
-  // the avatar approaches a wall. The wider safe-zones (was 18/82, now 30/70)
-  // let the bubble flip BEFORE it would have to wrap to fit. Anchor
-  // 'translate-x: 0%' means left edge at avatar (extends right); '-100%'
-  // means right edge at avatar (extends left); '-50%' is centered.
   const translateX = leftPct < 30 ? '0%' : leftPct > 70 ? '-100%' : '-50%';
+  const borderColor = color ?? DEFAULT_BORDER;
+  const liftPx = 28 + offsetY;
+
+  if (ambient) {
+    // Contentless "someone's talking over there" puff: small, faded, no text.
+    return (
+      <div
+        data-ambient="true"
+        data-fading={fading ? 'true' : undefined}
+        style={{
+          position: 'absolute',
+          left: `${leftPct}%`,
+          top: `${topPct}%`,
+          transform: `translate(-50%, calc(-100% - ${liftPx}px))`,
+          pointerEvents: 'none',
+          background: 'rgba(255,255,255,0.65)',
+          color: '#888',
+          border: `1px dashed ${borderColor}`,
+          borderRadius: 10,
+          padding: '1px 6px',
+          fontSize: 11,
+          lineHeight: 1,
+          opacity: fading ? 0 : 0.7,
+          transition: 'left 150ms linear, top 150ms linear, opacity 400ms ease-out',
+          zIndex: 4,
+        }}
+      >
+        <span>···</span>
+      </div>
+    );
+  }
+
   return (
     <div
       data-fading={fading ? 'true' : undefined}
@@ -34,19 +69,15 @@ export default function ChatBubble({
         position: 'absolute',
         left: `${leftPct}%`,
         top: `${topPct}%`,
-        transform: `translate(${translateX}, calc(-100% - 28px))`,
+        transform: `translate(${translateX}, calc(-100% - ${liftPx}px))`,
         pointerEvents: 'none',
         background: 'rgba(255,255,255,0.95)',
         color: '#2a2a2a',
-        border: '1px solid #c9b58a',
+        border: `1px solid ${borderColor}`,
         borderRadius: 10,
         padding: '3px 8px',
         fontSize: 12,
         boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
-        // ``width: max-content`` makes the bubble grow to fit its text rather
-        // than shrinking to whatever inline-size the containing block leaves
-        // available. Combined with maxWidth: 260 this gives the natural
-        // one-line look until the text genuinely exceeds 260px.
         width: 'max-content',
         maxWidth: 260,
         whiteSpace: 'normal',

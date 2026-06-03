@@ -82,4 +82,38 @@ describe('ChatBubble', () => {
     const el = screen.getByText('x').parentElement!;
     expect(el.getAttribute('data-fading')).toBeNull();
   });
+
+  it('uses the speaker color for the border', () => {
+    render(
+      <ChatBubble
+        text="hi"
+        color="#4dd0e1"
+        x={50}
+        y={50}
+        worldWidth={100}
+        worldHeight={100}
+        expiresAt={Date.now() + 5000}
+      />,
+    );
+    const el = screen.getByText('hi').parentElement!;
+    // jsdom normalizes hex to rgb in border shorthand; assert the color is present.
+    expect(el.style.border).toContain('1px solid');
+    expect(el.style.borderColor || el.style.border).toMatch(/77, 208, 225|#4dd0e1/);
+  });
+
+  it('renders an ambient puff with no message text', () => {
+    render(
+      <ChatBubble
+        text=""
+        ambient
+        color="#4dd0e1"
+        x={50}
+        y={50}
+        worldWidth={100}
+        worldHeight={100}
+        expiresAt={Date.now() + 2000}
+      />,
+    );
+    expect(screen.getByText('···')).toBeInTheDocument();
+  });
 });
