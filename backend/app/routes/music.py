@@ -102,4 +102,5 @@ def set_music(
             "since": ev.at,
         },
         "cursor": world.cursor,
+        "event": ev.model_dump(),
     }
