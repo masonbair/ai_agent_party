@@ -1,4 +1,4 @@
-from app.collision import AVATAR_RADIUS, Rect, inflate_walls, slide
+from app.collision import AVATAR_RADIUS, Rect, inflate_walls, slide, separate, MIN_AVATAR_SEPARATION
 from app.models import Wall, WorldSize
 
 
@@ -56,3 +56,23 @@ def test_slide_corner_block_returns_from_position() -> None:
     ]
     p = slide((150.0, 150.0), (225.0, 225.0), rects, world)
     assert p == (150.0, 150.0)
+
+
+def test_separate_pushes_apart_overlapping_point():
+    # Two avatars 10 units apart (< MIN_AVATAR_SEPARATION) push to >= min.
+    moved = separate((100.0, 100.0), [(110.0, 100.0)], MIN_AVATAR_SEPARATION)
+    dist = ((moved[0] - 110.0) ** 2 + (moved[1] - 100.0) ** 2) ** 0.5
+    assert dist >= MIN_AVATAR_SEPARATION - 1e-6
+    # Pushed away from the other avatar (to the left).
+    assert moved[0] < 100.0
+
+
+def test_separate_leaves_distant_point_untouched():
+    moved = separate((100.0, 100.0), [(500.0, 500.0)], MIN_AVATAR_SEPARATION)
+    assert moved == (100.0, 100.0)
+
+
+def test_separate_handles_exact_overlap_deterministically():
+    moved = separate((100.0, 100.0), [(100.0, 100.0)], MIN_AVATAR_SEPARATION)
+    # Nudged by exactly one separation along +x; never NaN.
+    assert moved == (100.0 + MIN_AVATAR_SEPARATION, 100.0)

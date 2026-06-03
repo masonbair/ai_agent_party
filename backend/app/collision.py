@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 from app.models import Wall, WorldSize
@@ -5,6 +6,36 @@ from app.models import Wall, WorldSize
 # Avatar treated as a point + walls inflated by this radius.
 # Keep in sync with AVATAR_RADIUS in frontend/src/hooks/useMovement.ts.
 AVATAR_RADIUS = 14
+
+# Minimum center-to-center distance between two avatars (touching circles).
+MIN_AVATAR_SEPARATION = 2 * AVATAR_RADIUS
+
+
+def separate(
+    point: tuple[float, float],
+    others: list[tuple[float, float]],
+    min_dist: float,
+) -> tuple[float, float]:
+    """Push ``point`` out of any avatar in ``others`` it overlaps.
+
+    Single, deterministic push-out step (not an iterative physics solve):
+    for each overlapping other, shift ``point`` along the line away from it
+    so the pair end up ``min_dist`` apart. Exact overlap (dist == 0) is
+    nudged a fixed amount along +x so the result is never NaN.
+    """
+    x, y = point
+    for ox, oy in others:
+        dx, dy = x - ox, y - oy
+        dist = math.hypot(dx, dy)
+        if dist >= min_dist:
+            continue
+        if dist == 0.0:
+            x += min_dist
+            continue
+        push = (min_dist - dist) / dist
+        x += dx * push
+        y += dy * push
+    return (x, y)
 
 
 @dataclass(frozen=True)
