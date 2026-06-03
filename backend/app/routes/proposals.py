@@ -66,7 +66,11 @@ def create_proposal(
         raise HTTPException(
             status_code=422, detail=envelope(INVALID_PROPOSAL_TEXT)
         )
-    return {"proposal_id": ev.proposal_id, "expires_at": ev.expires_at}
+    return {
+        "proposal_id": ev.proposal_id,
+        "expires_at": ev.expires_at,
+        "event": ev.model_dump(),
+    }
 
 
 @router.post("/{slug}/proposals/{proposal_id}/vote")
@@ -92,4 +96,8 @@ def vote_proposal(
         )
     except ValueError:
         raise HTTPException(status_code=422, detail=envelope(INVALID_VOTE))
-    return {"proposal_id": proposal_id, "tallies": ev.tallies}
+    return {
+        "proposal_id": proposal_id,
+        "tallies": ev.tallies,
+        "event": ev.model_dump(),
+    }

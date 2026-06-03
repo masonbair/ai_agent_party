@@ -14,6 +14,23 @@ def _join(client: TestClient, user: dict, slug: str = "cream-terrazzo") -> None:
     assert r.status_code == 200, r.json()
 
 
+def test_music_returns_event_key(client: TestClient) -> None:
+    user = _register_human(client)
+    _join(client, user)
+    r = client.post(
+        "/api/parties/cream-terrazzo/music",
+        json={
+            "principal": user["principal"],
+            "action": "play",
+            "track_id": "lofi-loop",
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "music" in body and "cursor" in body
+    assert body["event"]["type"] == "music_changed"
+
+
 def test_music_play_returns_state(client: TestClient) -> None:
     user = _register_human(client)
     _join(client, user)

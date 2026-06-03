@@ -87,6 +87,7 @@ def gesture(
         "gesture": ev.gesture,
         "expires_at": ev.expires_at,
         "cursor": world.cursor,
+        "event": ev.model_dump(),
     }
 
 
@@ -115,4 +116,5 @@ def cosmetic(
         "effect": ev.effect,
         "expires_at": ev.expires_at,
         "cursor": world.cursor,
+        "event": ev.model_dump(),
     }

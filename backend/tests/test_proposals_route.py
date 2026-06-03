@@ -13,6 +13,37 @@ def _p(a: dict) -> dict:
     return {"kind": "agent", "id": a["agent_id"]}
 
 
+def test_create_proposal_returns_event_key(client: TestClient) -> None:
+    a = _agent(client, "Proposer2", "#4dd0e1")
+    client.post("/api/parties/cream-terrazzo/join", json={"principal": _p(a)})
+    r = client.post(
+        "/api/parties/cream-terrazzo/proposals",
+        json={"principal": _p(a), "text": "pizza or tacos", "expires_in_sec": 30},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "proposal_id" in body and "expires_at" in body
+    assert body["event"]["type"] == "proposal_created"
+
+
+def test_vote_proposal_returns_event_key(client: TestClient) -> None:
+    a = _agent(client, "Voter2", "#4dd0e1")
+    client.post("/api/parties/cream-terrazzo/join", json={"principal": _p(a)})
+    created = client.post(
+        "/api/parties/cream-terrazzo/proposals",
+        json={"principal": _p(a), "text": "pizza or tacos", "expires_in_sec": 30},
+    ).json()
+    pid = created["proposal_id"]
+    r = client.post(
+        f"/api/parties/cream-terrazzo/proposals/{pid}/vote",
+        json={"principal": _p(a), "vote": "yes"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "tallies" in body
+    assert body["event"]["type"] == "proposal_vote"
+
+
 def test_create_proposal_returns_id_and_expiry(client: TestClient) -> None:
     a = _agent(client, "Proposer", "#4dd0e1")
     client.post("/api/parties/cream-terrazzo/join", json={"principal": _p(a)})
