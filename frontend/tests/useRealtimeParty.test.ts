@@ -381,4 +381,24 @@ describe('useRealtimeParty — chat bubbles', () => {
     expect(bubble!.expiresAt).toBeGreaterThanOrEqual(before + BUBBLE_LIFETIME_MS - 50);
     expect(bubble!.expiresAt).toBeLessThanOrEqual(after + BUBBLE_LIFETIME_MS + 50);
   });
+
+  it('records an ambient bubble (no text) for ambient chat frames', async () => {
+    const { result } = renderHook(() =>
+      useRealtimeParty({ slug: 'cream-terrazzo', principal: selfPrincipal }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const ws = MockWebSocket.instances[0];
+    act(() =>
+      ws.receive({
+        type: 'event',
+        cursor: 7,
+        event: { type: 'chat', actor_id: 'sid-2', ambient: true, seq: 7 },
+      }),
+    );
+    expect(result.current.bubbles['sid-2']).toBeDefined();
+    expect(result.current.bubbles['sid-2'].ambient).toBe(true);
+    expect(result.current.bubbles['sid-2'].text).toBe('');
+  });
 });
