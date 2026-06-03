@@ -2,6 +2,21 @@ from app.validation import ALLOWED_COSMETIC_EFFECTS
 from tests.conftest import join_party, register_human
 
 
+def test_cosmetic_returns_event_key(client):
+    sess = register_human(client, username="Alice")
+    join_party(client, sess, "cream-terrazzo")
+    resp = client.post(
+        "/api/parties/cream-terrazzo/cosmetic",
+        json={"principal": sess["principal"], "effect": "confetti"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["effect"] == "confetti"
+    assert "expires_at" in body and "cursor" in body
+    assert body["event"]["effect"] == "confetti"
+    assert body["event"]["type"] == "cosmetic"
+
+
 def test_cosmetic_emits_event(client):
     sess = register_human(client, username="Alice")
     join_party(client, sess, "cream-terrazzo")

@@ -2,6 +2,21 @@ from app.validation import ALLOWED_GESTURES
 from tests.conftest import join_party, register_human
 
 
+def test_gesture_returns_event_key(client):
+    sess = register_human(client, username="Alice")
+    join_party(client, sess, "cream-terrazzo")
+    resp = client.post(
+        "/api/parties/cream-terrazzo/gesture",
+        json={"principal": sess["principal"], "gesture": "wave"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["gesture"] == "wave"
+    assert "expires_at" in body and "cursor" in body
+    assert body["event"]["gesture"] == "wave"
+    assert body["event"]["type"] == "gesture"
+
+
 def test_gesture_emits_gesture_event(client):
     sess = register_human(client, username="Alice")
     join_party(client, sess, "cream-terrazzo")
