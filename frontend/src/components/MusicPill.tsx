@@ -1,6 +1,10 @@
-type Props = { label: string };
+type Props = {
+  label: string;
+  trackId?: string | null;
+};
 
-export default function MusicPill({ label }: Props) {
+export default function MusicPill({ label, trackId }: Props) {
+  const display = trackId ? trackId : label;
   return (
     <div
       style={{
@@ -14,7 +18,7 @@ export default function MusicPill({ label }: Props) {
         fontSize: 12,
       }}
     >
-      🎵 {label}
+      🎵 {display}
     </div>
   );
 }

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.dm_store import DmStore, insert_dm
+from app.errors import RECIPIENT_UNKNOWN, SELF_DM
 from app.routes.principal import Principal, ResolvedPrincipal
 from app.validation import ChatValidationError, validate_chat_text
 
@@ -53,9 +54,9 @@ def send(
     sender_key = principal_key(sender)
     recipient_key = principal_key(recipient)
     if sender_key == recipient_key:
-        raise DmError("self_dm", status=400)
+        raise DmError(SELF_DM, status=400)
     if not store.principal_exists(recipient):
-        raise DmError("recipient_unknown", status=404)
+        raise DmError(RECIPIENT_UNKNOWN, status=404)
     tk = thread_key(sender_key, recipient_key)
     at = time.time()
     mid = insert_dm(

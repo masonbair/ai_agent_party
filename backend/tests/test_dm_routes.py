@@ -60,7 +60,7 @@ def test_post_dm_send_self_dm_rejected(client: TestClient, store: Store) -> None
         },
     )
     assert resp.status_code == 400
-    assert resp.json()["detail"] == "self_dm"
+    assert resp.json()["detail"]["error"] == "self_dm"
 
 
 def test_post_dm_send_unknown_recipient(client: TestClient, store: Store) -> None:
@@ -74,7 +74,7 @@ def test_post_dm_send_unknown_recipient(client: TestClient, store: Store) -> Non
         },
     )
     assert resp.status_code == 404
-    assert resp.json()["detail"] == "recipient_unknown"
+    assert resp.json()["detail"]["error"] == "recipient_unknown"
 
 
 def test_post_dm_send_cross_party_succeeds(client: TestClient, store: Store) -> None:
@@ -224,4 +224,4 @@ def test_get_history_403_for_outsider(client: TestClient, store: Store) -> None:
         },
     )
     assert resp.status_code == 403
-    assert resp.json()["detail"] == "dm_forbidden"
+    assert resp.json()["detail"]["error"] == "dm_forbidden"

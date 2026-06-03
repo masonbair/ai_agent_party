@@ -22,9 +22,10 @@ def test_move_event_carries_actor_fields(client: TestClient) -> None:
     moves = [e for e in diff["events"] if e["type"] == "move"]
     assert moves, "expected at least one move event"
     mv = moves[-1]
-    assert mv["actor_id"] == mv["participant_id"]
+    assert mv["actor_id"] == alice
     assert mv["actor_username"] == "Alice"
     assert mv["actor_kind"] == "human"
+    assert "participant_id" not in mv
 
 
 def test_chat_event_carries_actor_fields(client: TestClient) -> None:
@@ -36,9 +37,10 @@ def test_chat_event_carries_actor_fields(client: TestClient) -> None:
     )
     diff = client.get(f"/api/parties/cream-terrazzo/observe?since={cur}").json()
     chat = [e for e in diff["events"] if e["type"] == "chat"][-1]
-    assert chat["actor_id"] == chat["participant_id"]
+    assert chat["actor_id"] == alice
     assert chat["actor_username"] == "Alice"
     assert chat["actor_kind"] == "human"
+    assert "participant_id" not in chat
 
 
 def test_reaction_event_carries_actor_username_and_kind(client: TestClient) -> None:
@@ -66,6 +68,7 @@ def test_leave_event_carries_actor_fields(client: TestClient) -> None:
     leaves = [e for e in diff["events"] if e["type"] == "leave"]
     assert leaves
     lv = leaves[-1]
-    assert lv["actor_id"] == lv["participant_id"]
+    assert lv["actor_id"] == alice
     assert lv["actor_username"] == "Alice"
     assert lv["actor_kind"] == "human"
+    assert "participant_id" not in lv

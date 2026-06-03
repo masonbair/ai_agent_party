@@ -22,6 +22,13 @@ def test_observe_initial_returns_room_and_empty_participants(client: TestClient)
         "id", "label", "x", "y", "width", "height", "centerX", "centerY",
     }
     assert body["room"]["walls"][0].keys() == {"x", "y", "width", "height"}
+    assert body["music"] == {
+        "track_id": None,
+        "playing": False,
+        "volume": 50,
+        "since": None,
+    }
+    # The static label remains in room.music for backwards compatibility.
     assert body["room"]["music"] == "Music coming soon"
     assert body["participants"] == []
     assert body["cursor"] == 0
@@ -92,3 +99,28 @@ def test_observe_diff_empty_when_caught_up(client: TestClient) -> None:
     cursor = body["cursor"]
     r = client.get(f"/api/parties/cream-terrazzo/observe?since={cursor}")
     assert r.json() == {"events": [], "cursor": cursor}
+
+
+def test_observe_reflects_music_play(client: TestClient) -> None:
+    user = _human(client, username="DJ")
+    client.post(
+        "/api/parties/cream-terrazzo/join",
+        json={"principal": _principal_human(user)},
+    )
+    from app import rate_limit
+    rate_limit._buckets.clear()
+    client.post(
+        "/api/parties/cream-terrazzo/music",
+        json={
+            "principal": _principal_human(user),
+            "action": "play",
+            "track_id": "lofi-loop",
+        },
+    )
+    r = client.get("/api/parties/cream-terrazzo/observe")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["music"]["track_id"] == "lofi-loop"
+    assert body["music"]["playing"] is True
+    assert body["music"]["volume"] == 50
+    assert isinstance(body["music"]["since"], float)

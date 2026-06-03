@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Participant(BaseModel):
@@ -11,52 +11,81 @@ class Participant(BaseModel):
     x: float
     y: float
     joined_at: float
+    facing: str = "down"  # one of the 8 Facing directions
+    style: str | None = None
 
 
 class Agent(BaseModel):
     agent_id: str
     username: str
     color: str
+    style: Literal["chatty", "ambient", "reactive"] = "reactive"
 
 
 class JoinEvent(BaseModel):
     seq: int
     type: Literal["join"] = "join"
-    participant: Participant
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
+    x: float
+    y: float
+    zone: str | None = None
     at: float
+    room_wide: bool = False
 
 
 class LeaveEvent(BaseModel):
     seq: int
     type: Literal["leave"] = "leave"
-    participant_id: str
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     at: float
-    actor_id: str | None = None
-    actor_username: str | None = None
-    actor_kind: Literal["human", "agent"] | None = None
+    room_wide: bool = False
 
 
 class MoveEvent(BaseModel):
     seq: int
     type: Literal["move"] = "move"
-    participant_id: str
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     x: float
     y: float
     at: float
-    actor_id: str | None = None
-    actor_username: str | None = None
-    actor_kind: Literal["human", "agent"] | None = None
+    room_wide: bool = False
+    facing: str | None = None  # one of the 8 Facing directions
 
 
 class ChatEvent(BaseModel):
     seq: int
     type: Literal["chat"] = "chat"
-    participant_id: str
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
+    text: str
+    at: float
+    mentions: list[str] = []
+    to_id: str | None = None
+    reply_to: int | None = None
+    room_wide: bool = False
+
+
+class ModuleChatEvent(BaseModel):
+    seq: int
+    type: Literal["module_chat"] = "module_chat"
+    module_id: str
     text: str
     at: float
     actor_id: str | None = None
     actor_username: str | None = None
     actor_kind: Literal["human", "agent"] | None = None
+    room_wide: bool = False
 
 
 class StickyNote(BaseModel):
@@ -69,6 +98,7 @@ class StickyNote(BaseModel):
     x: float
     y: float
     created_at: float
+    reactions: dict[str, int] = Field(default_factory=dict)
 
 
 class Stroke(BaseModel):
@@ -92,11 +122,15 @@ class ReactionEvent(BaseModel):
     seq: int
     type: Literal["reaction"] = "reaction"
     actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    actor_color: str | None = None
     emoji: str
     expires_at: float
     at: float
-    actor_username: str | None = None
-    actor_kind: Literal["human", "agent"] | None = None
+    room_wide: bool = False
+    target_seq: int | None = None
+    target_actor_id: str | None = None
 
 
 class LightingChangedEvent(BaseModel):
@@ -105,6 +139,7 @@ class LightingChangedEvent(BaseModel):
     preset: Literal["day", "dusk", "night", "party"]
     changed_by: str
     at: float
+    room_wide: bool = True  # lighting is a whole-room change
 
 
 class NoteCreatedEvent(BaseModel):
@@ -113,6 +148,7 @@ class NoteCreatedEvent(BaseModel):
     module_id: str
     note: StickyNote
     at: float
+    room_wide: bool = False
 
 
 class NoteUpdatedEvent(BaseModel):
@@ -121,6 +157,7 @@ class NoteUpdatedEvent(BaseModel):
     module_id: str
     note: StickyNote
     at: float
+    room_wide: bool = False
 
 
 class NoteDeletedEvent(BaseModel):
@@ -129,6 +166,20 @@ class NoteDeletedEvent(BaseModel):
     module_id: str
     note_id: str
     at: float
+    room_wide: bool = False
+
+
+class NoteReactionEvent(BaseModel):
+    seq: int
+    type: Literal["note_reaction"] = "note_reaction"
+    module_id: str
+    note_id: str
+    emoji: str
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    room_wide: bool = False
 
 
 class StrokeAddedEvent(BaseModel):
@@ -137,6 +188,7 @@ class StrokeAddedEvent(BaseModel):
     module_id: str
     stroke: Stroke
     at: float
+    room_wide: bool = False
 
 
 class StrokeDroppedEvent(BaseModel):
@@ -145,6 +197,7 @@ class StrokeDroppedEvent(BaseModel):
     module_id: str
     stroke_id: str
     at: float
+    room_wide: bool = False
 
 
 class BoardClearedEvent(BaseModel):
@@ -153,6 +206,7 @@ class BoardClearedEvent(BaseModel):
     module_id: str
     cleared_by: str
     at: float
+    room_wide: bool = True  # visible to everyone — the board snaps clean
 
 
 class VoteChangedEvent(BaseModel):
@@ -162,6 +216,140 @@ class VoteChangedEvent(BaseModel):
     votes: int
     needed: int
     at: float
+    room_wide: bool = True  # tally visible to everyone watching the board
+
+
+class ProposalCreatedEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_created"] = "proposal_created"
+    proposal_id: str
+    text: str
+    expires_at: float
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
+class MusicChangedEvent(BaseModel):
+    seq: int
+    type: Literal["music_changed"] = "music_changed"
+    track_id: str
+    playing: bool
+    volume: int
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
+class ProposalVoteEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_vote"] = "proposal_vote"
+    proposal_id: str
+    vote: Literal["yes", "no", "abstain"]
+    tallies: dict  # {"yes": int, "no": int, "abstain": int}
+    at: float
+    actor_id: str | None = None
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+    actor_color: str | None = None
+    room_wide: bool = True
+
+
+class ProposalResolvedEvent(BaseModel):
+    seq: int
+    type: Literal["proposal_resolved"] = "proposal_resolved"
+    proposal_id: str
+    text: str
+    tallies: dict
+    at: float
+    room_wide: bool = True
+
+
+Facing = Literal[
+    "up", "down", "left", "right",
+    "up-left", "up-right", "down-left", "down-right",
+]
+
+
+class GestureEvent(BaseModel):
+    seq: int
+    type: Literal["gesture"] = "gesture"
+    gesture: str  # one of ALLOWED_GESTURES
+    at: float
+    expires_at: float
+    room_wide: bool = False
+    actor_id: str
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+
+
+class CosmeticEvent(BaseModel):
+    seq: int
+    type: Literal["cosmetic"] = "cosmetic"
+    effect: str  # one of ALLOWED_COSMETIC_EFFECTS
+    at: float
+    expires_at: float
+    room_wide: bool = True
+    actor_id: str
+    actor_username: str | None = None
+    actor_kind: Literal["human", "agent"] | None = None
+
+
+class ProximitySnapshotEvent(BaseModel):
+    """One-shot snapshot emitted to a specific requester when they enter
+    proximity of a module's interactionRect or another participant.
+
+    Server-side only: NEVER appended to ``PartyWorld._events`` because it is
+    per-requester. Constructed on the fly inside ``observe_since_scoped`` and
+    injected into that requester's event list.
+    """
+
+    seq: int  # mirrors the cursor at emit time so clients can sort/dedupe
+    type: Literal["proximity_snapshot"] = "proximity_snapshot"
+    at: float
+    entered: dict  # {"kind": "module"|"participant", "id": "..."}
+    # Populated when entered.kind == "module":
+    module: dict | None = None  # full module snapshot (notes/strokes/vote)
+    # Populated when entered.kind == "participant":
+    recent_chat: list[dict] | None = None  # last N visible chats from them
+    room_wide: bool = False
+
+
+class ProximityLeftEvent(BaseModel):
+    """One-shot leave event when the requester walks out of range of a
+    participant or out of a module's interactionRect."""
+
+    seq: int
+    type: Literal["proximity_left"] = "proximity_left"
+    at: float
+    left: dict  # {"kind": "module"|"participant", "id": "..."}
+    room_wide: bool = False
+
+
+class WelcomeEvent(BaseModel):
+    seq: int
+    type: Literal["welcome"] = "welcome"
+    at: float
+    # Targeted-delivery field — see "per-participant event delivery extension"
+    # in the onboarding plan. When set, ONLY this actor sees the event.
+    target_actor_id: str
+    # Unified-event-shape (spec #01) fields. For welcome these mirror the
+    # joining participant so consumers can render uniformly.
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    # Payload (matches GET /context shape minus type/seq/at).
+    room: dict
+    active_modules: list[dict]
+    recent_chat: list[dict]
+    nearby_participants: list[dict]
+    suggested_openers: list[str]
 
 
 Event = (
@@ -169,13 +357,24 @@ Event = (
     | LeaveEvent
     | MoveEvent
     | ChatEvent
+    | ModuleChatEvent
     | ReactionEvent
+    | GestureEvent
+    | CosmeticEvent
     | LightingChangedEvent
     | NoteCreatedEvent
     | NoteUpdatedEvent
     | NoteDeletedEvent
+    | NoteReactionEvent
     | StrokeAddedEvent
     | StrokeDroppedEvent
     | BoardClearedEvent
     | VoteChangedEvent
+    | ProposalCreatedEvent
+    | ProposalVoteEvent
+    | ProposalResolvedEvent
+    | MusicChangedEvent
+    | ProximitySnapshotEvent
+    | ProximityLeftEvent
+    | WelcomeEvent
 )

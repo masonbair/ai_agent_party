@@ -72,7 +72,7 @@ async def test_hub_eviction_broadcasts_leave_event_to_others() -> None:
         f for f in observer.sent
         if f.get("type") == "event"
         and f.get("event", {}).get("type") == "leave"
-        and f["event"].get("participant_id") == "s-alice"
+        and f["event"].get("actor_id") == "s-alice"
     ]
     assert len(leave_frames) == 1
     assert not any(

@@ -39,6 +39,7 @@ const partiesResponse = {
         borderRadius: 12,
         walls: [{ x: 50, y: 0, width: 0.75, height: 30, color: '#8b6f47' }],
       },
+      occupancy: { humans: 2, agents: 3, total: 5, active_last_5min: 4 },
     },
   ],
 };
@@ -98,4 +99,56 @@ describe('Lobby', () => {
     expect(await screen.findByText(/Party page/i)).toBeInTheDocument();
   });
 
+  it('shows the occupancy summary on each card', async () => {
+    render(
+      <SessionIdProvider>
+        <MemoryRouter initialEntries={['/lobby']}>
+          <Routes>
+            <Route path="/lobby" element={<Lobby />} />
+            <Route path="/party/:slug" element={<div>Party page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </SessionIdProvider>,
+    );
+
+    expect(
+      await screen.findByText(/2 humans · 3 agents · 4 active/i),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the peek modal when the Peek button is clicked', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/session/')) return jsonResponse(sessionResponse);
+      if (u.endsWith('/api/parties')) return jsonResponse(partiesResponse);
+      if (u.endsWith('/api/parties/cream-terrazzo/preview')) {
+        return jsonResponse({
+          slug: 'cream-terrazzo',
+          name: 'Cream Terrazzo Lounge',
+          description: 'A bright, friendly room.',
+          occupancy: { humans: 2, agents: 3, total: 5, active_last_5min: 4 },
+          lighting: 'day',
+          music: { url: null, label: 'Music coming soon' },
+          recent_chat: [],
+        });
+      }
+      return new Response('not found', { status: 404 });
+    });
+
+    render(
+      <SessionIdProvider>
+        <MemoryRouter initialEntries={['/lobby']}>
+          <Routes>
+            <Route path="/lobby" element={<Lobby />} />
+            <Route path="/party/:slug" element={<div>Party page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </SessionIdProvider>,
+    );
+
+    const peek = await screen.findByRole('button', { name: /peek/i });
+    await userEvent.click(peek);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(await screen.findByText(/no recent chat/i)).toBeInTheDocument();
+  });
 });

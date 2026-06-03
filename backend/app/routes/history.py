@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, Path, Query
 
 from app import db as db_module
+from app.errors import INVALID_BEFORE_ID, INVALID_LIMIT, PARTY_NOT_FOUND, http_envelope
 from app.store import Store
 
 router = APIRouter(prefix="/api/parties")
@@ -21,11 +22,11 @@ def broadcast_history(
     store: Store = Depends(_store_dep),
 ) -> dict:
     if store.get_party(slug) is None:
-        raise HTTPException(status_code=404, detail="party not found")
+        raise http_envelope(404, PARTY_NOT_FOUND)
     if limit < 1 or limit > db_module.MAX_HISTORY_LIMIT:
-        raise HTTPException(status_code=400, detail="invalid limit")
+        raise http_envelope(400, INVALID_LIMIT)
     if before_id is not None and before_id < 1:
-        raise HTTPException(status_code=400, detail="invalid before_id")
+        raise http_envelope(400, INVALID_BEFORE_ID)
     assert store.db is not None, "db not initialized"
     rows = db_module.query_broadcast_history(
         store.db, slug, before_id=before_id, limit=limit

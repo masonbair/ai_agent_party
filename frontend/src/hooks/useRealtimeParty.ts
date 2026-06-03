@@ -117,12 +117,32 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
         } else if (f.type === 'event') {
           const ev = (frame as { event: { type: string } }).event;
           if (ev.type === 'join') {
-            const p = (ev as unknown as { participant: Participant }).participant;
-            setParticipants((prev) =>
-              prev.some((q) => q.id === p.id) ? prev : [...prev, p],
-            );
+            const j = ev as unknown as {
+              actor_id: string;
+              actor_username: string;
+              actor_kind: 'human' | 'agent';
+              actor_color?: string;
+              x: number;
+              y: number;
+            };
+            // Build a minimal participant from join event flat fields.
+            // The server stamps the joiner's chosen color on the event so
+            // other clients render the avatar correctly; fall back to a
+            // neutral placeholder only if the server omitted it.
+            setParticipants((prev) => {
+              if (prev.some((q) => q.id === j.actor_id)) return prev;
+              const color = j.actor_color ?? '#aaaaaa';
+              return [...prev, {
+                id: j.actor_id,
+                kind: j.actor_kind,
+                username: j.actor_username,
+                color,
+                x: j.x,
+                y: j.y,
+              }];
+            });
           } else if (ev.type === 'leave') {
-            const id = (ev as unknown as { participant_id: string }).participant_id;
+            const id = (ev as unknown as { actor_id: string }).actor_id;
             setParticipants((prev) => prev.filter((q) => q.id !== id));
             setBubbles((prev) => {
               if (!(id in prev)) return prev;
@@ -132,14 +152,14 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
             });
           } else if (ev.type === 'move') {
             const m = ev as unknown as {
-              participant_id: string;
+              actor_id: string;
               x: number;
               y: number;
             };
-            if (m.participant_id === principal.id) return; // ignore self-echo
+            if (m.actor_id === principal.id) return; // ignore self-echo
             setParticipants((prev) =>
               prev.map((q) =>
-                q.id === m.participant_id ? { ...q, x: m.x, y: m.y } : q,
+                q.id === m.actor_id ? { ...q, x: m.x, y: m.y } : q,
               ),
             );
           } else if (ev.type === 'reaction') {
@@ -254,10 +274,10 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
               ),
             );
           } else if (ev.type === 'chat') {
-            const c = ev as unknown as { participant_id: string; text: string };
+            const c = ev as unknown as { actor_id: string; text: string };
             setBubbles((prev) => ({
               ...prev,
-              [c.participant_id]: {
+              [c.actor_id]: {
                 text: c.text,
                 expiresAt: Date.now() + BUBBLE_LIFETIME_MS,
               },

@@ -43,6 +43,7 @@ const partyResponse = {
   music: { url: null, label: 'Music coming soon' },
   worldSize: { width: 800, height: 500 },
   room: { clipPath: null, border: '6px solid #8b6f47', borderRadius: 12, walls: [] },
+  occupancy: { humans: 0, agents: 0, total: 0, active_last_5min: 0 },
 };
 
 function jsonResponse(body: unknown, status = 200) {

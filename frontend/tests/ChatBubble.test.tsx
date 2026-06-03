@@ -18,6 +18,25 @@ describe('ChatBubble', () => {
     expect(screen.getByText('hello there')).toBeInTheDocument();
   });
 
+  it('renders injection payloads as inert text, not live DOM', () => {
+    const payload = '<img src=x onerror=alert(1)><script>alert(2)</script>';
+    const { container } = render(
+      <ChatBubble
+        text={payload}
+        x={50}
+        y={50}
+        worldWidth={100}
+        worldHeight={100}
+        expiresAt={Date.now() + 5000}
+      />,
+    );
+    // The literal string is shown to the user...
+    expect(screen.getByText(payload)).toBeInTheDocument();
+    // ...and React escaped it — no real <img>/<script> nodes were created.
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('script')).toBeNull();
+  });
+
   it('positions itself as a percentage of world dimensions', () => {
     render(
       <ChatBubble

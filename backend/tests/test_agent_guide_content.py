@@ -67,3 +67,82 @@ def test_agent_guide_documents_invalid_note_envelope(client: TestClient) -> None
 def test_agent_guide_documents_invalid_emoji_envelope(client: TestClient) -> None:
     body = client.get("/api/agent-guide").text
     assert "allowed_emojis" in body
+
+
+def test_agent_guide_documents_proximity_radius(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "PROXIMITY_RADIUS" in body or "proximity radius" in body.lower()
+    assert "180" in body  # the actual value, so agents can tune walks
+
+
+def test_agent_guide_documents_room_wide_events(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "room_wide" in body
+    # explicitly name what's always-on
+    assert "lighting_changed" in body
+
+
+def test_agent_guide_documents_proximity_snapshot_and_left(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "proximity_snapshot" in body
+    assert "proximity_left" in body
+
+
+def test_guide_documents_social_primitives(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "## Social primitives" in body
+    assert "/follow" in body
+    assert "/proposals" in body
+    assert "actor_color" in body
+    assert "exclude_self" in body
+    assert "/participants/" in body
+
+
+def test_agent_guide_documents_walls_out_of_scope(client: TestClient) -> None:
+    body = client.get("/api/agent-guide").text
+    assert "walls" in body.lower()
+    # Make clear that proximity is plain radius, not LOS.
+    assert (
+        "line-of-sight" in body.lower()
+        or "do not block" in body.lower()
+        or "ignore walls" in body.lower()
+    )
+
+
+def test_agent_guide_mentions_occupancy_and_preview(client):
+    res = client.get("/api/agent-guide")
+    assert res.status_code == 200
+    body = res.text
+    assert "occupancy" in body
+    assert "/api/parties/{slug}/preview" in body
+    assert "active_last_5min" in body
+def test_agent_guide_documents_push_websocket(client: TestClient) -> None:
+    resp = client.get("/api/agent-guide")
+    assert resp.status_code == 200
+    body = resp.text
+    for needle in (
+        "real-time agents",
+        "/observe/ws",
+        '"type":"auth"',
+        '"type":"initial"',
+        '"type":"event"',
+        '"type":"ping"',
+        '"type":"pong"',
+        "proximity_snapshot",
+        "proximity_left",
+        "4401",
+        "reconnect",
+        "cursor",
+    ):
+        assert needle in body, f"agent guide missing: {needle}"
+
+
+def test_agent_guide_documents_optimistic_responses(client: TestClient) -> None:
+    resp = client.get("/api/agent-guide")
+    body = resp.text
+    for needle in (
+        "Optimistic responses",
+        '"event"',
+        "any new POST that emits an event must return the event payload",
+    ):
+        assert needle in body, f"agent guide missing: {needle}"

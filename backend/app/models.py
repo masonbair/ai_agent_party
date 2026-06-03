@@ -2,7 +2,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.validation import ALLOWED_COLORS, USERNAME_REGEX
+from app.validation import ALLOWED_COLORS, validate_username
 
 
 class CreateSessionRequest(BaseModel):
@@ -12,9 +12,7 @@ class CreateSessionRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def _check_username(cls, v: str) -> str:
-        if USERNAME_REGEX.fullmatch(v) is None:
-            raise ValueError("username must be 2-20 letters/digits")
-        return v
+        return validate_username(v)
 
     @field_validator("color")
     @classmethod
@@ -99,9 +97,14 @@ class LightingModule(BaseModel):
     preset: LightingPreset = "day"
 
 
-PlacedModule = Union[StickyNoteModule, DrawBoardModule]
+class FreeNotesModule(BaseModel):
+    id: str = Field(pattern=r"^[a-z0-9-]+$")
+    kind: Literal["freenotes"] = "freenotes"
+
+
+PlacedModule = Union[StickyNoteModule, DrawBoardModule, FreeNotesModule]
 Module = Annotated[
-    Union[StickyNoteModule, DrawBoardModule, LightingModule],
+    Union[StickyNoteModule, DrawBoardModule, FreeNotesModule, LightingModule],
     Field(discriminator="kind"),
 ]
 
@@ -118,5 +121,40 @@ class PartyConfig(BaseModel):
     modules: list[Module] = Field(default_factory=list)
 
 
+class Occupancy(BaseModel):
+    humans: int
+    agents: int
+    total: int
+    active_last_5min: int
+
+
+class PartyListEntry(PartyConfig):
+    occupancy: Occupancy
+
+
 class PartiesListResponse(BaseModel):
-    parties: list[PartyConfig]
+    parties: list[PartyListEntry]
+
+
+class PartyPreviewMusic(BaseModel):
+    url: str | None
+    label: str
+
+
+class PartyPreviewChat(BaseModel):
+    seq: int
+    actor_id: str
+    actor_username: str
+    actor_kind: Literal["human", "agent"]
+    text: str
+    at: float
+
+
+class PartyPreviewResponse(BaseModel):
+    slug: str
+    name: str
+    description: str
+    occupancy: Occupancy
+    lighting: LightingPreset
+    music: PartyPreviewMusic
+    recent_chat: list[PartyPreviewChat]

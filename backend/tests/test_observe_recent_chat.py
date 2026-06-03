@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.rate_limit import reset_chat_limiter_for_tests
 from app.validation import RECENT_CHAT_LIMIT
 
 
@@ -16,6 +17,7 @@ def _join(client: TestClient, name: str = "Alice", color: str = "#ff6b9d") -> st
 def test_initial_observe_includes_recent_chat(client: TestClient) -> None:
     sid = _join(client)
     for i in range(3):
+        reset_chat_limiter_for_tests()
         client.post(
             "/api/parties/cream-terrazzo/chat",
             json={"principal": {"kind": "human", "id": sid}, "text": f"hello {i}"},
@@ -32,6 +34,7 @@ def test_initial_observe_includes_recent_chat(client: TestClient) -> None:
 def test_initial_observe_recent_chat_capped_at_20(client: TestClient) -> None:
     sid = _join(client)
     for i in range(25):
+        reset_chat_limiter_for_tests()
         client.post(
             "/api/parties/cream-terrazzo/chat",
             json={"principal": {"kind": "human", "id": sid}, "text": f"msg{i}"},

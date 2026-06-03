@@ -36,7 +36,7 @@ def test_note_text_validation() -> None:
     with pytest.raises(NoteValidationError):
         validate_note_text("x" * (STICKY_TEXT_MAX + 1))
     with pytest.raises(NoteValidationError):
-        validate_note_text("nope<script>")
+        validate_note_text("nope 🙂")
 
 
 def test_note_color_validation() -> None:

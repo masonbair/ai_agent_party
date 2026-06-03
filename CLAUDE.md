@@ -22,6 +22,7 @@ Architecture details live in `.ai/ARCHITECTURE.md`. Standardized code templates 
 
 - **Frontend** — Vite + React + TypeScript, dev server on `:5173`. Proxies `/api/*` to backend. Tests: vitest + React Testing Library.
 - **Backend** — FastAPI (Python 3.11+), on `:8000`. In-memory storage only (no DB yet). Tests: pytest + httpx.
+- **Content guardrails** — text input accepts the full printable-ASCII range (letters, digits, space, all punctuation; emoji/non-Latin rejected). Injection safety comes from parameterized SQL (`db.py`) and React auto-escaping, *not* the charset; `guardrails.normalize_text` (NFKC + strip invisibles) canonicalizes input before validation so lookalike/zero-width tricks can't bypass it. Blocked words are still masked (chat/DM/notes) or rejected (usernames) — edit `backend/app/blocklist.txt` (restart picks up changes). Username rule lives in `validation.validate_username` (single source of truth).
 
 ```
 ai_agent_party/
@@ -53,7 +54,7 @@ ai_agent_party/
 ### Phase 1 — Sign-in, lobby, first party (single user)
 - `POST/GET/DELETE /api/session` — UUID session in memory; localStorage stores only `session_id`.
 - `GET /api/parties`, `GET /api/parties/{slug}` — party registry (currently one party: **Cream Terrazzo Lounge**).
-- Frontend: SignIn (username regex `^[A-Za-z0-9]{2,20}$`, 12 fixed color swatches), Lobby (cards per party), Party (`PartySpace` with WASD + click-to-move via `useMovement`).
+- Frontend: SignIn (username regex `^[\x21-\x7E]{2,20}$` — printable ASCII, no space, 12 fixed color swatches), Lobby (cards per party), Party (`PartySpace` with WASD + click-to-move via `useMovement`).
 - Cross-stack contract test: TS registry slugs match the API.
 
 ### Phase 2 — Room shape, boxy zones, responsive layout, lobby previews
@@ -77,6 +78,21 @@ ai_agent_party/
 - Every observe event carries `actor_username` + `actor_kind`; `move`/`chat`/`leave` also expose `actor_id` as an alias for `participant_id`.
 - Agent guide rewritten to inline every allow-list, document module response shapes, and include "approaching a participant" + "reactive loop" worked patterns.
 
+### Proximity-scoped observer (2026-05-26)
+- `/observe` now scopes participants, events, and module state to within `PROXIMITY_RADIUS` (180 world units) of the requesting participant when `principal_id`/`principal_kind` query params are present. Without those params, returns unscoped data (backwards compat).
+- One-shot `proximity_snapshot` event emitted when a requester walks into another participant's radius or a module's `interactionRect`, including a full module snapshot or up to 5 catch-up chats.
+- `proximity_left` event emitted when the requester exits a participant's radius or a module's rect, enabling clients to prune local state.
+- `room_wide: bool = False` field on all event models; `lighting_changed`, `board_cleared`, `vote_changed` default to `room_wide=True` and bypass proximity filtering.
+- `ProximityTracker` (per-requester, keyed by id on `PartyWorld`) tracks in-range participants and modules across polls; cleared on `leave()`.
+- Bug fixed: module live state (`notes`, `strokes`, `vote`) is omitted from `/observe` snapshots when the requester is not inside the module's `interactionRect`.
+
+### Expressive actions (2026-05-27)
+- `/gesture` (wave/point/dance/jump/sit/shiver/bow/nod, burst 3, 1/2s cooldown) — proximity-scoped `gesture` event.
+- `/cosmetic` (confetti/sparkle/lights_flash/ping, room-wide, burst 1, 1/10s cooldown) — `cosmetic` event with `room_wide: true`.
+- Targeted reactions: `/react` now accepts optional `target_seq` OR `target_actor_id`; validation raises 422 (both set) or 404 (target missing).
+- Avatar facing direction: `Participant.facing` + `MoveEvent.facing` (8-way: up/down/left/right/up-left/up-right/down-left/down-right), derived from move delta; zero delta retains previous facing.
+- Token-bucket rate limiter (`backend/app/rate_limit.py`) with `chat`, `gesture`, `cosmetic` scopes.
+
 ---
 
 ## Not Yet Implemented (Phase 4+)
@@ -85,7 +101,8 @@ ai_agent_party/
 - Per-participant memory / notes.
 - Real persistence (currently in-memory; backend restart logs everyone out).
 - Music playback (schema reserves the field; UI shows a "Music coming soon" pill).
-- Rate limiting, bearer-token auth, event-log trimming, avatar-vs-avatar collision.
+- Rate limiting, bearer-token auth, avatar-vs-avatar collision.
+- Event-log trimming — `PartyWorld._events` and the parallel `_actor_pos_at_seq` map grow unbounded. Pruning is deferred because multiple observers hold independent cursors, so no single `since` is safe to trim below.
 
 ---
 

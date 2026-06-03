@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ValidationError
 
 from app.dm import DmError, principal_key, send
 from app.dm_store import list_threads_for, query_thread_history
-from app.errors import INVALID_CHAT_TEXT, envelope
+from app.errors import (
+    DM_FORBIDDEN,
+    INVALID_CHAT_TEXT,
+    PRINCIPAL_UNKNOWN,
+    RECIPIENT_UNKNOWN,
+    http_envelope,
+)
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
 from app.validation import ChatValidationError
@@ -36,7 +42,7 @@ def send_dm(
     try:
         recipient = Principal(kind=body.recipient.kind, id=body.recipient.id)
     except ValidationError:
-        raise HTTPException(status_code=404, detail="recipient_unknown")
+        raise http_envelope(404, RECIPIENT_UNKNOWN)
     try:
         return send(
             store=store,
@@ -47,12 +53,9 @@ def send_dm(
             text=body.text,
         )
     except ChatValidationError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=envelope(INVALID_CHAT_TEXT, message=str(exc)),
-        )
+        raise http_envelope(422, INVALID_CHAT_TEXT, message=str(exc))
     except DmError as exc:
-        raise HTTPException(status_code=exc.status, detail=exc.code)
+        raise http_envelope(exc.status, exc.code)
 
 
 @router.get("/threads")
@@ -64,7 +67,7 @@ def list_threads(
     try:
         principal = Principal(kind=principal_kind, id=principal_id)
     except ValidationError:
-        raise HTTPException(status_code=401, detail="principal_unknown")
+        raise http_envelope(401, PRINCIPAL_UNKNOWN)
     resolved = resolve_principal(store, principal)
     key = principal_key(resolved)
     return {"threads": list_threads_for(store.dm_store, principal_key=key)}
@@ -82,12 +85,12 @@ def get_history(
     try:
         principal = Principal(kind=principal_kind, id=principal_id)
     except ValidationError:
-        raise HTTPException(status_code=401, detail="principal_unknown")
+        raise http_envelope(401, PRINCIPAL_UNKNOWN)
     resolved = resolve_principal(store, principal)
     key = principal_key(resolved)
     parts = thread_key.split("|")
     if len(parts) != 2 or key not in parts:
-        raise HTTPException(status_code=403, detail="dm_forbidden")
+        raise http_envelope(403, DM_FORBIDDEN)
     messages = query_thread_history(
         store.dm_store,
         thread_key=thread_key,

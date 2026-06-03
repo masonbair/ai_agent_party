@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel
 
-from app.errors import NOT_IN_PARTY, envelope
+from app.errors import INVALID_STROKE, NOT_FOUND, NOT_IN_PARTY, PARTY_NOT_FOUND, http_envelope, not_in_range_envelope
 from app.routes.principal import Principal, resolve_principal
 from app.store import Store
 from app.validation import (
@@ -21,7 +21,7 @@ def _store_dep() -> Store:  # pragma: no cover
 def _world(store: Store, slug: str) -> PartyWorld:
     world = store.get_or_create_world(slug)
     if world is None:
-        raise HTTPException(status_code=404, detail="party not found")
+        raise http_envelope(404, PARTY_NOT_FOUND)
     return world
 
 
@@ -48,22 +48,40 @@ _DrawErrors = (
 )
 
 
-def _map_errors(exc: Exception) -> HTTPException:
+def _map_errors(
+    exc: Exception,
+    world: "PartyWorld | None" = None,
+    module_id: str | None = None,
+    actor_id: str | None = None,
+) -> Exception:
     if isinstance(exc, ParticipantNotInPartyError):
-        return HTTPException(status_code=409, detail=NOT_IN_PARTY)
+        return http_envelope(409, NOT_IN_PARTY)
     if isinstance(exc, PartyWorld.NotInRangeError):
-        return HTTPException(status_code=409, detail=envelope("not_in_range"))
-    if isinstance(exc, StrokeValidationError):
-        return HTTPException(
-            status_code=422,
-            detail=envelope(
-                "invalid_stroke",
-                message=str(exc),
-                allowed_colors=list(STROKE_COLOR_ALLOWLIST),
-                allowed_widths=list(STROKE_WIDTH_ALLOWLIST),
-            ),
+        rect = (
+            world.interaction_rect(module_id)
+            if world is not None and module_id is not None
+            else None
         )
-    return HTTPException(status_code=404, detail=envelope("not_found"))
+        pos = (
+            world.actor_position(actor_id)
+            if world is not None and actor_id is not None
+            else None
+        )
+        body = not_in_range_envelope(
+            module_id=module_id or "",
+            interaction_rect=rect or {"x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0},
+            actor_position=pos or {"x": 0.0, "y": 0.0},
+        )
+        return HTTPException(status_code=409, detail=body)
+    if isinstance(exc, StrokeValidationError):
+        return http_envelope(
+            422,
+            INVALID_STROKE,
+            message=str(exc),
+            allowed_colors=list(STROKE_COLOR_ALLOWLIST),
+            allowed_widths=list(STROKE_WIDTH_ALLOWLIST),
+        )
+    return http_envelope(404, NOT_FOUND)
 
 
 @router.post("/{slug}/modules/{module_id}/strokes")
@@ -79,7 +97,7 @@ def add_stroke(
     try:
         ev = world.add_stroke(resolved.id, module_id, raw)
     except _DrawErrors as exc:
-        raise _map_errors(exc) from exc
+        raise _map_errors(exc, world=world, module_id=module_id, actor_id=resolved.id) from exc
     return {"stroke": ev.stroke.model_dump(), "cursor": world.cursor}
 
 
@@ -95,5 +113,5 @@ def clear_board(
     try:
         result = world.vote_clear(resolved.id, module_id)
     except _DrawErrors as exc:
-        raise _map_errors(exc) from exc
+        raise _map_errors(exc, world=world, module_id=module_id, actor_id=resolved.id) from exc
     return result

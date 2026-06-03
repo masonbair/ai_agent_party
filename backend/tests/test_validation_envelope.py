@@ -35,7 +35,7 @@ def test_chat_invalid_text_uses_envelope_shape(client: TestClient) -> None:
     client.post("/api/parties/cream-terrazzo/join", json={"principal": principal})
     r = client.post(
         "/api/parties/cream-terrazzo/chat",
-        json={"principal": principal, "text": "<script>"},
+        json={"principal": principal, "text": "nope 🙂"},
     )
     assert r.status_code == 422
     detail = r.json()["detail"]

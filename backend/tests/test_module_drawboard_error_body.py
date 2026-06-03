@@ -46,3 +46,29 @@ def test_invalid_stroke_width_returns_allowlists(client: TestClient) -> None:
     body = r.json()["detail"]
     assert body["error"] == "invalid_stroke"
     assert body["allowed_widths"] == list(STROKE_WIDTH_ALLOWLIST)
+
+
+def test_stroke_not_in_range_includes_rect_and_actor_position(
+    client: TestClient,
+) -> None:
+    r = client.post("/api/session", json={"username": "alex", "color": "#ff6b9d"})
+    sid = r.json()["session_id"]
+    client.post(
+        "/api/parties/cream-terrazzo/join",
+        json={"principal": {"kind": "human", "id": sid}, "x": 10.0, "y": 10.0},
+    )
+    resp = client.post(
+        "/api/parties/cream-terrazzo/modules/draw-1/strokes",
+        json={
+            "principal": {"kind": "human", "id": sid},
+            "color": "#222222",
+            "width": "thin",
+            "points": [{"x": 1.0, "y": 1.0}],
+        },
+    )
+    assert resp.status_code == 409
+    body = resp.json()["detail"]
+    assert body["error"] == "not_in_range"
+    assert body["module_id"] == "draw-1"
+    assert "interactionRect" in body
+    assert body["actor_position"] == {"x": 10.0, "y": 10.0}
