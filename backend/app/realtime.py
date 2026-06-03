@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 from typing import Protocol
 
-from app.events import Event
+from app.events import ChatEvent, Event
 from app.world import PartyWorld
 
 
@@ -32,6 +32,25 @@ def _serialise_event(event: Event) -> dict:
     return {
         "type": "event",
         "event": event.model_dump(),
+        "cursor": event.seq,
+    }
+
+
+def _serialise_ambient_chat(event: ChatEvent) -> dict:
+    """A contentless chat frame for out-of-range observers: enough to render a
+    'someone's talking over there' puff, with the message text omitted."""
+    return {
+        "type": "event",
+        "event": {
+            "type": "chat",
+            "seq": event.seq,
+            "actor_id": event.actor_id,
+            "actor_username": event.actor_username,
+            "actor_kind": event.actor_kind,
+            "actor_color": event.actor_color,
+            "at": event.at,
+            "ambient": True,
+        },
         "cursor": event.seq,
     }
 
@@ -51,6 +70,7 @@ class PartyWorldHub:
         self.world = world
         self.subscribers: set[SocketLike] = set()
         self._by_principal: dict[str, SocketLike] = {}
+        self._participant_by_sock: dict[SocketLike, str] = {}
         self._pending: list[asyncio.Task] = []
         self._loop: asyncio.AbstractEventLoop | None = None
         self._unsub = world.on_event(self._on_event)
@@ -72,14 +92,17 @@ class PartyWorldHub:
             self._evict(old, participant_id)
         self._by_principal[principal_key] = sock
         self.subscribers.add(sock)
+        self._participant_by_sock[sock] = participant_id
 
     def unsubscribe(self, sock: SocketLike, principal_key: str) -> None:
         self.subscribers.discard(sock)
+        self._participant_by_sock.pop(sock, None)
         if self._by_principal.get(principal_key) is sock:
             del self._by_principal[principal_key]
 
     def _evict(self, old: SocketLike, participant_id: str) -> None:
         self.subscribers.discard(old)
+        self._participant_by_sock.pop(old, None)
         self._dispatch(self._send_evict_and_close(old))
         try:
             self.world.leave(participant_id)
@@ -109,18 +132,28 @@ class PartyWorldHub:
             coro.close()
 
     def _on_event(self, event: Event) -> None:
-        payload = _serialise_event(event)
         snapshot = list(self.subscribers)
         if not snapshot:
             return
+        full = _serialise_event(event)
+        # Only chat is proximity-scoped here; positions/presence/room-wide
+        # events broadcast unchanged.
+        if not isinstance(event, ChatEvent) or getattr(event, "room_wide", False):
+            for sock in snapshot:
+                self._dispatch(self._send_or_drop(sock, full))
+            return
+        ambient = _serialise_ambient_chat(event)
         for sock in snapshot:
-            self._dispatch(self._send_or_drop(sock, payload))
+            pid = self._participant_by_sock.get(sock)
+            in_range = pid is not None and self.world.visible_to(pid, event)
+            self._dispatch(self._send_or_drop(sock, full if in_range else ambient))
 
     async def _send_or_drop(self, sock: SocketLike, payload: dict) -> None:
         try:
             await sock.send_json(payload)
         except Exception:
             self.subscribers.discard(sock)
+            self._participant_by_sock.pop(sock, None)
             stale = [k for k, v in self._by_principal.items() if v is sock]
             for k in stale:
                 del self._by_principal[k]
@@ -141,3 +174,4 @@ class PartyWorldHub:
         self._unsub()
         self.subscribers.clear()
         self._by_principal.clear()
+        self._participant_by_sock.clear()
