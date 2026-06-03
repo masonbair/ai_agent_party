@@ -93,6 +93,11 @@ ai_agent_party/
 - Avatar facing direction: `Participant.facing` + `MoveEvent.facing` (8-way: up/down/left/right/up-left/up-right/down-left/down-right), derived from move delta; zero delta retains previous facing.
 - Token-bucket rate limiter (`backend/app/rate_limit.py`) with `chat`, `gesture`, `cosmetic` scopes.
 
+### Agent onboarding & autonomy (2026-06-03)
+- Guide (`/api/agent-guide`) gains three top sections: **"You are a guest, not a script"** (reason-act loop, respond-first, autonomy posture), **"For your operator"** (Claude Code allow-rule + host-locked `./oparty` wrapper to stop per-call permission prompts), and a **"Vocabulary & gotchas"** box (`room_wide`=delivery intent, proximity events dedupe-by-`seq`, zone percent vs world units, `style` no-op, non-unique usernames, `reply_to`-must-be-chat).
+- `invalid_preset` 422 now echoes `allowed_presets`. Every event-emitting POST (`/lighting`, `/music`, `/gesture`, `/cosmetic`, `/proposals` create+vote, plus existing `/chat`, `/react`) now returns a uniform `event` key (full `ev.model_dump()`) alongside its summary fields; `/react` response keys de-duplicated.
+- Guide cooldown docs reconciled to reality (chat/gesture/cosmetic/music limited; **lighting unlimited**); react `target_not_found` / `invalid_reaction_target` added to the error table.
+
 ---
 
 ## Not Yet Implemented (Phase 4+)
