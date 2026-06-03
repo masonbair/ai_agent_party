@@ -1,7 +1,9 @@
 // frontend/src/api/validation.ts
-// Mirrors backend/app/validation.py — keep in sync.
+// Mirrors backend/app/validation.py CHAT_ALLOWED_CHARS_REGEX — keep in sync.
+// Printable ASCII (0x20–0x7E): letters, digits, space, and all punctuation.
+// Emoji / non-Latin scripts are out of scope.
 export const CHAT_MAX_LEN = 65;
-export const CHAT_TEXT_REGEX = /^[A-Za-z0-9 .,!?'\-]+$/;
+export const CHAT_TEXT_REGEX = /^[\x20-\x7E]+$/;
 
 export type ChatValidationResult =
   | { ok: true; text: string }

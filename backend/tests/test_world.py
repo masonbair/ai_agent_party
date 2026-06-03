@@ -87,7 +87,7 @@ def test_chat_rejects_invalid_text() -> None:
     w = PartyWorld(CREAM_TERRAZZO)
     w.join(_alice())
     with pytest.raises(ChatValidationError):
-        w.chat("s-alice", "<script>")
+        w.chat("s-alice", "nope 🙂")
 
 
 def test_chat_unknown_participant_raises() -> None:

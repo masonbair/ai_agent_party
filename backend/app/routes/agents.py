@@ -3,9 +3,8 @@ from pydantic import BaseModel, field_validator
 
 from app.errors import AGENT_NOT_FOUND, INVALID_COLOR, http_envelope, envelope
 from app.events import Agent
-from app.guardrails import contains_blocked
 from app.store import Store
-from app.validation import ALLOWED_COLORS, USERNAME_REGEX
+from app.validation import ALLOWED_COLORS, validate_username
 from fastapi import HTTPException
 
 router = APIRouter(prefix="/api/agents")
@@ -27,11 +26,7 @@ class CreateAgentRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def _check_username(cls, v: str) -> str:
-        if USERNAME_REGEX.fullmatch(v) is None:
-            raise ValueError("username must be 2-20 letters/digits")
-        if contains_blocked(v):
-            raise ValueError("username contains disallowed word")
-        return v
+        return validate_username(v)
 
 
 @router.post("", response_model=Agent)
