@@ -89,6 +89,22 @@ describe('PartySpace — chat bubbles & input', () => {
     expect(screen.queryByText('lost')).not.toBeInTheDocument();
   });
 
+  it('passes speaker color to the chat bubble border', () => {
+    render(
+      <PartySpace
+        party={party}
+        user={selfUser}
+        participants={participants}
+        bubbles={{ 'sid-2': { text: 'hello', expiresAt: Date.now() + 5000 } }}
+        slug={party.slug}
+        principal={{ kind: 'human', id: 'sid-1' }}
+        status="open"
+      />,
+    );
+    const bubble = screen.getByText('hello').parentElement!;
+    expect(bubble.style.border).toMatch(/77, 208, 225|#4dd0e1/);
+  });
+
   it('mounts a chat input', () => {
     render(
       <PartySpace

@@ -24,6 +24,7 @@ import { ReactionLayer } from './ReactionLayer';
 import { RadialReactionPicker } from './RadialReactionPicker';
 import { Module, isInZone } from './modules/Module';
 import { ModuleModal } from './modules/ModuleModal';
+import { computeBubbleOffsets } from './bubbleLayout';
 
 const SPEED = 220; // logical units / sec
 
@@ -51,7 +52,7 @@ type Props = {
   music?: MusicState | null;
   reactions?: Map<string, { emoji: string; expiresAt: number }>;
   applyObserveInitial?: ApplyObserveInitial;
-  bubbles?: Record<string, { text: string; expiresAt: number }>;
+  bubbles?: Record<string, { text: string; expiresAt: number; ambient?: boolean }>;
   slug: string;
   status: 'connecting' | 'open' | 'closed';
 };
@@ -287,21 +288,31 @@ export default function PartySpace({
             onClose={() => setPickerOpen(false)}
           />
         ) : null}
-        {Object.entries(bubbles ?? {}).map(([participantId, bubble]) => {
-          const speaker = renderList.find((p) => p.id === participantId);
-          if (!speaker) return null;
-          return (
+        {(() => {
+          const entries = Object.entries(bubbles ?? {}).flatMap(
+            ([participantId, bubble]) => {
+              const speaker = renderList.find((p) => p.id === participantId);
+              return speaker ? [{ participantId, bubble, speaker }] : [];
+            },
+          );
+          const offsets = computeBubbleOffsets(
+            entries.map((e) => ({ id: e.participantId, x: e.speaker.x, y: e.speaker.y })),
+          );
+          return entries.map(({ participantId, bubble, speaker }) => (
             <ChatBubble
               key={participantId}
               text={bubble.text}
+              ambient={bubble.ambient}
+              color={speaker.color}
+              offsetY={offsets[participantId] ?? 0}
               x={speaker.x}
               y={speaker.y}
               worldWidth={width}
               worldHeight={height}
               expiresAt={bubble.expiresAt}
             />
-          );
-        })}
+          ));
+        })()}
       </div>
       </div>
       {principal ? (
