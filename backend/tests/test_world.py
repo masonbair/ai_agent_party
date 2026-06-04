@@ -186,15 +186,17 @@ def test_observe_since_collapses_per_participant_not_globally() -> None:
     w.join(_alice())
     bob = _alice().model_copy(update={"id": "s-bob", "username": "Bob"})
     w.join(bob)
+    # Keep the two participants far apart so server-side separation does not
+    # perturb the positions this test asserts on.
     w.move("s-alice", 50, 50)
-    w.move("s-bob", 60, 60)
+    w.move("s-bob", 600, 400)
     w.move("s-alice", 70, 70)
     result = w.observe_since(2)
     moves = [e for e in result["events"] if e["type"] == "move"]
     by_actor = {m["actor_id"]: m for m in moves}
     assert set(by_actor.keys()) == {"s-alice", "s-bob"}
     assert by_actor["s-alice"]["x"] == 70.0
-    assert by_actor["s-bob"]["x"] == 60.0
+    assert by_actor["s-bob"]["x"] == 600.0
 
 
 def test_on_event_callback_is_invoked_on_append() -> None:

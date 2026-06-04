@@ -23,6 +23,11 @@ type Options = {
    * the avatar doesn't wander while the user is choosing a reaction.
    */
   paused?: boolean;
+  /**
+   * Returns the current positions of OTHER avatars (excluding self), in world
+   * units. Used to softly separate the local avatar so bodies don't stack.
+   */
+  getOthers?: () => Point[];
 };
 
 const KEY_TO_DIR: Record<string, Point> = {
@@ -42,6 +47,28 @@ const DETOUR_MARGIN = 2;
 const WAYPOINT_REACHED_DIST = 4;
 const TARGET_REACHED_DIST = 1;
 const MAX_DETOUR_ITERATIONS = 4;
+
+export const MIN_AVATAR_SEPARATION = 2 * AVATAR_RADIUS;
+
+// Mirror of backend `collision.separate`: one deterministic push-out step so
+// the local avatar's predicted position matches the server's.
+export function separatePoint(point: Point, others: Point[]): Point {
+  let { x, y } = point;
+  for (const o of others) {
+    const dx = x - o.x;
+    const dy = y - o.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist >= MIN_AVATAR_SEPARATION) continue;
+    if (dist === 0) {
+      x += MIN_AVATAR_SEPARATION;
+      continue;
+    }
+    const push = (MIN_AVATAR_SEPARATION - dist) / dist;
+    x += dx * push;
+    y += dy * push;
+  }
+  return { x, y };
+}
 
 type Rect = { left: number; top: number; right: number; bottom: number };
 
@@ -188,6 +215,8 @@ export function useMovement(opts: Options) {
   const lastTimeRef = useRef<number | null>(null);
   const wallsRef = useRef<Rect[]>(inflateWalls(opts.walls, worldWidth, worldHeight));
   const onMoveRef = useRef(opts.onMove);
+  const getOthersRef = useRef(opts.getOthers);
+  getOthersRef.current = opts.getOthers;
   const lastEmitRef = useRef<{ time: number; x: number; y: number }>({
     time: 0,
     x: NaN,
@@ -360,6 +389,21 @@ export function useMovement(opts: Options) {
         } else {
           nx = x;
           ny = y;
+        }
+      }
+
+      const others = getOthersRef.current?.() ?? [];
+      if (others.length > 0) {
+        const separated = separatePoint({ x: nx, y: ny }, others);
+        // Re-resolve walls after the push so a separation nudge can't predict
+        // the avatar inside a wall (mirrors the backend's separate-then-slide).
+        if (!isBlocked(separated, rects)) {
+          nx = separated.x;
+          ny = separated.y;
+        } else if (!isBlocked({ x: separated.x, y: ny }, rects)) {
+          nx = separated.x;
+        } else if (!isBlocked({ x: nx, y: separated.y }, rects)) {
+          ny = separated.y;
         }
       }
 

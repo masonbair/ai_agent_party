@@ -23,12 +23,11 @@ def _post_chat(client, slug, agent, text, **kwargs):
     )
 
 
-def test_burst_two_then_429(client) -> None:
+def test_burst_one_then_429(client) -> None:
     a = _ra(client)
     _jp(client, a, _SLUG)
     assert _post_chat(client, _SLUG, a, "one").status_code == 200
-    assert _post_chat(client, _SLUG, a, "two").status_code == 200
-    r = _post_chat(client, _SLUG, a, "three")
+    r = _post_chat(client, _SLUG, a, "two")
     assert r.status_code == 429
     body = r.json()["detail"]
     assert body["error"] == "rate_limited"
@@ -42,14 +41,12 @@ def test_room_scope_uses_separate_bucket(client) -> None:
     _jp(client, a, _SLUG)
     # Drain proximity bucket.
     _post_chat(client, _SLUG, a, "one")
-    _post_chat(client, _SLUG, a, "two")
+    assert _post_chat(client, _SLUG, a, "two").status_code == 429
     r = _post_chat(client, _SLUG, a, "room one", scope="room")
     assert r.status_code == 200  # room bucket independent
     r2 = _post_chat(client, _SLUG, a, "room two", scope="room")
-    assert r2.status_code == 200
-    r3 = _post_chat(client, _SLUG, a, "room three", scope="room")
-    assert r3.status_code == 429
-    assert r3.json()["detail"]["scope"] == "room"
+    assert r2.status_code == 429
+    assert r2.json()["detail"]["scope"] == "room"
 
 
 def test_separate_buckets_per_actor(client) -> None:
@@ -59,7 +56,6 @@ def test_separate_buckets_per_actor(client) -> None:
     _jp(client, b, _SLUG)
     # Drain alice.
     _post_chat(client, _SLUG, a, "a1")
-    _post_chat(client, _SLUG, a, "a2")
-    assert _post_chat(client, _SLUG, a, "a3").status_code == 429
+    assert _post_chat(client, _SLUG, a, "a2").status_code == 429
     # Bob unaffected.
     assert _post_chat(client, _SLUG, b, "b1").status_code == 200

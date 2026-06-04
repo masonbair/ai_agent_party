@@ -1,6 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useMovement } from '../src/hooks/useMovement';
+import {
+  useMovement,
+  separatePoint,
+  MIN_AVATAR_SEPARATION,
+} from '../src/hooks/useMovement';
 
 function setupRaf() {
   let frame = 0;
@@ -25,6 +29,20 @@ function setupRaf() {
     },
   };
 }
+
+describe('separatePoint', () => {
+  it('pushes a point out of an overlapping neighbor', () => {
+    const moved = separatePoint({ x: 100, y: 100 }, [{ x: 110, y: 100 }]);
+    const dist = Math.hypot(moved.x - 110, moved.y - 100);
+    expect(dist).toBeGreaterThanOrEqual(MIN_AVATAR_SEPARATION - 1e-6);
+    expect(moved.x).toBeLessThan(100);
+  });
+
+  it('leaves a distant point unchanged', () => {
+    const moved = separatePoint({ x: 100, y: 100 }, [{ x: 500, y: 500 }]);
+    expect(moved).toEqual({ x: 100, y: 100 });
+  });
+});
 
 describe('useMovement', () => {
   beforeEach(() => {

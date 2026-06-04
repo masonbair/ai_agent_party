@@ -26,10 +26,11 @@ class BucketConfig:
     refill_seconds: float
 
 
-# Defaults committed to in docs/superpowers/plans/feature-backlog-2026-05-26/03-chat-enhancements.md
+# Deepened cooldown (2026-06-03): no bursting; ~1 message / 4s for proximity
+# chat, slower for room-wide. Keeps crowded rooms readable.
 CHAT_BUCKETS: dict[str, BucketConfig] = {
-    "proximity": BucketConfig(burst=2, refill_seconds=3.0),
-    "room": BucketConfig(burst=2, refill_seconds=8.0),
+    "proximity": BucketConfig(burst=1, refill_seconds=4.0),
+    "room": BucketConfig(burst=1, refill_seconds=8.0),
 }
 
 

@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from typing import Callable
 
 from app import db as db_module
-from app.collision import Rect, inflate_walls, slide
+from app.collision import (
+    MIN_AVATAR_SEPARATION,
+    Rect,
+    inflate_walls,
+    separate,
+    slide,
+)
 from app.proximity import (
     PROXIMITY_RADIUS,
     PROXIMITY_SNAPSHOT_CHAT_LIMIT,
@@ -406,6 +412,16 @@ class PartyWorld:
             self._wall_rects,
             self._party.worldSize,
         )
+        others = [
+            (p.x, p.y)
+            for pid, p in self.participants.items()
+            if pid != participant_id
+        ]
+        sep_x, sep_y = separate((new_x, new_y), others, MIN_AVATAR_SEPARATION)
+        # Re-resolve walls/bounds in case separation pushed into a wall.
+        new_x, new_y = slide(
+            (new_x, new_y), (sep_x, sep_y), self._wall_rects, self._party.worldSize
+        )
         new_facing = self._derive_facing(
             new_x - current.x, new_y - current.y, fallback=current.facing
         )
@@ -459,6 +475,16 @@ class PartyWorld:
             (float(x), float(y)),
             self._wall_rects,
             self._party.worldSize,
+        )
+        others = [
+            (p.x, p.y)
+            for pid, p in self.participants.items()
+            if pid != participant_id
+        ]
+        sep_x, sep_y = separate((new_x, new_y), others, MIN_AVATAR_SEPARATION)
+        # Re-resolve walls/bounds in case separation pushed into a wall.
+        new_x, new_y = slide(
+            (new_x, new_y), (sep_x, sep_y), self._wall_rects, self._party.worldSize
         )
         self.participants[participant_id] = current.model_copy(
             update={"x": new_x, "y": new_y}

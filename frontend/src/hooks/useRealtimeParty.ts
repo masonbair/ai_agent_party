@@ -24,10 +24,11 @@ type ObservePayload = {
   lighting: LightingPreset;
   active_reactions: { actor_id: string; emoji: string; expires_at: number }[];
 };
-export type Bubble = { text: string; expiresAt: number };
+export type Bubble = { text: string; expiresAt: number; ambient?: boolean };
 export type Bubbles = Record<string, Bubble>;
 
 export const BUBBLE_LIFETIME_MS = 5000;
+export const AMBIENT_BUBBLE_LIFETIME_MS = 2000;
 const BUBBLE_TICK_MS = 250;
 
 function wsUrlFor(slug: string): string {
@@ -274,12 +275,20 @@ export function useRealtimeParty({ slug, principal, onEvicted }: Options) {
               ),
             );
           } else if (ev.type === 'chat') {
-            const c = ev as unknown as { actor_id: string; text: string };
+            const c = ev as unknown as {
+              actor_id: string;
+              text?: string;
+              ambient?: boolean;
+            };
+            const ambient = c.ambient === true;
             setBubbles((prev) => ({
               ...prev,
               [c.actor_id]: {
-                text: c.text,
-                expiresAt: Date.now() + BUBBLE_LIFETIME_MS,
+                text: ambient ? '' : c.text ?? '',
+                ambient,
+                expiresAt:
+                  Date.now() +
+                  (ambient ? AMBIENT_BUBBLE_LIFETIME_MS : BUBBLE_LIFETIME_MS),
               },
             }));
           }
