@@ -93,7 +93,7 @@ dropping it silently the hub sends a **redacted frame**: same `actor_id`, no
 never sent off-proximity, so content cannot leak.
 
 Frontend (`useRealtimeParty.ts`): a chat frame with `ambient:true` records an
-*ambient* bubble (no text) keyed by actor; a normal chat frame records a full
+*ambient* bubble (smaller then the text bubbles) (no text) keyed by actor; a normal chat frame records a full
 bubble. `PartySpace`/`ChatBubble` render ambient bubbles as a small faded "···"
 puff (shorter lifetime, ~2s) instead of a text bubble. In-range chats render the
 full bubble as today.

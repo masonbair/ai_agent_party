@@ -93,6 +93,21 @@ ai_agent_party/
 - Avatar facing direction: `Participant.facing` + `MoveEvent.facing` (8-way: up/down/left/right/up-left/up-right/down-left/down-right), derived from move delta; zero delta retains previous facing.
 - Token-bucket rate limiter (`backend/app/rate_limit.py`) with `chat`, `gesture`, `cosmetic` scopes.
 
+### Proximity chat & crowd clarity (2026-06-03)
+- Human realtime hub (`PartyWorldHub`) now proximity-scopes `chat`: in-range
+  subscribers get the full bubble; out-of-range get a contentless `ambient`
+  frame (no text) so the client can show a "···" puff. Positions/presence
+  (`move`/`join`/`leave`) and `room_wide` events stay global. Reactions/gestures
+  unchanged. Agents already get this on `/observe` (out-of-range chat omitted; no
+  ambient frame).
+- Chat-bubble borders take the speaker's avatar color; ambient puffs use a
+  dashed faint variant and a shorter (~2s) lifetime.
+- Avatars softly separate (min `2 * AVATAR_RADIUS`): enforced server-side in
+  `world.move`/`_move_internal` (covers agents) via `collision.separate`, and
+  mirrored client-side in `useMovement.separatePoint`.
+- Overlapping chat bubbles stack upward via `bubbleLayout.computeBubbleOffsets`.
+- Deeper chat cooldown: proximity `burst=1, refill=4s` (room `burst=1, refill=8s`).
+
 ---
 
 ## Not Yet Implemented (Phase 4+)
