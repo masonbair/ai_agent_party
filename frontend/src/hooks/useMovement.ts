@@ -23,6 +23,11 @@ type Options = {
    * the avatar doesn't wander while the user is choosing a reaction.
    */
   paused?: boolean;
+  /**
+   * Returns the current positions of OTHER avatars (excluding self), in world
+   * units. Used to softly separate the local avatar so bodies don't stack.
+   */
+  getOthers?: () => Point[];
 };
 
 const KEY_TO_DIR: Record<string, Point> = {
@@ -42,6 +47,28 @@ const DETOUR_MARGIN = 2;
 const WAYPOINT_REACHED_DIST = 4;
 const TARGET_REACHED_DIST = 1;
 const MAX_DETOUR_ITERATIONS = 4;
+
+export const MIN_AVATAR_SEPARATION = 2 * AVATAR_RADIUS;
+
+// Mirror of backend `collision.separate`: one deterministic push-out step so
+// the local avatar's predicted position matches the server's.
+export function separatePoint(point: Point, others: Point[]): Point {
+  let { x, y } = point;
+  for (const o of others) {
+    const dx = x - o.x;
+    const dy = y - o.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist >= MIN_AVATAR_SEPARATION) continue;
+    if (dist === 0) {
+      x += MIN_AVATAR_SEPARATION;
+      continue;
+    }
+    const push = (MIN_AVATAR_SEPARATION - dist) / dist;
+    x += dx * push;
+    y += dy * push;
+  }
+  return { x, y };
+}
 
 type Rect = { left: number; top: number; right: number; bottom: number };
 
@@ -188,6 +215,8 @@ export function useMovement(opts: Options) {
   const lastTimeRef = useRef<number | null>(null);
   const wallsRef = useRef<Rect[]>(inflateWalls(opts.walls, worldWidth, worldHeight));
   const onMoveRef = useRef(opts.onMove);
+  const getOthersRef = useRef(opts.getOthers);
+  getOthersRef.current = opts.getOthers;
   const lastEmitRef = useRef<{ time: number; x: number; y: number }>({
     time: 0,
     x: NaN,
@@ -363,9 +392,13 @@ export function useMovement(opts: Options) {
         }
       }
 
+      const others = getOthersRef.current?.() ?? [];
+      const separated =
+        others.length > 0 ? separatePoint({ x: nx, y: ny }, others) : { x: nx, y: ny };
+
       const clamped = {
-        x: clamp(nx, 0, worldWidth),
-        y: clamp(ny, 0, worldHeight),
+        x: clamp(separated.x, 0, worldWidth),
+        y: clamp(separated.y, 0, worldHeight),
       };
       if (clamped.x !== x || clamped.y !== y) {
         posRef.current = clamped;

@@ -85,6 +85,10 @@ export default function PartySpace({
     onMove,
     moveThrottleMs: 100,
     paused: inputBlocked,
+    getOthers: () =>
+      (participants ?? [])
+        .filter((p) => p.id !== user.session_id)
+        .map((p) => ({ x: p.x, y: p.y })),
   });
   const floorRef = useRef<HTMLDivElement>(null);
   const dm = useDm();
