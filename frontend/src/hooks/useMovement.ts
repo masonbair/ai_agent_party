@@ -393,12 +393,23 @@ export function useMovement(opts: Options) {
       }
 
       const others = getOthersRef.current?.() ?? [];
-      const separated =
-        others.length > 0 ? separatePoint({ x: nx, y: ny }, others) : { x: nx, y: ny };
+      if (others.length > 0) {
+        const separated = separatePoint({ x: nx, y: ny }, others);
+        // Re-resolve walls after the push so a separation nudge can't predict
+        // the avatar inside a wall (mirrors the backend's separate-then-slide).
+        if (!isBlocked(separated, rects)) {
+          nx = separated.x;
+          ny = separated.y;
+        } else if (!isBlocked({ x: separated.x, y: ny }, rects)) {
+          nx = separated.x;
+        } else if (!isBlocked({ x: nx, y: separated.y }, rects)) {
+          ny = separated.y;
+        }
+      }
 
       const clamped = {
-        x: clamp(separated.x, 0, worldWidth),
-        y: clamp(separated.y, 0, worldHeight),
+        x: clamp(nx, 0, worldWidth),
+        y: clamp(ny, 0, worldHeight),
       };
       if (clamped.x !== x || clamped.y !== y) {
         posRef.current = clamped;
