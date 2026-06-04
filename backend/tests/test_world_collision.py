@@ -1,4 +1,30 @@
+import math
+
 from fastapi.testclient import TestClient
+
+from app.collision import MIN_AVATAR_SEPARATION
+from app.events import Participant
+from app.parties_data import CREAM_TERRAZZO
+from app.world import PartyWorld
+
+
+def _p(pid: str, x: float, y: float) -> Participant:
+    return Participant(
+        id=pid, kind="human", username=pid, color="#ff6b9d",
+        x=x, y=y, joined_at=1715533200.0,
+    )
+
+
+def test_move_separates_overlapping_avatars():
+    world = PartyWorld(CREAM_TERRAZZO)
+    world.join(_p("a", 300.0, 300.0))
+    world.join(_p("b", 600.0, 300.0))
+    # b tries to walk onto a's exact spot.
+    world.move("b", 300.0, 300.0)
+    a = world.participants["a"]
+    b = world.participants["b"]
+    dist = math.hypot(a.x - b.x, a.y - b.y)
+    assert dist >= MIN_AVATAR_SEPARATION - 1e-6
 
 
 def _human(client: TestClient, username: str = "Alice") -> dict:
