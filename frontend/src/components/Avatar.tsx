@@ -39,12 +39,14 @@ export default function Avatar({
           bottom: 28,
           left: '50%',
           transform: 'translateX(-50%)',
-          fontSize: 12,
-          background: 'rgba(255,255,255,0.9)',
-          padding: '1px 6px',
-          borderRadius: 8,
+          fontFamily: 'var(--op-font-mono)',
+          fontSize: 11,
+          background: 'var(--op-ink)',
+          color: '#fff',
+          padding: '2px 7px',
+          borderRadius: 999,
           whiteSpace: 'nowrap',
-          fontWeight: 600,
+          fontWeight: 700,
           pointerEvents: 'none',
         }}
       >
@@ -65,12 +67,12 @@ export default function Avatar({
           padding: 0,
           borderRadius: '50%',
           background: color,
-          border: '2px solid white',
+          border: '3px solid var(--op-ink)',
           cursor: onSelect ? 'pointer' : 'default',
           boxShadow:
             variant === 'self'
-              ? '0 2px 6px rgba(0,0,0,0.25), inset 0 0 0 2px rgba(255,255,255,0.8)'
-              : '0 2px 6px rgba(0,0,0,0.25)',
+              ? '2px 2px 0 var(--op-shadow), inset 0 0 0 2px rgba(255,255,255,0.85)'
+              : '2px 2px 0 var(--op-shadow)',
         }}
       />
     </div>

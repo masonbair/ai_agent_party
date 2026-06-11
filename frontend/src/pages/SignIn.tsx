@@ -28,7 +28,6 @@ export default function SignIn() {
   const [color, setColor] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     if (session.status === 'authed') {
@@ -60,185 +59,198 @@ export default function SignIn() {
   return (
     <main
       style={{
-        maxWidth: 'min(440px, 92vw)',
-        margin: 'clamp(24px, 8vh, 80px) auto',
-        padding: 'clamp(20px, 4vw, 32px)',
-        background: '#fff',
-        border: '1px solid #f0e6d8',
-        borderRadius: 16,
-        boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+        maxWidth: 'min(460px, 92vw)',
+        margin: 'clamp(24px, 8vh, 72px) auto',
+        padding: '0 16px',
+        position: 'relative',
       }}
     >
-      <h1 style={{ fontSize: 'clamp(24px, 6vw, 36px)', margin: 0, color: '#1a1a1a' }}>
-        Welcome to openParty
-      </h1>
-      <p style={{ margin: '6px 0 24px', color: '#666', fontSize: 'clamp(13px, 3.5vw, 15px)' }}>
-        Throw parties with humans and AI agents.
-      </p>
+      {/* scattered Memphis confetti around the card */}
+      <span
+        aria-hidden
+        className="op-shape op-shape--dot"
+        style={{ width: 20, height: 20, background: 'var(--op-blue)', top: -10, left: 4 }}
+      />
+      <span
+        aria-hidden
+        className="op-shape op-shape--tri"
+        style={{ top: 30, right: -2, transform: 'rotate(18deg)' }}
+      />
+      <span
+        aria-hidden
+        className="op-shape op-shape--dot"
+        style={{ width: 26, height: 26, background: 'var(--op-yellow)', bottom: 20, right: 8 }}
+      />
 
-      {takeoverNotice && (
-        <div
-          role="status"
-          style={{
-            background: '#fff7e0',
-            border: '1px solid #f3d36b',
-            color: '#7a5a00',
-            padding: '10px 12px',
-            borderRadius: 8,
-            marginBottom: 16,
-            fontSize: 14,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <span>
-            You were signed out because this account was opened in another window.
-          </span>
-          <button
-            type="button"
-            onClick={() => setTakeoverNotice(false)}
-            aria-label="Dismiss"
+      <div className="op-card" style={{ padding: 'clamp(24px, 5vw, 34px) clamp(20px, 4vw, 30px)' }}>
+        <p className="op-label" style={{ margin: '0 0 10px' }}>
+          // est. 2026 · humans + AI
+        </p>
+        <h1 style={{ fontSize: 'clamp(30px, 7vw, 44px)', margin: 0, lineHeight: 0.96 }}>
+          Welcome to{' '}
+          <span
             style={{
-              border: 'none',
-              background: 'transparent',
-              color: '#7a5a00',
-              fontSize: 18,
-              lineHeight: 1,
-              cursor: 'pointer',
-              padding: 4,
+              position: 'relative',
+              display: 'inline-block',
+              whiteSpace: 'nowrap',
             }}
           >
-            ×
-          </button>
-        </div>
-      )}
-
-      <form onSubmit={onSubmit}>
-        <label
-          htmlFor="username"
-          style={{ display: 'block', marginTop: 8, fontWeight: 600, fontSize: 14 }}
-        >
-          Username
-        </label>
-        <input
-          id="username"
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoComplete="off"
-          maxLength={20}
+            openParty
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: -2,
+                right: -2,
+                bottom: 3,
+                height: 12,
+                background: 'var(--op-yellow)',
+                zIndex: -1,
+                transform: 'rotate(-1.5deg)',
+              }}
+            />
+          </span>
+        </h1>
+        <p
           style={{
-            width: '100%',
-            padding: '10px 12px',
-            marginTop: 6,
-            border: '1px solid #ddd',
-            borderRadius: 8,
-            fontSize: 16,
+            fontFamily: 'var(--op-font-mono)',
+            fontSize: 13,
+            color: 'var(--op-muted)',
+            margin: '10px 0 24px',
           }}
-        />
-        {usernameTouched && !usernameValid && (
-          <p style={{ color: '#b00020', fontSize: 13, marginTop: 6 }}>
-            Use 2–20 letters and numbers only.
-          </p>
+        >
+          // throw parties with humans and AI agents
+        </p>
+
+        {takeoverNotice && (
+          <div
+            role="status"
+            style={{
+              background: 'var(--op-yellow)',
+              border: 'var(--op-bw) solid var(--op-ink)',
+              borderRadius: 'var(--op-radius-sm)',
+              color: 'var(--op-ink)',
+              padding: '10px 12px',
+              marginBottom: 18,
+              fontSize: 13,
+              fontWeight: 700,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: '3px 3px 0 var(--op-shadow)',
+            }}
+          >
+            <span>
+              You were signed out because this account was opened in another window.
+            </span>
+            <button
+              type="button"
+              onClick={() => setTakeoverNotice(false)}
+              aria-label="Dismiss"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--op-ink)',
+                fontSize: 20,
+                lineHeight: 1,
+                cursor: 'pointer',
+                padding: 4,
+                fontWeight: 900,
+              }}
+            >
+              ×
+            </button>
+          </div>
         )}
 
-        <fieldset style={{ marginTop: 20, border: 'none', padding: 0 }}>
-          <legend style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-            Favorite color
-          </legend>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
-            {ALLOWED_COLORS.map((c) => {
-              const selected = color === c;
-              return (
-                <label
-                  key={c}
-                  style={{
-                    display: 'inline-flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="color"
-                    value={c}
-                    checked={selected}
-                    onChange={() => setColor(c)}
-                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-                  />
-                  <span
-                    aria-hidden
+        <form onSubmit={onSubmit}>
+          <label htmlFor="username" className="op-label" style={{ display: 'block', marginBottom: 8 }}>
+            Username
+          </label>
+          <input
+            id="username"
+            className="op-field"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="off"
+            placeholder="discoduck"
+            maxLength={20}
+          />
+          {usernameTouched && !usernameValid && (
+            <p style={{ color: 'var(--op-coral)', fontSize: 13, fontWeight: 700, marginTop: 8 }}>
+              Use 2–20 letters and numbers only.
+            </p>
+          )}
+
+          <fieldset style={{ marginTop: 22, border: 'none', padding: 0 }}>
+            <legend className="op-label" style={{ marginBottom: 10, padding: 0 }}>
+              Pick your color
+            </legend>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 11 }}>
+              {ALLOWED_COLORS.map((c) => {
+                const selected = color === c;
+                return (
+                  <label
+                    key={c}
                     style={{
                       display: 'inline-flex',
                       justifyContent: 'center',
                       alignItems: 'center',
-                      width: 40,
-                      height: 40,
-                      borderRadius: '50%',
-                      background: c,
-                      color: '#fff',
-                      fontWeight: 700,
-                      transform: selected ? 'scale(1.1)' : 'scale(1)',
-                      outline: selected ? '3px solid #333' : '2px solid rgba(0,0,0,0.06)',
-                      outlineOffset: 2,
-                      transition: 'transform 120ms ease, outline-color 120ms ease',
-                      cursor: 'pointer',
                     }}
                   >
-                    {selected ? '✓' : ''}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
+                    <input
+                      type="radio"
+                      name="color"
+                      value={c}
+                      checked={selected}
+                      onChange={() => setColor(c)}
+                      style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span
+                      aria-hidden
+                      className="op-swatch"
+                      data-selected={selected ? 'true' : 'false'}
+                      style={{ background: c, width: '100%' }}
+                    >
+                      {selected ? '✓' : ''}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
-        {serverError && (
-          <p
-            role="alert"
-            style={{
-              color: '#b00020',
-              marginTop: 14,
-              fontSize: 14,
-              background: '#fdecef',
-              padding: '8px 12px',
-              borderRadius: 8,
-            }}
+          {serverError && (
+            <p
+              role="alert"
+              style={{
+                color: '#fff',
+                marginTop: 16,
+                fontSize: 14,
+                fontWeight: 700,
+                background: 'var(--op-coral)',
+                border: 'var(--op-bw) solid var(--op-ink)',
+                padding: '8px 12px',
+                borderRadius: 'var(--op-radius-sm)',
+                boxShadow: '3px 3px 0 var(--op-shadow)',
+              }}
+            >
+              {serverError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="op-btn op-btn--coral"
+            disabled={!canSubmit}
+            style={{ marginTop: 26, width: '100%', fontSize: 18, padding: 15 }}
           >
-            {serverError}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          style={{
-            marginTop: 24,
-            width: '100%',
-            padding: '12px 20px',
-            background: canSubmit ? '#ff6b9d' : '#f0c7d6',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 999,
-            fontSize: 16,
-            fontWeight: 600,
-            cursor: canSubmit ? 'pointer' : 'not-allowed',
-            transform: canSubmit && hovered ? 'translateY(-1px)' : 'translateY(0)',
-            boxShadow: canSubmit
-              ? hovered
-                ? '0 6px 14px rgba(255,107,157,0.40)'
-                : '0 4px 10px rgba(255,107,157,0.30)'
-              : 'none',
-            transition: 'transform 120ms ease, box-shadow 120ms ease',
-          }}
-        >
-          Enter
-        </button>
-      </form>
+            Enter the party <span className="op-btn__arrow">→</span>
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

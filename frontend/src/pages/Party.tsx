@@ -15,7 +15,6 @@ export default function Party() {
   const { slug } = useParams<{ slug: string }>();
   const [party, setParty] = useState<PartyConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [leaveHovered, setLeaveHovered] = useState(false);
 
   useEffect(() => {
     if (!slug || session.status !== 'authed') return;
@@ -76,10 +75,19 @@ export default function Party() {
   };
 
   return (
-    <main>
+    <main
+      style={{
+        // Center the whole stack (header + room + chat) vertically so the gap
+        // above the header matches the gap below the chat bar.
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        minHeight: '100vh',
+      }}
+    >
       <header
         style={{
-          padding: 'clamp(8px, 2vw, 16px) clamp(12px, 3vw, 24px)',
+          padding: 'clamp(6px, 1.2vw, 10px) clamp(12px, 3vw, 24px)',
           display: 'flex',
           flexWrap: 'wrap',
           gap: 12,
@@ -87,27 +95,36 @@ export default function Party() {
           alignItems: 'center',
         }}
       >
-        <h1 style={{ margin: 0, fontSize: 'clamp(20px, 4vw, 28px)' }}>{party.name}</h1>
+        <div className="op-plate" style={{ padding: '5px 14px' }}>
+          <p className="op-label" style={{ margin: 0, fontSize: 9.5 }}>
+            // you're in the room
+          </p>
+          <h1 style={{ margin: 0, fontSize: 'clamp(20px, 3.6vw, 28px)', lineHeight: 1.05 }}>
+            {party.name}
+          </h1>
+        </div>
+        {principal ? (
+          <div
+            aria-live="polite"
+            className="op-plate"
+            style={{
+              padding: '7px 16px',
+              borderRadius: 999,
+              fontFamily: 'var(--op-font-mono)',
+              fontSize: 12.5,
+              fontWeight: 700,
+              lineHeight: 1.5,
+              color: 'var(--op-ink)',
+            }}
+          >
+            press <kbd>R</kbd> to react · walk near a board and press <kbd>E</kbd> to interact
+          </div>
+        ) : null}
         <button
           type="button"
+          className="op-btn op-btn--ink"
           onClick={() => navigate('/lobby')}
-          onMouseEnter={() => setLeaveHovered(true)}
-          onMouseLeave={() => setLeaveHovered(false)}
-          style={{
-            background: party.theme.accent,
-            color: '#fff',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: 999,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-            transform: leaveHovered ? 'translateY(-1px)' : 'translateY(0)',
-            boxShadow: leaveHovered
-              ? '0 4px 10px rgba(0,0,0,0.15)'
-              : '0 2px 6px rgba(0,0,0,0.10)',
-            transition: 'transform 120ms ease, box-shadow 120ms ease',
-          }}
+          style={{ fontSize: 13, padding: '10px 18px', borderRadius: 999 }}
         >
           ← Leave party
         </button>

@@ -11,14 +11,16 @@ export default function InboxButton({ unreadCount, onClick }: Props) {
       onClick={onClick}
       style={{
         position: 'relative',
-        background: '#fff',
-        border: '1px solid rgba(0,0,0,0.1)',
-        padding: '6px 14px',
+        fontFamily: 'var(--op-font-display)',
+        background: 'var(--op-paper)',
+        border: '3px solid var(--op-ink)',
+        color: 'var(--op-ink)',
+        padding: '8px 16px',
         borderRadius: 999,
         fontSize: 14,
-        fontWeight: 600,
+        fontWeight: 800,
         cursor: 'pointer',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        boxShadow: '3px 3px 0 var(--op-shadow)',
       }}
     >
       Inbox
@@ -27,15 +29,17 @@ export default function InboxButton({ unreadCount, onClick }: Props) {
           data-testid="inbox-unread-badge"
           style={{
             position: 'absolute',
-            top: -6,
-            right: -6,
-            background: '#ff6b9d',
+            top: -8,
+            right: -8,
+            background: 'var(--op-coral)',
             color: 'white',
+            border: '2px solid var(--op-ink)',
             borderRadius: 999,
             padding: '0 6px',
             fontSize: 11,
+            fontWeight: 800,
             lineHeight: '18px',
-            minWidth: 18,
+            minWidth: 20,
             textAlign: 'center',
           }}
         >

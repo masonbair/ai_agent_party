@@ -39,25 +39,25 @@ export default function PartyPeekModal({ slug, party, onClose }: Props) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.45)',
+        background: 'rgba(27,23,20,0.5)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        padding: 16,
         zIndex: 50,
       }}
       onClick={onClose}
     >
       <div
+        className="op-card"
         style={{
-          background: '#fff',
-          borderRadius: 12,
-          padding: 20,
+          padding: 22,
           width: 'min(560px, 92vw)',
           maxHeight: '90vh',
           overflow: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 14,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -72,13 +72,40 @@ export default function PartyPeekModal({ slug, party, onClose }: Props) {
         )}
         {state.kind === 'ready' && (
           <>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>{state.data.name}</h2>
-              <button type="button" onClick={onClose} aria-label="Close">
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <h2 style={{ margin: 0, fontSize: 'clamp(20px, 4vw, 26px)' }}>{state.data.name}</h2>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                style={{
+                  flexShrink: 0,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
+                  border: '3px solid var(--op-ink)',
+                  background: 'var(--op-paper)',
+                  fontSize: 18,
+                  fontWeight: 900,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  boxShadow: '2px 2px 0 var(--op-shadow)',
+                }}
+              >
                 ×
               </button>
             </header>
-            <p style={{ margin: 0, color: '#555' }}>{state.data.description}</p>
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--op-muted)',
+                fontFamily: 'var(--op-font-mono)',
+                fontSize: 12.5,
+                lineHeight: 1.5,
+              }}
+            >
+              {state.data.description}
+            </p>
             {party && <PartyPreview party={party} />}
             <PartyPreviewBody data={state.data} />
           </>
@@ -96,27 +123,47 @@ export default function PartyPeekModal({ slug, party, onClose }: Props) {
 function PartyPreviewBody({ data }: { data: PartyPreviewResponse }) {
   const occ = data.occupancy;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <span className="op-pill op-pill--h">
+          <span className="op-pill__b" />
+          {occ.humans} humans
+        </span>
+        <span className="op-pill op-pill--a">
+          <span className="op-pill__b" />
+          {occ.agents} agents
+        </span>
+        <span className="op-pill op-pill--live">
+          <span className="op-pill__b" />
+          {occ.active_last_5min} active
+        </span>
+      </div>
       <div
         style={{
-          padding: 10,
-          background: '#f6f6f6',
-          borderRadius: 8,
-          fontSize: 14,
+          padding: '10px 12px',
+          background: 'var(--op-paper-2)',
+          border: '2px solid var(--op-ink)',
+          borderRadius: 'var(--op-radius-sm)',
+          fontFamily: 'var(--op-font-mono)',
+          fontSize: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3,
         }}
       >
-        <div>
-          {occ.humans} humans · {occ.agents} agents · {occ.active_last_5min} active
-        </div>
         <div>Lighting: {data.lighting}</div>
         <div>Music: {data.music.label}</div>
       </div>
       <div>
-        <strong style={{ fontSize: 13 }}>Recent chat</strong>
+        <strong className="op-label" style={{ fontSize: 11 }}>
+          Recent chat
+        </strong>
         {data.recent_chat.length === 0 ? (
-          <p style={{ margin: '4px 0 0', color: '#888' }}>No recent chat.</p>
+          <p style={{ margin: '6px 0 0', color: 'var(--op-faint)', fontFamily: 'var(--op-font-mono)', fontSize: 12 }}>
+            No recent chat.
+          </p>
         ) : (
-          <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 13.5 }}>
             {data.recent_chat.map((c) => (
               <li key={c.seq}>
                 {c.actor_username}: {c.text}

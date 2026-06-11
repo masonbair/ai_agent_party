@@ -29,30 +29,33 @@ export default function Lobby() {
         padding: 'clamp(16px, 4vw, 24px)',
       }}
     >
-      <h1 style={{ fontSize: 'clamp(22px, 5vw, 32px)', margin: 0 }}>
-        Pick a party, {session.user.username}
-      </h1>
+      <div className="op-plate">
+        <p className="op-label" style={{ margin: '0 0 6px' }}>
+          // {parties?.length ?? 0} rooms open
+        </p>
+        <h1 style={{ fontSize: 'clamp(24px, 5vw, 38px)', margin: 0, lineHeight: 1 }}>
+          Pick a party,{' '}
+          <span style={{ color: 'var(--op-coral)' }}>{session.user.username}</span>
+        </h1>
+      </div>
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
-          gap: 16,
-          marginTop: 16,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))',
+          gap: 22,
+          marginTop: 22,
         }}
       >
-        {parties === null && <p>Loading parties…</p>}
+        {parties === null && (
+          <p style={{ fontFamily: 'var(--op-font-mono)', color: 'var(--op-muted)' }}>
+            Loading parties…
+          </p>
+        )}
         {parties?.map((p) => (
           <div
             key={p.slug}
-            style={{
-              padding: 12,
-              border: `2px solid ${p.theme.accent}`,
-              borderRadius: 12,
-              background: '#fff',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-            }}
+            className="op-card op-lobby-card"
+            style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
           >
             <button
               type="button"
@@ -63,36 +66,55 @@ export default function Lobby() {
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 10,
               }}
             >
-              <PartyPreview party={p} />
-              <div>
-                <strong>{p.name}</strong>
-                <p style={{ margin: '4px 0 0', color: '#555' }}>{p.description}</p>
+              <div style={{ borderBottom: 'var(--op-bw-thick) solid var(--op-ink)' }}>
+                <PartyPreview party={p} />
+              </div>
+              <div style={{ padding: '16px 18px 0' }}>
+                <strong style={{ fontSize: 'clamp(18px, 2.5vw, 22px)', fontWeight: 900, letterSpacing: '-0.5px' }}>
+                  {p.name}
+                </strong>
+                <p
+                  style={{
+                    margin: '5px 0 0',
+                    color: 'var(--op-muted)',
+                    fontFamily: 'var(--op-font-mono)',
+                    fontSize: 11.5,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {p.description}
+                </p>
               </div>
             </button>
             <div
-              style={{ fontSize: 13, color: '#666' }}
               data-testid={`occupancy-${p.slug}`}
+              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '14px 18px 0' }}
             >
-              {p.occupancy.humans} humans · {p.occupancy.agents} agents ·{' '}
-              {p.occupancy.active_last_5min} active
+              <span className="op-pill op-pill--h">
+                <span className="op-pill__b" />
+                {p.occupancy.humans} humans
+              </span>
+              <span className="op-pill op-pill--a">
+                <span className="op-pill__b" />
+                {p.occupancy.agents} agents
+              </span>
+              <span className="op-pill op-pill--live">
+                <span className="op-pill__b" />
+                {p.occupancy.active_last_5min} active
+              </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setPeekSlug(p.slug)}
-              style={{
-                alignSelf: 'flex-start',
-                padding: '6px 12px',
-                borderRadius: 8,
-                border: '1px solid #ccc',
-                background: '#fafafa',
-                cursor: 'pointer',
-              }}
-            >
-              Peek
-            </button>
+            <div style={{ padding: '16px 18px 18px', marginTop: 'auto' }}>
+              <button
+                type="button"
+                className="op-btn op-btn--yellow"
+                onClick={() => setPeekSlug(p.slug)}
+                style={{ fontSize: 12, padding: '8px 16px', borderRadius: 'var(--op-radius-sm)' }}
+              >
+                👁 Peek
+              </button>
+            </div>
           </div>
         ))}
       </div>

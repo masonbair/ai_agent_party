@@ -194,24 +194,14 @@ export default function PartySpace({
   return (
     <div
       style={{
-        width: 'min(95vw, 1000px)',
-        margin: '24px auto',
+        // Cap by height too (aspect 800/500 = 1.6) so the room never grows so
+        // tall it shoves the chat bar to the viewport edge; keeps everything high.
+        // The R/E hint now lives in the page header, so only header + chat sit
+        // outside the room — a smaller reserve lets the room ride higher.
+        width: 'min(95vw, 1000px, calc((100vh - 150px) * 1.6))',
+        margin: '0 auto',
       }}
     >
-      {principal ? (
-        <div
-          aria-live="polite"
-          style={{
-            margin: '0 auto 12px',
-            textAlign: 'center',
-            fontSize: 'clamp(14px, 1.6vw, 18px)',
-            color: '#333',
-            letterSpacing: 0.4,
-          }}
-        >
-          press <kbd>R</kbd> to react · walk near a board and press <kbd>E</kbd> to interact
-        </div>
-      ) : null}
       <div
         style={{
           width: '100%',
@@ -230,7 +220,7 @@ export default function PartySpace({
           borderRadius: party.room.borderRadius ?? 0,
           clipPath: party.room.clipPath ?? 'none',
           overflow: 'hidden',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+          boxShadow: '10px 10px 0 var(--op-shadow)',
           cursor: 'pointer',
           userSelect: 'none',
         }}

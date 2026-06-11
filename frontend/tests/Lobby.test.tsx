@@ -111,9 +111,10 @@ describe('Lobby', () => {
       </SessionIdProvider>,
     );
 
-    expect(
-      await screen.findByText(/2 humans · 3 agents · 4 active/i),
-    ).toBeInTheDocument();
+    const occupancy = await screen.findByTestId('occupancy-cream-terrazzo');
+    expect(occupancy).toHaveTextContent('2 humans');
+    expect(occupancy).toHaveTextContent('3 agents');
+    expect(occupancy).toHaveTextContent('4 active');
   });
 
   it('opens the peek modal when the Peek button is clicked', async () => {

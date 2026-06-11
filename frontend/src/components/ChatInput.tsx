@@ -119,24 +119,30 @@ export default function ChatInput({ slug, principal, disabled }: Props) {
         onKeyDown={onKeyDown}
         style={{
           width: '100%',
-          padding: '8px 12px',
+          padding: '10px 16px',
+          fontFamily: 'var(--op-font-display)',
+          fontWeight: 600,
           fontSize: 14,
           borderRadius: 999,
-          border: '1px solid #c9b58a',
-          background: disabled ? '#eee' : '#fff',
+          border: '3px solid var(--op-ink)',
+          background: disabled ? 'var(--op-paper-2)' : '#fff',
+          color: 'var(--op-ink)',
           outline: 'none',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+          boxShadow: '3px 3px 0 var(--op-shadow)',
         }}
       />
       {error && (
         <div
           role="alert"
           style={{
+            fontFamily: 'var(--op-font-mono)',
             fontSize: 12,
-            color: '#b03030',
-            background: 'rgba(255,255,255,0.9)',
+            fontWeight: 700,
+            color: 'var(--op-ink)',
+            background: 'var(--op-coral)',
+            border: '2px solid var(--op-ink)',
             padding: '2px 8px',
-            borderRadius: 6,
+            borderRadius: 8,
             alignSelf: 'flex-start',
           }}
         >
@@ -147,9 +153,12 @@ export default function ChatInput({ slug, principal, disabled }: Props) {
         <div
           aria-live="polite"
           style={{
+            fontFamily: 'var(--op-font-mono)',
             fontSize: 11,
-            color: value.length >= CHAT_MAX_LEN - 10 ? '#b86b00' : '#6a6a6a',
-            background: 'rgba(255,255,255,0.85)',
+            fontWeight: 700,
+            color: value.length >= CHAT_MAX_LEN - 10 ? 'var(--op-coral)' : 'var(--op-muted)',
+            background: 'var(--op-paper)',
+            border: '2px solid var(--op-ink)',
             padding: '1px 8px',
             borderRadius: 6,
             alignSelf: 'flex-end',
