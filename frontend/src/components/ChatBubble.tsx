@@ -13,7 +13,7 @@ type Props = {
 };
 
 const FADE_WINDOW_MS = 500;
-const DEFAULT_BORDER = '#c9b58a';
+const DEFAULT_BORDER = '#1b1714';
 
 export default function ChatBubble({
   text,
@@ -45,14 +45,15 @@ export default function ChatBubble({
           top: `${topPct}%`,
           transform: `translate(-50%, calc(-100% - ${liftPx}px))`,
           pointerEvents: 'none',
-          background: 'rgba(255,255,255,0.65)',
-          color: '#888',
-          border: `1px dashed ${borderColor}`,
-          borderRadius: 10,
-          padding: '1px 6px',
+          background: '#fff',
+          color: 'var(--op-muted)',
+          border: `2px dashed ${borderColor}`,
+          borderRadius: 12,
+          boxShadow: '2px 2px 0 var(--op-shadow)',
+          padding: '2px 7px',
           fontSize: 11,
           lineHeight: 1,
-          opacity: fading ? 0 : 0.7,
+          opacity: fading ? 0 : 0.72,
           transition: 'left 150ms linear, top 150ms linear, opacity 400ms ease-out',
           zIndex: 4,
         }}
@@ -71,13 +72,14 @@ export default function ChatBubble({
         top: `${topPct}%`,
         transform: `translate(${translateX}, calc(-100% - ${liftPx}px))`,
         pointerEvents: 'none',
-        background: 'rgba(255,255,255,0.95)',
-        color: '#2a2a2a',
-        border: `1px solid ${borderColor}`,
-        borderRadius: 10,
-        padding: '3px 8px',
+        background: '#fff',
+        color: 'var(--op-ink)',
+        border: `2px solid ${borderColor}`,
+        borderRadius: 12,
+        padding: '4px 9px',
         fontSize: 12,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
+        fontWeight: 600,
+        boxShadow: '2px 2px 0 var(--op-shadow)',
         width: 'max-content',
         maxWidth: 260,
         whiteSpace: 'normal',

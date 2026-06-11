@@ -46,7 +46,7 @@ export default function DmDrawer({
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(15, 17, 22, 0.18)',
+          background: 'rgba(27, 23, 20, 0.35)',
           zIndex: 99,
         }}
       />
@@ -60,12 +60,12 @@ export default function DmDrawer({
           right: 0,
           bottom: 0,
           width: 'min(440px, 92vw)',
-          background: 'white',
-          boxShadow: '-12px 0 32px rgba(0, 0, 0, 0.18)',
+          background: 'var(--op-paper)',
+          boxShadow: '-10px 0 0 var(--op-shadow)',
           display: 'flex',
           flexDirection: 'column',
           zIndex: 100,
-          borderLeft: '1px solid rgba(0,0,0,0.06)',
+          borderLeft: '4px solid var(--op-ink)',
         }}
       >
       <header
@@ -73,24 +73,32 @@ export default function DmDrawer({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '14px 18px',
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
+          padding: '16px 18px',
+          borderBottom: '3px solid var(--op-ink)',
         }}
       >
-        <strong style={{ fontSize: 16 }}>Direct messages</strong>
+        <strong style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.4px' }}>
+          Direct messages
+        </strong>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close direct messages"
           title="Close (Esc)"
           style={{
-            background: 'transparent',
-            border: 'none',
-            fontSize: 22,
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: 'var(--op-paper)',
+            border: '3px solid var(--op-ink)',
+            boxShadow: '2px 2px 0 var(--op-shadow)',
+            fontSize: 18,
+            fontWeight: 900,
             lineHeight: 1,
             cursor: 'pointer',
-            color: '#555',
-            padding: 4,
+            color: 'var(--op-ink)',
+            padding: 0,
+            flexShrink: 0,
           }}
         >
           ×

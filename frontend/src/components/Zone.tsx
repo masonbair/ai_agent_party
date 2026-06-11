@@ -13,22 +13,25 @@ export default function Zone({ zone }: Props) {
         width: `${zone.width}%`,
         height: `${zone.height}%`,
         background: zone.color,
-        border: `3px solid ${zone.borderColor}`,
-        borderRadius: 6,
+        border: '3px solid var(--op-ink)',
+        borderRadius: 8,
         pointerEvents: 'none',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.10)',
+        boxShadow: '3px 3px 0 var(--op-shadow)',
       }}
     >
       <div
         style={{
           position: 'absolute',
-          top: 8,
-          left: 8,
-          color: zone.labelColor,
-          fontSize: 12,
+          top: 6,
+          left: 6,
+          background: 'var(--op-ink)',
+          color: '#fff',
+          padding: '2px 7px',
+          borderRadius: 999,
+          fontFamily: 'var(--op-font-mono)',
+          fontSize: 10,
           fontWeight: 700,
-          letterSpacing: 1.5,
-          textShadow: '0 1px 2px rgba(0,0,0,0.25)',
+          letterSpacing: 1,
         }}
       >
         {zone.label}

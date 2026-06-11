@@ -48,11 +48,11 @@ export default function DmThreadView({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <header
         style={{
-          padding: '10px 16px',
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
+          padding: '12px 16px',
+          borderBottom: '3px solid var(--op-ink)',
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
+          gap: 10,
         }}
       >
         <button
@@ -60,15 +60,26 @@ export default function DmThreadView({
           onClick={onBack}
           aria-label="Back to thread list"
           style={{
-            background: 'transparent',
-            border: 'none',
-            fontSize: 18,
+            width: 30,
+            height: 30,
+            borderRadius: 999,
+            background: 'var(--op-paper)',
+            border: '3px solid var(--op-ink)',
+            boxShadow: '2px 2px 0 var(--op-shadow)',
+            fontSize: 16,
+            fontWeight: 900,
+            lineHeight: 1,
             cursor: 'pointer',
+            color: 'var(--op-ink)',
+            padding: 0,
+            flexShrink: 0,
           }}
         >
           ←
         </button>
-        <strong>{otherName}</strong>
+        <strong style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.3px' }}>
+          {otherName}
+        </strong>
       </header>
       <div
         style={{
@@ -93,14 +104,28 @@ export default function DmThreadView({
               key={m.id}
               style={{
                 alignSelf: mine ? 'flex-end' : 'flex-start',
-                background: mine ? '#ffd2e2' : '#f1f1f1',
-                padding: '6px 10px',
-                borderRadius: 12,
+                background: mine ? 'var(--op-coral)' : 'var(--op-paper-2)',
+                color: 'var(--op-ink)',
+                border: '2px solid var(--op-ink)',
+                boxShadow: '2px 2px 0 var(--op-shadow)',
+                padding: '7px 11px',
+                borderRadius: 'var(--op-radius-sm)',
                 maxWidth: '80%',
               }}
             >
-              <div style={{ fontSize: 11, color: '#888' }}>{m.sender_name}</div>
-              <div>{m.text}</div>
+              <div
+                style={{
+                  fontFamily: 'var(--op-font-mono)',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 0.3,
+                  opacity: 0.75,
+                  marginBottom: 1,
+                }}
+              >
+                {m.sender_name}
+              </div>
+              <div style={{ fontWeight: 600 }}>{m.text}</div>
             </div>
           );
         })}

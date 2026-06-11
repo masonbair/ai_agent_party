@@ -97,7 +97,7 @@ describe('ChatBubble', () => {
     );
     const el = screen.getByText('hi').parentElement!;
     // jsdom normalizes hex to rgb in border shorthand; assert the color is present.
-    expect(el.style.border).toContain('1px solid');
+    expect(el.style.border).toContain('2px solid');
     expect(el.style.borderColor || el.style.border).toMatch(/77, 208, 225|#4dd0e1/);
   });
 

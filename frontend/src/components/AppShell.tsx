@@ -156,25 +156,25 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                background: 'white',
-                border: '1px solid rgba(0,0,0,0.08)',
+                fontFamily: 'var(--op-font-display)',
+                background: 'var(--op-paper)',
+                border: '3px solid var(--op-ink)',
                 borderRadius: 999,
-                padding: '6px 12px 6px 6px',
-                boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+                padding: '6px 14px 6px 6px',
+                boxShadow: '4px 4px 0 var(--op-shadow)',
                 cursor: 'pointer',
                 animation: 'dm-toast-in 180ms ease-out',
-                maxWidth: 260,
+                maxWidth: 280,
               }}
             >
               <span
                 aria-hidden="true"
                 style={{
-                  width: 22,
-                  height: 22,
+                  width: 24,
+                  height: 24,
                   borderRadius: '50%',
                   background: toast.sender_color ?? '#999',
-                  border: '2px solid white',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                  border: '3px solid var(--op-ink)',
                   flexShrink: 0,
                 }}
               />
@@ -189,7 +189,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 }}
               >
                 <strong>{toast.sender_name}</strong>
-                <span style={{ color: '#666' }}> {toast.text}</span>
+                <span style={{ color: 'var(--op-muted)' }}> {toast.text}</span>
               </span>
             </button>
           ) : null}

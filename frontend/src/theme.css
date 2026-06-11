@@ -1,0 +1,263 @@
+/* openParty — Memphis Pop design system
+ * Tokens + base styles + reusable component classes.
+ * Loaded after styles.css so these win. Keep visual decisions here, not inline. */
+
+:root {
+  /* surfaces */
+  --op-paper: #fbf6ea;
+  --op-paper-2: #f3ecda;
+  --op-ink: #1b1714;
+
+  /* the pop palette */
+  --op-teal: #12b6a8;
+  --op-coral: #ff5a5f;
+  --op-yellow: #ffce3a;
+  --op-blue: #2f6bff;
+  --op-purple: #9a5bd6;
+
+  /* ink tints for body copy — muted clears WCAG AA (4.5:1) on paper + paper-2;
+     faint is decorative / placeholder use only (not body text) */
+  --op-muted: #6f6357;
+  --op-faint: #9a8d7c;
+
+  /* structure */
+  --op-shadow: #1b1714;
+  --op-bw: 3px; /* standard chunky border */
+  --op-bw-thick: 4px; /* card / hero border */
+  --op-radius: 14px;
+  --op-radius-sm: 10px;
+
+  /* type */
+  --op-font-display: 'Archivo', system-ui, sans-serif;
+  --op-font-mono: 'Space Mono', ui-monospace, monospace;
+}
+
+/* ---- base ---- */
+body {
+  font-family: var(--op-font-display);
+  color: var(--op-ink);
+  background-color: var(--op-paper);
+  /* halftone grain */
+  background-image: radial-gradient(var(--op-ink) 0.9px, transparent 1px);
+  background-size: 6px 6px;
+  -webkit-font-smoothing: antialiased;
+  /* decorative confetti / offset shadows must never spawn a horizontal scrollbar */
+  overflow-x: hidden;
+}
+
+h1, h2, h3 {
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+
+::selection {
+  background: var(--op-yellow);
+  color: var(--op-ink);
+}
+
+kbd {
+  font-family: var(--op-font-mono);
+  font-size: 0.85em;
+  font-weight: 700;
+  background: var(--op-paper);
+  border: 2px solid var(--op-ink);
+  border-radius: 6px;
+  box-shadow: 2px 2px 0 var(--op-shadow);
+  padding: 1px 6px;
+  color: var(--op-ink);
+}
+
+/* ---- card ---- */
+.op-card {
+  background: var(--op-paper);
+  border: var(--op-bw-thick) solid var(--op-ink);
+  border-radius: var(--op-radius);
+  box-shadow: 8px 8px 0 var(--op-shadow);
+}
+
+/* ---- plate: solid backing so page text never sits on the grain ---- */
+.op-plate {
+  display: inline-block;
+  background: var(--op-paper);
+  border: var(--op-bw) solid var(--op-ink);
+  border-radius: var(--op-radius);
+  box-shadow: 4px 4px 0 var(--op-shadow);
+  padding: 8px 16px;
+}
+
+/* lobby card lifts on hover */
+.op-lobby-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.op-lobby-card:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 12px 12px 0 var(--op-shadow);
+}
+
+/* ---- label (mono eyebrow) ---- */
+.op-label {
+  font-family: var(--op-font-mono);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--op-muted);
+}
+
+/* ---- text field ---- */
+.op-field {
+  width: 100%;
+  font-family: var(--op-font-display);
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--op-ink);
+  background: var(--op-paper-2);
+  border: var(--op-bw) solid var(--op-ink);
+  border-radius: 12px;
+  padding: 13px 15px;
+  outline: none;
+  transition: box-shadow 0.14s ease, transform 0.14s ease;
+}
+.op-field::placeholder { color: var(--op-faint); }
+.op-field:focus {
+  box-shadow: 5px 5px 0 var(--op-blue);
+  transform: translate(-1px, -1px);
+}
+.op-field:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ---- button ---- */
+.op-btn {
+  font-family: var(--op-font-display);
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--op-ink);
+  background: var(--op-paper);
+  border: var(--op-bw) solid var(--op-ink);
+  border-radius: 12px;
+  padding: 12px 20px;
+  cursor: pointer;
+  box-shadow: 5px 5px 0 var(--op-shadow);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.op-btn:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--op-shadow); }
+.op-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--op-shadow); }
+.op-btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+  opacity: 0.55;
+  transform: none;
+  box-shadow: 3px 3px 0 var(--op-shadow);
+}
+/* keyboard focus ring — mirrors the field's Memphis blue focus treatment */
+.op-btn:focus-visible {
+  outline: none;
+  box-shadow: 5px 5px 0 var(--op-blue);
+  transform: translate(-1px, -1px);
+}
+/* ink text on coral clears WCAG AA (5.8:1); white on coral was 3.05:1 */
+.op-btn--coral { background: var(--op-coral); color: var(--op-ink); }
+.op-btn--teal { background: var(--op-teal); color: #fff; }
+.op-btn--yellow { background: var(--op-yellow); color: var(--op-ink); }
+.op-btn--ink { background: var(--op-ink); color: var(--op-paper); }
+
+/* arrow nudge for buttons that contain a .op-btn__arrow */
+.op-btn__arrow { transition: transform 0.15s ease; }
+.op-btn:hover:not(:disabled) .op-btn__arrow { transform: translateX(5px); }
+
+/* ---- pill (occupancy / status) ---- */
+.op-pill {
+  font-family: var(--op-font-mono);
+  font-weight: 700;
+  font-size: 10.5px;
+  border: var(--op-bw) solid var(--op-ink);
+  border-radius: 999px;
+  padding: 4px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--op-paper);
+  color: var(--op-ink);
+}
+/* ink ring keeps each dot legible against its tinted pill bg (redundant cue) */
+.op-pill__b {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--op-ink);
+  box-shadow: 0 0 0 1.5px var(--op-ink);
+}
+.op-pill--h { background: #e1ecff; }
+.op-pill--h .op-pill__b { background: var(--op-blue); }
+.op-pill--a { background: #d8f6f2; }
+.op-pill--a .op-pill__b { background: var(--op-teal); }
+.op-pill--live { background: var(--op-coral); color: var(--op-ink); }
+.op-pill--live .op-pill__b { background: #fff; animation: op-blink 1.1s steps(1) infinite; }
+@keyframes op-blink { 50% { opacity: 0.25; } }
+
+/* ---- color swatch (radio) ---- */
+.op-swatch {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: var(--op-bw) solid var(--op-ink);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 2px 2px 0 var(--op-shadow);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+}
+.op-swatch:hover { transform: translateY(-4px) rotate(-6deg); }
+.op-swatch[data-selected='true'] {
+  transform: scale(1.14);
+  box-shadow: 3px 3px 0 var(--op-shadow), 0 0 0 3px var(--op-paper), 0 0 0 6px var(--op-ink);
+}
+/* The visible swatch is a sibling of a visually-hidden radio; surface keyboard
+   focus on the radio as a blue ring on the swatch (distinct from the ink selected ring). */
+input[type='radio']:focus-visible + .op-swatch {
+  box-shadow: 2px 2px 0 var(--op-shadow), 0 0 0 3px var(--op-paper), 0 0 0 6px var(--op-blue);
+}
+
+/* tiny decorative confetti shapes for hero corners */
+.op-shape { position: absolute; pointer-events: none; }
+.op-shape--dot { border-radius: 50%; border: var(--op-bw) solid var(--op-ink); }
+.op-shape--tri {
+  width: 0; height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-bottom: 28px solid var(--op-blue);
+}
+
+/* ---- motion accessibility (WCAG 2.3.3) ----
+ * Neutralize decorative motion for users who ask for reduced motion.
+ * Box-shadow focus/selection cues stay intact, so nothing becomes ambiguous. */
+@media (prefers-reduced-motion: reduce) {
+  .op-lobby-card,
+  .op-lobby-card:hover,
+  .op-btn,
+  .op-btn:hover,
+  .op-btn:active,
+  .op-btn:focus-visible,
+  .op-btn__arrow,
+  .op-btn:hover:not(:disabled) .op-btn__arrow,
+  .op-field,
+  .op-field:focus,
+  .op-swatch,
+  .op-swatch:hover,
+  .op-swatch[data-selected='true'] {
+    transition: none !important;
+    transform: none !important;
+  }
+  .op-pill--live .op-pill__b {
+    animation: none !important;
+  }
+}

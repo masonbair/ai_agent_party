@@ -99,11 +99,11 @@ export function RadialReactionPicker({
               width: BUTTON_PX,
               height: BUTTON_PX,
               borderRadius: '50%',
-              border: active ? '3px solid #ff6b9d' : '2px solid #d6d2c4',
-              background: active ? '#fff' : 'rgba(255,255,255,0.9)',
+              border: active ? '3px solid var(--op-coral)' : '3px solid var(--op-ink)',
+              background: 'var(--op-paper)',
               boxShadow: active
-                ? '0 0 0 5px rgba(255,107,157,0.25), 0 8px 18px rgba(0,0,0,0.3)'
-                : '0 5px 12px rgba(0,0,0,0.2)',
+                ? '3px 3px 0 var(--op-shadow), 0 0 0 4px var(--op-paper), 0 0 0 7px var(--op-coral)'
+                : '3px 3px 0 var(--op-shadow)',
               cursor: 'pointer',
               pointerEvents: 'auto',
               fontSize: EMOJI_PX,

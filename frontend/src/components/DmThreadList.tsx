@@ -9,7 +9,15 @@ type Props = {
 export default function DmThreadList({ threads, unreadCount, onOpen }: Props) {
   if (threads.length === 0) {
     return (
-      <p style={{ padding: 24, color: '#888', textAlign: 'center' }}>
+      <p
+        style={{
+          padding: 24,
+          color: 'var(--op-muted)',
+          fontFamily: 'var(--op-font-mono)',
+          fontSize: 13,
+          textAlign: 'center',
+        }}
+      >
         No threads yet — open a DM by clicking someone's avatar.
       </p>
     );
@@ -34,24 +42,26 @@ export default function DmThreadList({ threads, unreadCount, onOpen }: Props) {
               style={{
                 width: '100%',
                 textAlign: 'left',
-                padding: '12px 16px',
+                padding: '13px 16px',
                 background: 'transparent',
                 border: 'none',
-                borderBottom: '1px solid rgba(0,0,0,0.06)',
+                borderBottom: '2px solid var(--op-ink)',
                 cursor: 'pointer',
                 display: 'flex',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 gap: 8,
               }}
             >
               <span style={{ flex: 1, overflow: 'hidden' }}>
-                <strong style={{ display: 'block' }}>
+                <strong style={{ display: 'block', fontWeight: 800 }}>
                   {t.last_sender_name}
                 </strong>
                 <span
                   style={{
-                    color: '#666',
-                    fontSize: 13,
+                    color: 'var(--op-muted)',
+                    fontFamily: 'var(--op-font-mono)',
+                    fontSize: 12,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -65,14 +75,17 @@ export default function DmThreadList({ threads, unreadCount, onOpen }: Props) {
                 <span
                   aria-label={`${unread} unread`}
                   style={{
-                    background: '#ff6b9d',
-                    color: 'white',
+                    background: 'var(--op-coral)',
+                    color: '#fff',
+                    border: '2px solid var(--op-ink)',
                     borderRadius: 999,
-                    padding: '0 8px',
+                    padding: '0 7px',
                     fontSize: 12,
+                    fontWeight: 800,
                     lineHeight: '20px',
-                    minWidth: 20,
-                    height: 20,
+                    minWidth: 22,
+                    height: 22,
+                    textAlign: 'center',
                     alignSelf: 'center',
                   }}
                 >

@@ -39,9 +39,9 @@ describe('PartyPeekModal', () => {
 
   it('fetches and renders the preview payload', async () => {
     render(<PartyPeekModal slug="cream-terrazzo" onClose={() => {}} />);
-    expect(
-      await screen.findByText(/2 humans · 3 agents · 4 active/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/2 humans/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 agents/i)).toBeInTheDocument();
+    expect(screen.getByText(/4 active/i)).toBeInTheDocument();
     expect(screen.getByText(/lighting:\s*dusk/i)).toBeInTheDocument();
     expect(screen.getByText(/music:\s*Lo-fi/i)).toBeInTheDocument();
     expect(screen.getByText(/alice:\s*hello world/i)).toBeInTheDocument();

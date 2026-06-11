@@ -35,10 +35,12 @@ describe('Zone', () => {
     expect(el.style.height).toBe('36%');
   });
 
-  it('uses solid fill color and a border in borderColor', () => {
+  it('uses solid fill color and a chunky ink border', () => {
     render(<Zone zone={zone} />);
     const el = screen.getByLabelText('zone-dance') as HTMLElement;
     expect(el.style.background).toContain('rgb(255, 107, 157)');
-    expect(el.style.border).toContain('rgb(139, 26, 74)');
+    // Memphis Pop: zones use a uniform thick ink border, not per-zone borderColor.
+    expect(el.style.border).toContain('3px solid');
+    expect(el.style.border).toContain('var(--op-ink)');
   });
 });

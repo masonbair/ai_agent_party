@@ -5,12 +5,9 @@ export const creamTerrazzo: PartyConfig = {
   name: 'Cream Terrazzo Lounge',
   description: 'A bright, friendly room with bold pastel zones.',
   theme: {
-    floor:
-      '#f4ead5 radial-gradient(circle 2px at 10% 20%, #c0a070 1px, transparent 2px), ' +
-      'radial-gradient(circle 2px at 40% 60%, #a85d3a 1px, transparent 2px), ' +
-      'radial-gradient(circle 2px at 70% 30%, #c0a070 1px, transparent 2px), ' +
-      'radial-gradient(circle 2px at 85% 80%, #8b6f47 1px, transparent 2px), ' +
-      'radial-gradient(circle 2px at 25% 85%, #c0a070 1px, transparent 2px)',
+    // Flat, opaque fill — one straight color so the page grain doesn't show
+    // through the room floor (mirrors backend parties_data.py).
+    floor: '#f4ead5',
     accent: '#ff6b9d',
   },
   zones: [

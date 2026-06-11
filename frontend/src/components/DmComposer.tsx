@@ -1,10 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { CHAT_MAX_LEN, validateChatText } from '../api/validation';
 
 const NOT_CO_LOCATED_REASONS: Record<string, string> = {
   not_present: "You're not in any party right now.",
   recipient_not_present: "The other person isn't in any party right now.",
   not_co_located: "You're not at the same party.",
+};
+
+const dmAlertStyle: CSSProperties = {
+  fontFamily: 'var(--op-font-mono)',
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'var(--op-ink)',
+  background: 'var(--op-coral)',
+  border: '2px solid var(--op-ink)',
+  borderRadius: 8,
+  padding: '4px 8px',
+  marginBottom: 6,
 };
 
 type Props = {
@@ -70,20 +82,17 @@ export default function DmComposer({
     <div
       style={{
         padding: 12,
-        borderTop: '1px solid rgba(0,0,0,0.06)',
-        background: explanatory ? '#faf3f3' : '#fafafa',
+        borderTop: '3px solid var(--op-ink)',
+        background: explanatory ? '#fff3d6' : 'var(--op-paper)',
       }}
     >
       {explanatory ? (
-        <div
-          role="alert"
-          style={{ fontSize: 12, color: '#a33', marginBottom: 6 }}
-        >
+        <div role="alert" style={dmAlertStyle}>
           {explanatory}
         </div>
       ) : null}
       {localError ? (
-        <div role="alert" style={{ fontSize: 12, color: '#a33', marginBottom: 6 }}>
+        <div role="alert" style={dmAlertStyle}>
           {localError}
         </div>
       ) : null}
@@ -96,11 +105,11 @@ export default function DmComposer({
           display: 'flex',
           alignItems: 'flex-end',
           gap: 8,
-          background: 'white',
-          border: `1px solid ${focused ? '#7a5cff' : '#e2e2e6'}`,
+          background: '#fff',
+          border: `3px solid ${focused ? 'var(--op-blue)' : 'var(--op-ink)'}`,
           boxShadow: focused
-            ? '0 0 0 3px rgba(122, 92, 255, 0.15)'
-            : '0 1px 2px rgba(0,0,0,0.03)',
+            ? '3px 3px 0 var(--op-blue)'
+            : '3px 3px 0 var(--op-shadow)',
           borderRadius: 14,
           padding: 8,
           transition: 'border-color 120ms ease, box-shadow 120ms ease',
@@ -129,7 +138,9 @@ export default function DmComposer({
             border: 'none',
             outline: 'none',
             resize: 'none',
-            fontFamily: 'inherit',
+            fontFamily: 'var(--op-font-display)',
+            fontWeight: 600,
+            color: 'var(--op-ink)',
             fontSize: 14,
             lineHeight: 1.4,
             background: 'transparent',
@@ -141,13 +152,16 @@ export default function DmComposer({
           disabled={disabledForSend}
           aria-label="Send message"
           style={{
-            background: disabledForSend ? '#d6d6da' : '#7a5cff',
-            color: 'white',
-            border: 'none',
+            background: disabledForSend ? 'var(--op-paper-2)' : 'var(--op-coral)',
+            color: 'var(--op-ink)',
+            border: '3px solid var(--op-ink)',
             borderRadius: 10,
             padding: '8px 14px',
-            fontWeight: 600,
+            fontFamily: 'var(--op-font-display)',
+            fontWeight: 900,
             cursor: disabledForSend ? 'not-allowed' : 'pointer',
+            boxShadow: disabledForSend ? 'none' : '2px 2px 0 var(--op-shadow)',
+            opacity: disabledForSend ? 0.55 : 1,
             transition: 'background 120ms ease',
           }}
         >
